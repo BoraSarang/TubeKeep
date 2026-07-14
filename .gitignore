@@ -1,0 +1,6 @@
+.build/
+.build_cache/
+.cache/
+Releases/
+*.zip
+.DS_Store
