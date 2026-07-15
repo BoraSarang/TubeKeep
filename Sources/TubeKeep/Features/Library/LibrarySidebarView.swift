@@ -1,0 +1,382 @@
+import SwiftUI
+import ComposableArchitecture
+
+struct LibrarySidebarView: View {
+    let store: StoreOf<AppReducer>
+    @State private var channelNames: [(id: String, name: String, count: Int)] = []
+    @State private var avatarImages: [String: NSImage] = [:]
+    @State private var draggedChannelId: String?
+    @State private var dropTargetIndex: Int?
+    @AppStorage(Constants.channelOrderKey) private var channelOrderData: Data = Data()
+
+    private var channelOrder: [String] {
+        get { (try? JSONDecoder().decode([String].self, from: channelOrderData)) ?? [] }
+        set { channelOrderData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    private func saveChannelOrder() {
+        let order = channelNames.map(\.id)
+        if let data = try? JSONEncoder().encode(order) {
+            UserDefaults.standard.set(data, forKey: Constants.channelOrderKey)
+        }
+    }
+
+    private func moveChannel(from source: Int, to destination: Int) {
+        guard source != destination else { return }
+        channelNames.move(fromOffsets: IndexSet(integer: source), toOffset: destination > source ? destination + 1 : destination)
+        saveChannelOrder()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            searchField
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+
+            Divider()
+
+            filterSection
+                .padding(.vertical, 4)
+
+            Divider()
+
+            channelList
+
+            Divider()
+
+            Button {
+                let dir = store.settings.storageDirectory
+                let url = URL(fileURLWithPath: dir)
+                NSWorkspace.shared.open(url)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 12))
+                    Text("Finder에서 보기")
+                        .font(.system(size: 12))
+                    Spacer()
+                    Text(formatBytes(store.library.diskUsageBytes))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .help("용량 새로고침")
+                        .onTapGesture {
+                            store.send(.library(.calculateDiskUsage))
+                        }
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                        .help("용량 새로고침")
+                        .onTapGesture {
+                            store.send(.library(.calculateDiskUsage))
+                        }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .background(Color(.windowBackgroundColor))
+        .onChange(of: store.library.items) { newItems in
+            updateChannelNames(newItems)
+        }
+        .onAppear {
+            updateChannelNames(store.library.items)
+            store.send(.library(.calculateDiskUsage))
+        }
+    }
+
+    // MARK: - Search
+
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 12))
+            TextField("검색...", text: Binding(
+                get: { store.library.searchText },
+                set: { store.send(.library(.setSearchText($0))) }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 12))
+
+            if !store.library.searchText.isEmpty {
+                Button {
+                    store.send(.library(.setSearchText("")))
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(Color(.textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    // MARK: - Filter
+
+    private var filterSection: some View {
+        VStack(spacing: 2) {
+            filterRow(
+                title: "전체",
+                count: store.library.items.count,
+                isSelected: store.library.filterMode == .all && store.library.selectedChannel == nil
+            ) {
+                store.send(.library(.setFilterMode(.all)))
+                store.send(.library(.setSelectedChannel(nil)))
+            }
+
+            filterRow(
+                title: "최근",
+                count: recentCount,
+                isSelected: store.library.filterMode == .recent
+            ) {
+                store.send(.library(.setFilterMode(.recent)))
+                store.send(.library(.setSelectedChannel(nil)))
+            }
+        }
+    }
+
+    private var recentCount: Int {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return store.library.items.filter { $0.downloadDate >= cutoff }.count
+    }
+
+    private func filterRow(title: String, count: Int, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                Spacer()
+                Text("\(count)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Channel List
+
+    private var channelList: some View {
+        VStack(spacing: 0) {
+            channelHeader
+                .padding(.top, 4)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(Array(channelNames.enumerated()), id: \.element.id) { index, channel in
+                        channelRow(channel, index: index)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            Divider()
+
+            Button {
+                NotificationCenter.default.post(name: Constants.openChannelWindowNotification, object: nil)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 12))
+                    Text("채널 추가")
+                        .font(.system(size: 12))
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var channelHeader: some View {
+        HStack {
+            Text("채널")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private func channelRow(_ channel: (id: String, name: String, count: Int), index: Int) -> some View {
+        let isSelected = store.library.filterMode == .all && store.library.selectedChannel == channel.id
+        let isDropTarget = dropTargetIndex == index
+        return HStack(spacing: 6) {
+            Image(systemName: "line.horizontal.3")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .help("드래그하여 순서 변경")
+
+            avatarView(for: channel.id)
+                .frame(width: 20, height: 20)
+
+            Text(channel.name)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : .primary)
+
+            Spacer()
+
+            Text("\(channel.count)")
+                .font(.system(size: 11))
+                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor : isDropTarget ? Color.accentColor.opacity(0.08) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            store.send(.library(.setFilterMode(.all)))
+            store.send(.library(.setSelectedChannel(channel.id)))
+        }
+        .contextMenu {
+            Button("채널로 가기") {
+                openChannelURL(channel.id)
+            }
+            Button("채널 다운로더 실행") {
+                NotificationCenter.default.post(
+                    name: Constants.openChannelWithIdNotification,
+                    object: nil,
+                    userInfo: ["channelId": channel.id, "channelName": channel.name]
+                )
+            }
+            Divider()
+            Button("위로 이동") {
+                guard index > 0 else { return }
+                moveChannel(from: index, to: index - 1)
+            }
+            .disabled(index == 0)
+            Button("아래로 이동") {
+                guard index < channelNames.count - 1 else { return }
+                moveChannel(from: index, to: index + 1)
+            }
+            .disabled(index == channelNames.count - 1)
+        }
+        .onDrag {
+            draggedChannelId = channel.id
+            return NSItemProvider(object: channel.id as NSString)
+        }
+        .onDrop(of: [.text], delegate: ChannelDropDelegate(
+            channel: channel,
+            currentIndex: index,
+            channelNames: $channelNames,
+            draggedChannelId: $draggedChannelId,
+            dropTargetIndex: $dropTargetIndex,
+            onMove: moveChannel
+        ))
+    }
+
+    private func openChannelURL(_ channelId: String) {
+        let urlString = "https://youtube.com/channel/\(channelId)"
+        guard let url = URL(string: urlString) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - Avatar
+
+    private func avatarView(for channelId: String) -> some View {
+        Group {
+            if let img = avatarImages[channelId] {
+                Image(nsImage: img)
+                    .resizable()
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .resizable()
+                    .foregroundStyle(.secondary)
+                    .onAppear {
+                        loadAvatar(channelId: channelId)
+                    }
+            }
+        }
+        .frame(width: 20, height: 20)
+    }
+
+    private func loadAvatar(channelId: String) {
+        guard avatarImages[channelId] == nil else { return }
+        let service = LibraryCacheService.shared
+        Task {
+            if let cached = await service.cachedAvatar(for: channelId) {
+                await MainActor.run { avatarImages[channelId] = cached }
+                return
+            }
+            await MainActor.run { avatarImages[channelId] = service.placeholderAvatar() }
+        }
+    }
+
+// MARK: - Drop Delegate
+
+private struct ChannelDropDelegate: DropDelegate {
+    let channel: (id: String, name: String, count: Int)
+    let currentIndex: Int
+    @Binding var channelNames: [(id: String, name: String, count: Int)]
+    @Binding var draggedChannelId: String?
+    @Binding var dropTargetIndex: Int?
+    let onMove: (Int, Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        dropTargetIndex = currentIndex
+    }
+
+    func dropExited(info: DropInfo) {
+        if dropTargetIndex == currentIndex {
+            dropTargetIndex = nil
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer { dropTargetIndex = nil }
+        guard let draggedId = draggedChannelId,
+              let fromIdx = channelNames.firstIndex(where: { $0.id == draggedId }),
+              fromIdx != currentIndex
+        else {
+            draggedChannelId = nil
+            return false
+        }
+        onMove(fromIdx, currentIndex)
+        draggedChannelId = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+    // MARK: - Helpers
+
+    private func updateChannelNames(_ items: [LibraryItem]) {
+        Task {
+            let names = await LibraryCacheService.shared.channelNames(from: items)
+            await MainActor.run {
+                let order = channelOrder
+                channelNames = names.sorted { a, b in
+                    guard let ai = order.firstIndex(of: a.id),
+                          let bi = order.firstIndex(of: b.id) else {
+                        return order.contains(a.id) && !order.contains(b.id)
+                    }
+                    return ai < bi
+                }
+            }
+        }
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+}

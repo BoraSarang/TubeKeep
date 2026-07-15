@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "동영상 다운로더",
+    name: "TubeKeep",
     platforms: [.macOS(.v13)],
     dependencies: [
         .package(
@@ -12,7 +12,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "MDownload",
+            name: "TubeKeep",
             dependencies: [
                 .product(
                     name: "ComposableArchitecture",

@@ -5,23 +5,23 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>ko_KR</string>
     <key>CFBundleDisplayName</key>
-    <string>Video Downloader</string>
+    <string>TubeKeep</string>
     <key>CFBundleExecutable</key>
-    <string>VideoDownloader</string>
+    <string>TubeKeep</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.mdownload.videodownloader</string>
+    <string>com.tubekeep</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>VideoDownloader</string>
+    <string>튜브킵 (TubeKeep)</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.2.0</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
@@ -34,5 +34,16 @@
     <true/>
     <key>NSSupportsSuddenTermination</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.tubekeep</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>tubekeep</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

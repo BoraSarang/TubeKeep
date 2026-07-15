@@ -1,55 +1,67 @@
 #!/bin/bash
 set -e
 
-# Terminate any running instance first
-pkill -f "VideoDownloader" 2>/dev/null || true
+# Terminate any running instances
+pkill -f "TubeKeep" 2>/dev/null || true
 
 BUILD_MODE="${1:-release}"
+CLEAN=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --clean) CLEAN=true ;;
+    esac
+done
 
 if [ "$BUILD_MODE" != "release" ] && [ "$BUILD_MODE" != "debug" ]; then
-    echo "Usage: $0 [release|debug]"
+    echo "Usage: $0 [release|debug] [--clean]"
     echo "  default: release"
+    echo "  --clean: run 'swift package clean' before build"
     exit 1
 fi
 
-BUNDLE_NAME="VideoDownloader"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/.build"
-APP_BUNDLE="/tmp/VideoDownloader-build/$BUNDLE_NAME.app"
+
+cd "$PROJECT_DIR"
+$CLEAN && echo "🧹 Cleaning..." && swift package clean
 
 echo "🔨 Building ($BUILD_MODE)..."
-cd "$PROJECT_DIR"
 
 if [ "$BUILD_MODE" = "debug" ]; then
     swift build -c debug
-    EXECUTABLE="$BUILD_DIR/debug/MDownload"
+    EXECUTABLE="$BUILD_DIR/debug/TubeKeep"
 else
     swift build -c release
-    EXECUTABLE="$BUILD_DIR/release/MDownload"
+    EXECUTABLE="$BUILD_DIR/release/TubeKeep"
 fi
 
-echo "📦 Creating .app bundle..."
-rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_BUNDLE/Contents/MacOS"
-mkdir -p "$APP_BUNDLE/Contents/Resources"
+APP_BUNDLE_BASE="/tmp/TubeKeep-build"
+rm -rf "$APP_BUNDLE_BASE"
 
-cp "$EXECUTABLE" "$APP_BUNDLE/Contents/MacOS/VideoDownloader"
-cp "$PROJECT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
-cp "$PROJECT_DIR/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+# ──────────────────────────────────────────────
+# Main app: TubeKeep.app
+# ──────────────────────────────────────────────
+echo "📦 Creating TubeKeep.app..."
+MAIN_BUNDLE="$APP_BUNDLE_BASE/TubeKeep.app"
+mkdir -p "$MAIN_BUNDLE/Contents/MacOS"
+mkdir -p "$MAIN_BUNDLE/Contents/Resources"
 
-# Copy localizations
+cp "$EXECUTABLE" "$MAIN_BUNDLE/Contents/MacOS/TubeKeep"
+cp "$PROJECT_DIR/Info.plist" "$MAIN_BUNDLE/Contents/Info.plist"
+cp "$PROJECT_DIR/AppIcon.icns" "$MAIN_BUNDLE/Contents/Resources/"
+
 for lang in en ko; do
     SRC="$PROJECT_DIR/Resources/$lang.lproj"
     if [ -d "$SRC" ]; then
-        cp -r "$SRC" "$APP_BUNDLE/Contents/Resources/"
+        cp -r "$SRC" "$MAIN_BUNDLE/Contents/Resources/"
     fi
 done
 
-# Bundle external dependencies
-RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
+RESOURCES_DIR="$MAIN_BUNDLE/Contents/Resources"
 CACHE_DIR="$PROJECT_DIR/.build_cache"
 
-# yt-dlp: install as Python library via pip, then create launcher script
+# yt-dlp
 mkdir -p "$CACHE_DIR"
 if [ -d "$CACHE_DIR/yt-dlp-lib" ]; then
     cp -r "$CACHE_DIR/yt-dlp-lib" "$RESOURCES_DIR/yt-dlp-lib"
@@ -66,12 +78,10 @@ else
         rm -rf "$CACHE_DIR/yt-dlp-lib"
         if $PYTHON -m pip install --target "$CACHE_DIR/yt-dlp-lib" yt-dlp 2>&1 | tail -3; then
             cp -r "$CACHE_DIR/yt-dlp-lib" "$RESOURCES_DIR/yt-dlp-lib"
-            # Create launcher script that finds Python at runtime
             cat > "$CACHE_DIR/yt-dlp-launcher" << 'LAUNCHER'
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
 PYTHON=""
-# 우선순위: Homebrew → MacPorts → Xcode/usr → PATH
 for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /opt/local/bin/python3 /usr/bin/python3; do
     [ -x "$p" ] && { PYTHON="$p"; break; }
 done
@@ -91,9 +101,9 @@ LAUNCHER
             if command -v yt-dlp &> /dev/null; then
                 cp "$(command -v yt-dlp)" "$RESOURCES_DIR/yt-dlp"
                 chmod +x "$RESOURCES_DIR/yt-dlp"
-                echo "📦 yt-dlp bundled from system (Python script, may have path issues)"
+                echo "📦 yt-dlp bundled from system"
             else
-                echo "⬇️  Falling back to standalone yt-dlp (may be slow)..."
+                echo "⬇️  Falling back to standalone yt-dlp..."
                 curl -# -f -L -o "$RESOURCES_DIR/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
                 chmod +x "$RESOURCES_DIR/yt-dlp"
             fi
@@ -104,14 +114,14 @@ LAUNCHER
             cp "$(command -v yt-dlp)" "$RESOURCES_DIR/yt-dlp"
             chmod +x "$RESOURCES_DIR/yt-dlp"
         else
-            echo "⬇️  Falling back to standalone yt-dlp (may be slow)..."
+            echo "⬇️  Falling back to standalone yt-dlp..."
             curl -# -f -L -o "$RESOURCES_DIR/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
             chmod +x "$RESOURCES_DIR/yt-dlp"
         fi
     fi
 fi
 
-# ffmpeg: static build from evermeet.cx (fully self-contained, no dylib deps)
+# ffmpeg
 if [ -f "$CACHE_DIR/ffmpeg" ]; then
     cp "$CACHE_DIR/ffmpeg" "$RESOURCES_DIR/ffmpeg"
     echo "📦 ffmpeg from cache"
@@ -140,7 +150,7 @@ else
         if command -v ffmpeg &> /dev/null; then
             cp "$(command -v ffmpeg)" "$RESOURCES_DIR/ffmpeg"
             chmod +x "$RESOURCES_DIR/ffmpeg"
-            echo "📦 ffmpeg bundled from system (may have library issues on other Macs)"
+            echo "📦 ffmpeg bundled from system"
         else
             echo "❌ ffmpeg not found. Please install: brew install ffmpeg"
             exit 1
@@ -148,13 +158,20 @@ else
     fi
 fi
 
-# Install to ~/Applications/ (no sudo needed, TCC-free, Spotlight-searchable)
+# ──────────────────────────────────────────────
+# Install to ~/Applications/
+# ──────────────────────────────────────────────
 INSTALL_DIR="$HOME/Applications"
 mkdir -p "$INSTALL_DIR"
-INSTALL_PATH="$INSTALL_DIR/$BUNDLE_NAME.app"
-rm -rf "$INSTALL_PATH"
-cp -R "$APP_BUNDLE" "$INSTALL_PATH"
-echo "✅ Installed: $INSTALL_PATH"
+
+rm -rf "$INSTALL_DIR/TubeKeep.app"
+cp -R "$MAIN_BUNDLE" "$INSTALL_DIR/TubeKeep.app"
+
+echo "✅ Installed: $INSTALL_DIR/TubeKeep.app"
+
+# Ad-hoc sign to suppress Gatekeeper "Intel 미지원" warning (ARM64-only build)
+codesign --force --deep --sign - "$INSTALL_DIR/TubeKeep.app" 2>/dev/null
+
 echo ""
-echo "🚀 Launching..."
-open "$INSTALL_PATH"
+echo "🚀 Launching TubeKeep..."
+open "$INSTALL_DIR/TubeKeep.app"
