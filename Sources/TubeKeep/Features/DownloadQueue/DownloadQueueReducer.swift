@@ -96,7 +96,7 @@ struct DownloadQueueReducer {
         case retryAttempt(UUID)
         case retryAllFailed
         case updateProgress(UUID, Double, String)
-        case downloadCompleted(UUID, Bool, String?)
+        case downloadCompleted(UUID, Bool, String?, String?)
         case revealInFinder(UUID)
         case startAll
         case stopAll
@@ -208,8 +208,8 @@ struct DownloadQueueReducer {
                         progressHandler: { id, progress, speed in
                             Task { await send(.updateProgress(id, progress, speed)) }
                         },
-                        completionHandler: { id, success, error in
-                            Task { await send(.downloadCompleted(id, success, error)) }
+                        completionHandler: { id, success, outputPath, error in
+                            Task { await send(.downloadCompleted(id, success, outputPath, error)) }
                         },
                         logHandler: logHandler
                     )
@@ -254,12 +254,13 @@ struct DownloadQueueReducer {
                 state.items[id: id]?.downloadSpeed = speed
                 return .none
 
-            case let .downloadCompleted(id, success, error):
+            case let .downloadCompleted(id, success, outputPath, error):
                 if success {
                     let item = state.items[id: id]
                     state.items[id: id]?.status = .completed
                     state.items[id: id]?.progress = 1.0
                     state.items[id: id]?.downloadSpeed = ""
+                    if let outputPath { state.items[id: id]?.outputPath = outputPath }
                     let nextEffect = tryStartNextDownloads(state: &state)
                     let title = state.items[id: id]?.videoInfo.title ?? ""
                     let toast = ToastMessage(

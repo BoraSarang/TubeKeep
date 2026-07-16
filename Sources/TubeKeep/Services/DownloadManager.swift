@@ -24,7 +24,7 @@ final class DownloadManager: @unchecked Sendable {
     func startDownload(
         item: DownloadItem,
         progressHandler: @escaping @Sendable (UUID, Double, String) -> Void,
-        completionHandler: @escaping @Sendable (UUID, Bool, String?) -> Void,
+        completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void,
         logHandler: (@Sendable (UUID, String) -> Void)? = nil
     ) {
         let outputDir = settings.storageDirectory
@@ -34,6 +34,9 @@ final class DownloadManager: @unchecked Sendable {
 
             var args = buildDownloadArgs(item: item, outputDir: outputDir)
             args += ["--progress-template", "%(progress._percent_str)s|%(progress._speed_str)s"]
+
+            let outputPathFile = FileManager.default.temporaryDirectory.appendingPathComponent("tubekeep_output_\(item.id.uuidString).txt").path
+            args += ["--print-to-file", "after_move:filepath", outputPathFile]
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -120,20 +123,30 @@ final class DownloadManager: @unchecked Sendable {
                 let errMsg = String(data: buf.data, encoding: .utf8)
 
                 if !Task.isCancelled {
-                    if process.terminationStatus == 0 {
-                        completionHandler(item.id, true, nil)
+                    let actualPath: String? = {
+                        guard let data = try? Data(contentsOf: URL(fileURLWithPath: outputPathFile)),
+                              let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                              !path.isEmpty
+                        else { return nil }
+                        try? FileManager.default.removeItem(atPath: outputPathFile)
+                        return path
+                    }()
+                    let fileExists = actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
+
+                    if process.terminationStatus == 0 || fileExists {
+                        completionHandler(item.id, true, actualPath, nil)
                         if self.settings.playSoundOnComplete {
                             _ = await MainActor.run {
                                 NSSound(named: "Purr")?.play()
                             }
                         }
                     } else {
-                        completionHandler(item.id, false, ErrorMessageMapper.map(errMsg))
+                        completionHandler(item.id, false, nil, ErrorMessageMapper.map(errMsg))
                     }
                 }
             } catch {
                 if !Task.isCancelled {
-                    completionHandler(item.id, false, error.localizedDescription)
+                    completionHandler(item.id, false, nil, error.localizedDescription)
                 }
             }
         }
@@ -148,7 +161,7 @@ final class DownloadManager: @unchecked Sendable {
 
     func resumeDownload(item: DownloadItem,
                         progressHandler: @escaping @Sendable (UUID, Double, String) -> Void,
-                        completionHandler: @escaping @Sendable (UUID, Bool, String?) -> Void) {
+                        completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void) {
         pausedItems.remove(item.id)
         startDownload(item: item, progressHandler: progressHandler, completionHandler: completionHandler)
     }

@@ -210,7 +210,7 @@ struct AppReducer {
                 state.statusBar.downloadETA = state.downloadQueue.aggregateETA
                 return .none
 
-            case let .downloadQueue(.downloadCompleted(id, success, _)):
+            case let .downloadQueue(.downloadCompleted(id, success, outputPath, _)):
                 let completed = state.downloadQueue.recentlyCompletedCount
                 if completed > 0 {
                     state.statusBar.badgeCount = completed
@@ -229,7 +229,7 @@ struct AppReducer {
                             channelId: item.videoInfo.channelId,
                             channelName: item.videoInfo.channel,
                             thumbnailURL: item.videoInfo.thumbnailURL,
-                            filePath: item.estimatedFilename,
+                            filePath: outputPath ?? item.estimatedFilename,
                             downloadDate: Date(),
                             uploadDate: LibraryItem.parseUploadDate(item.videoInfo.uploadDate),
                             duration: item.videoInfo.duration > 0 ? Int(item.videoInfo.duration) : nil,
