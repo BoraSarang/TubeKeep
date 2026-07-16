@@ -291,6 +291,9 @@ struct ChannelDownloaderView: View {
                 BookmarkManager.ensureAccess()
                 ChannelDownloadCache.syncDownloadedIDsFromDisk(channelName: channel.name)
 
+                // Rename 000-prefixed files with correct sequential index
+                ChannelDownloadCache.renameZeroIndexedFiles(channelName: channel.name, videos: videos, totalCount: count)
+
                 // Update library items with channel upload index
                 let updates = videos.compactMap { v -> (videoId: String, uploadIndex: Int)? in
                     let idx = count - v.playlistIndex + 1

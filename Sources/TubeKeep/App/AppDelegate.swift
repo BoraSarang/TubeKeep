@@ -3,6 +3,7 @@ import SwiftUI
 import ComposableArchitecture
 import UserNotifications
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     let store = Store(initialState: AppReducer.State()) {
@@ -14,6 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusBarHeight: CGFloat = 22
     private var videoDownloaderWindow: NSWindow?
     private var libraryWindowController: FixedWidthWindowController?
+    private var lastMenuState: (active: Int, completed: Int, total: Int, speed: String, eta: String)?
+    private var menuActiveItem: NSMenuItem?
+    private var menuCompletedItem: NSMenuItem?
+    private var menuPendingItem: NSMenuItem?
+    private var menuETAItem: NSMenuItem?
+    private var menuQueueSeparator: NSMenuItem?
+    private var hasQueueSection = false
     #if DEBUG
     private var libraryLogManager: DebugLogManager?
     private var downloaderLogManager: DebugLogManager?
@@ -62,6 +70,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: Constants.openChannelWithIdNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openSettingsWindow),
+            name: Constants.openSettingsWindowNotification,
+            object: nil
+        )
+
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "," {
+                self.openSettingsWindow()
+                return nil
+            }
+            return event
+        }
 
         DispatchQueue.main.async {
             self.migrateLibraryData()
@@ -69,7 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Restore security-scoped bookmark for storage directory
             BookmarkManager.ensureAccess()
 
-            self.openMainWindow()
+            if let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
+               let data = json.data(using: .utf8),
+               let settings = try? JSONDecoder().decode(Settings.self, from: data),
+               !settings.showMainWindowOnLaunch {
+                // 설정에서 메인창 자동 표시가 꺼져있으면 열지 않음
+            } else {
+                self.openMainWindow()
+            }
             self.startClipboardMonitoring()
         }
     }
@@ -131,9 +160,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
         updateStatusBarText()
 
-        Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
-            self?.updateStatusBarText()
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.updateStatusBarText()
+            let s = self.store.state.statusBar
+            let shouldHaveSection = s.hasActiveDownloads || s.activeCount > 0
+
+            if shouldHaveSection != self.hasQueueSection {
+                self.hasQueueSection = shouldHaveSection
+                self.rebuildMenu()
+                return
+            }
+
+            if shouldHaveSection, self.menuActiveItem != nil {
+                let active = s.activeCount
+                let completed = s.completedCount
+                let pending = s.totalCount - active - completed
+                let speed = s.downloadSpeed.isEmpty ? "" : " · \(s.downloadSpeed)"
+
+                self.menuActiveItem?.title = active > 0 ? "다운로드 중: \(active)개\(speed)" : "다운로드 중: 0개"
+                self.menuCompletedItem?.title = completed > 0 ? "완료: \(completed)개" : "완료: 0개"
+                self.menuPendingItem?.title = pending > 0 ? "대기: \(pending)개" : "대기: 0개"
+                self.menuETAItem?.title = s.downloadETA.isEmpty
+                    ? "남은 시간: --"
+                    : "남은 시간: \(s.downloadETA)"
+
+                // Force live update while menu is open (menu tracking uses .eventTracking run loop)
+                self.menuActiveItem?.menu?.itemChanged(self.menuActiveItem!)
+                self.menuCompletedItem?.menu?.itemChanged(self.menuCompletedItem!)
+                self.menuPendingItem?.menu?.itemChanged(self.menuPendingItem!)
+                self.menuETAItem?.menu?.itemChanged(self.menuETAItem!)
+            }
         }
+        RunLoop.main.add(timer, forMode: .common)
 
         // Observe appearance changes for dark mode
         DistributedNotificationCenter.default.addObserver(
@@ -201,6 +260,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(startSpeedTest),
             keyEquivalent: ""
         ))
+
+        if store.state.statusBar.hasActiveDownloads || store.state.statusBar.activeCount > 0 {
+            let sep = NSMenuItem.separator()
+            menu.addItem(sep)
+            menuQueueSeparator = sep
+            let sb = store.state.statusBar
+
+            let activeTitle = sb.activeCount > 0
+                ? "다운로드 중: \(sb.activeCount)개\(sb.downloadSpeed.isEmpty ? "" : " · \(sb.downloadSpeed)")"
+                : "다운로드 중: 0개"
+            menuActiveItem = NSMenuItem(title: activeTitle, action: nil, keyEquivalent: "")
+            menuActiveItem?.isEnabled = false
+            menu.addItem(menuActiveItem!)
+
+            let completedTitle = sb.completedCount > 0 ? "완료: \(sb.completedCount)개" : "완료: 0개"
+            menuCompletedItem = NSMenuItem(title: completedTitle, action: nil, keyEquivalent: "")
+            menuCompletedItem?.isEnabled = false
+            menu.addItem(menuCompletedItem!)
+
+            let pending = sb.totalCount - sb.activeCount - sb.completedCount
+            let pendingTitle = pending > 0 ? "대기: \(pending)개" : "대기: 0개"
+            menuPendingItem = NSMenuItem(title: pendingTitle, action: nil, keyEquivalent: "")
+            menuPendingItem?.isEnabled = false
+            menu.addItem(menuPendingItem!)
+
+            let etaTitle = sb.downloadETA.isEmpty ? "남은 시간: --" : "남은 시간: \(sb.downloadETA)"
+            menuETAItem = NSMenuItem(title: etaTitle, action: nil, keyEquivalent: "")
+            menuETAItem?.isEnabled = false
+            menu.addItem(menuETAItem!)
+        } else {
+            menuQueueSeparator = nil
+            menuActiveItem = nil
+            menuCompletedItem = nil
+            menuPendingItem = nil
+            menuETAItem = nil
+        }
+
         #if DEBUG
         menu.addItem(NSMenuItem.separator())
         let mockSubmenu = NSMenu()
@@ -607,9 +703,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.managed, .ignoresCycle]
         window.identifier = NSUserInterfaceItemIdentifier("settings")
-        window.contentMinSize = NSSize(width: 480, height: 400)
-        window.contentMaxSize = NSSize(width: 480, height: 9999)
-        window.setContentSize(NSSize(width: 480, height: 580))
+        window.setContentSize(NSSize(width: 560, height: 420))
+        window.contentMinSize = window.frame.size
+        window.contentMaxSize = window.frame.size
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

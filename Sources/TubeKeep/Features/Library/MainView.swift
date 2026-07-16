@@ -12,12 +12,18 @@ struct MainView: View {
 
             Divider()
 
-            switch store.library.viewMode {
-            case .grid:
-                LibraryGridView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .list:
-                LibraryListView(store: store)
+            switch store.library.sidebarMode {
+            case .library:
+                switch store.library.viewMode {
+                case .grid:
+                    LibraryGridView(store: store)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .list:
+                    LibraryListView(store: store)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .discover:
+                DiscoverView(store: store)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -28,6 +34,12 @@ struct MainView: View {
                     .animation(.easeInOut(duration: 0.25), value: toast.id)
             }
         }
+        .sheet(isPresented: .init(
+            get: { store.library.librarySummaryVideoId != nil },
+            set: { if !$0 { store.send(.library(.dismissLibrarySummary)) } }
+        )) {
+            librarySummarySheet
+        }
         .overlay(alignment: .top) {
             if let toast = store.downloadQueue.toastMessage {
                 toastBanner(toast)
@@ -36,6 +48,20 @@ struct MainView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.3), value: toast.id)
             }
+        }
+        .alert("Gemini API 키 필요", isPresented: Binding(
+            get: { store.library.showGeminiKeyAlert },
+            set: { store.send(.library(.setGeminiKeyAlert($0))) }
+        )) {
+            Button("키 발급 받기") {
+                NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/apikey")!)
+            }
+            Button("설정 열기") {
+                store.send(.library(.openSettingsForGeminiKey))
+            }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해주세요.")
         }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
@@ -155,6 +181,59 @@ struct MainView: View {
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private var librarySummarySheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("AI 요약", systemImage: "text.bubble")
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+                Button("닫기") {
+                    store.send(.library(.dismissLibrarySummary))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+
+            if store.library.librarySummaryLoading {
+                VStack {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .scaleEffect(0.9)
+                        Text("AI 요약 중...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else if let text = store.library.librarySummaryText {
+                VStack(spacing: 8) {
+                    ScrollView {
+                        Text(text)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    }
+                    HStack {
+                        Spacer()
+                        Button("복사") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(text, forType: .string)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                }
+            } else {
+                Spacer()
+            }
+        }
+        .padding(24)
+        .frame(width: 380, height: 320)
     }
 }
 

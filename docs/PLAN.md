@@ -11,6 +11,7 @@
 | M5: 라이브러리 대시보드 | ✅ 완료 | Photos 스타일 메인 창, 그리드/목록 뷰, 검색/필터/정렬, 좌클릭 메뉴 |
 | **v1.0.0** | 🏁 **릴리스** | Git tag `v1.0.0`, `~/Applications/VideoDownloader.app` → `TubeKeep.app` |
 | **v1.1.0** | 🏁 **전체 완료** | ✅자막 ✅hover툴팁 ✅다중선택삭제 ✅채널순서변경 ✅채널추가버튼 ✅폴더열기 ✅URL Scheme ✅채널업데이트+뱃지클릭+new표시 ✅큐영속성 ✅업로드날짜정렬 ✅단일앱복원 ✅DebugLogView ✅설정창분리(⌘,) ✅뷰이름정리 ✅alwaysOnTop비활성화 ✅설정공유상태화 ✅워닝0 |
+| **v2.0.0** | 🏁 **완료** (본 문서 참조) | ✅Discover 탭 ✅AI 영상 요약 ✅AI 자동 태깅 ✅Swift 6 동시성 ✅macOS 26+ ✅사이드바 네비게이션 |
 
 ---
  
@@ -131,6 +132,190 @@
 - [x] UI 텍스트 변경: "출력 폴더" → "저장 폴더"
 - [x] Settings.CodingKeys로 JSON 키 `"outputDirectory"` 하위호환 유지 (마이그레이션 불필요)
 - [x] BookmarkManager 키 변경: `outputDirectoryBookmark` → `storageDirectoryBookmark`
+
+### v2.0.0 — Discover 탭 + AI 요약/자동 태깅 (2026-07-16) ⚡
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+#### Discover Tab
+- [x] 사이드바 Library/Discover 네비게이션 (SF Symbol + accentColor)
+- [x] 8개 카테고리: 전체/음악/기술/게임/뉴스/스포츠/엔터테인먼트/교육
+- [x] yt-dlp `ytsearch` 기반 트렌딩/인기 영상 검색
+- [x] 30분 TTL 캐싱 (TrendingService CacheEntry)
+- [x] DiscoverView 카드 그리드 (호버 시 다운로드/AI 요약 버튼)
+- [x] 원클릭 다운로드 큐 추가 (discoverAddToQueue)
+- [x] 오프라인 안내 화면 (wifi.slash + 에러 메시지)
+- [x] Discover 모드에서만 카테고리 리스트 표시
+
+#### AI 요약 (Ollama)
+- [x] SummarizationService — 자막(VTT/SRT) 추출 → Ollama LLM 요약
+- [x] 요약 결과: 개요 + 핵심 포인트
+- [x] LibraryItem.summary 영구 저장 (updateItem)
+- [x] Library 좌클릭 메뉴 "AI 요약" (그리드 + 목록 뷰)
+- [x] 온라인: yt-dlp 자막 fetch → 요약
+- [x] 오프라인: 로컬 자막 파일 → 요약
+- [x] 자막 없음 에러 처리
+
+#### AI 자동 태깅 (Ollama + 키워드 fallback)
+- [x] TaggingService — Ollama 분류 (우선) + 키워드 기반 fallback
+- [x] 10개 카테고리 자동 분류 (기술/IT, 음악, 게임, 뉴스, 스포츠, 엔터테인먼트, 교육, 요리, 여행, 과학)
+- [x] 다운로드 완료 시 자동 태깅 (AppReducer downloadCompleted)
+- [x] LibraryItem.tags 저장 (updateItem)
+- [x] 키워드 fallback: channel+title 키워드 매칭
+
+#### Infrastructure
+- [x] macOS 타겟 26+ 상향 (Package.swift, Info.plist)
+- [x] Swift 6 동시성 에러 전면 수정 (8개 파일)
+- [x] LibraryCacheService.updateItem() 추가
+- [x] TrendingVideo 모델 + TrendingCategory 열거형
+
+#### 새 파일 (6개)
+- Models/TrendingVideo.swift
+- Features/Discover/DiscoverView.swift
+- Services/TrendingService.swift
+- Services/SummarizationService.swift
+- Services/TaggingService.swift
+
+### v2.0.1 — AI 요약 팝업 UI 통일 + Discover UX 개선 (2026-07-16) ⚡
+
+#### UI 개선
+- [x] 사이드바 한글화: Library→보관함, Discover→트랜드
+- [x] 트랜드 검색창: 사이드바 실시간 검색 필드
+- [x] 카테고리 리스트 리디자인: 드래그 핸들 + SF Symbol 아이콘 + 이름 + 드래그-드롭 순서변경 (카운트 제거)
+- [x] TrendingCategory.systemIcon 프로퍼티 + FeaturedCategoryDropDelegate
+- [x] 카테고리 순서 @AppStorage("categoryOrder") 영구 저장
+- [x] DiscoverCard ZStack → `.overlay()`로 변경 (hover 버튼 레이아웃 영향 제거)
+- [x] 다운로드 완료 배지 가시성 개선 (초록 배경 + 흰 아이콘 + 그림자)
+- [x] Discover popover arrowEdge `.leading` → `.trailing` (오른쪽 표시)
+- [x] Library AI 요약 sheet 내용 상단 정렬
+
+#### AI 요약 UX 통일
+- [x] Discover AI 요약: 인라인 → `.popover` (discoverSummaryVideoId/Text/Loading State)
+- [x] Library AI 요약: 좌클릭 메뉴 → `.sheet` (librarySummaryVideoId/Text/Loading State)
+- [x] HomeView(다운로더): AI 요약 버튼 + popover (summaryText/Loading/showSummaryPopover State)
+- [x] 요약 결과 LibraryItem.summary 영구 저장 유지
+
+#### Bug Fixes
+- [x] Local file 요약 실패: 외부 자막 파일 없으면 fetchTranscript(videoId) fallback
+- [x] LibraryItem 구버전 호환: tags/summary decodeIfPresent
+- [x] Library sheet 가려짐: overlay → .sheet 전환
+
+#### Infrastructure
+- [x] docs/SETUP_OLLAMA.md 문서화
+
+### v2.1.0 — Google Gemini API 마이그레이션 (2026-07-16) ⚡
+
+#### Breaking Changes
+- [x] Ollama → Google Gemini API 전환 (SummarizationService, TaggingService)
+- [x] Ollama 의존성 제거 (더 이상 brew install ollama 불필요)
+
+#### Setting
+- [x] Gemini API 키 입력 필드 (SettingsView SecureField + 발급 링크)
+- [x] API 키 검증 알럿 + "설정 열기" / "키 발급 받기" 플로우
+- [x] API 키 UserDefaults 저장 (geminiAPIKey 키)
+
+#### SummarizationService
+- [x] queryOllama → queryGemini(prompt:apiKey:) 교체
+- [x] 프롬프트 → Gemini generateContent API 형식으로 마이그레이션
+- [x] apiKey 파라미터 추가, 키 없을 시 요약 불가
+
+#### TaggingService
+- [x] queryOllama → queryGemini(prompt:apiKey:) 교체
+- [x] classify(title:channel:apiKey:) — 키 없으면 autoClassify fallback
+
+#### Reducer Flow
+- [x] LibraryReducer: discoverRequestSummary/showSummary에 API 키 체크 + showGeminiKeyAlert
+- [x] HomeReducer: requestSummary에 API 키 체크 + showGeminiKeyAlert
+- [x] Constants.openSettingsWindowNotification + AppDelegate observer → openSettingsWindow()
+
+#### Views
+- [x] MainView: .alert (showGeminiKeyAlert)
+- [x] DiscoverView: .alert (showGeminiKeyAlert)
+- [x] HomeView: .alert (showGeminiKeyAlert)
+
+#### Infrastructure
+- [x] docs/SETUP_GEMINI.md 신규 작성
+- [x] docs/SETUP_OLLAMA.md 레거시 마이그레이션 노트 추가
+
+### v2.2.0 — 설정 UI 전면 개편 (OpenCode Desktop 스타일) (2026-07-16) ⚡
+
+#### Breaking Changes
+- [x] 설정 창 UI 전면 개편: 접이식 VStack 패널 → YouTube/시스템 환경설정 스타일 4탭 레이아웃
+- [x] 창 크기 480×580 → 560×420 고정 (리사이즈 불가)
+- [x] SettingsView: 기존 3개 헬퍼(`settingRow`/`row`/`infoText`) → 단일 제네릭 `SettingsRow<Control>` 컴포넌트
+
+#### Settings 탭 내비게이션
+- [x] `SettingsTab` enum (일반/저장/시스템/AI 요약) — CaseIterable + SF Symbol icon 매핑
+- [x] 좌측 140pt 사이드바 + 우측 ScrollView 콘텐츠
+- [x] `SettingsReducer.selectedTab` State/Action으로 탭 전환
+- [x] 항목 간 하단 border 구분
+
+#### SettingsRow 컴포넌트
+- [x] `VStack { HStack(title, control) + Text(description, .trailing, lineLimit(1)) }` 구조
+- [x] 제네릭 `Control: View` 파라미터로 모든 설정 타입 지원
+- [x] description 11pt `.caption` + `minimumScaleFactor(0.7)` + 한 줄 고정
+
+#### 설정 항목 변경
+- [x] 일반 탭: 다운로드 경로, 동시 다운로드, 속도 제한, 해상도 Picker (4K→144p 순서)
+- [x] 저장 탭: 파일명 템플릿 (200pt 고정 폭), 알림음, 시작 프로그램
+- [x] 시스템 탭: 메인창 자동 표시 토글 (신규), 메뉴바 아이콘 스타일
+- [x] AI 요약 탭: 서비스 드롭다운 (yTeaser/Gemini), API 키 입력, Billing 링크, 우선순위 안내
+- [x] 서비스 선택: RadioGroup → Menu Picker, `.fixedSize()`로 truncation 방지
+- [x] 항상 위에 고정: 설정에서 제거, 각 창 로컬 `@State`로 이전
+- [x] 해상도 Picker 3군데 통일: SettingsView, ChannelContentView, BatchDownloadView
+
+#### 단축키
+- [x] `⌘,` NSEvent.addLocalMonitorForEvents 글로벌 모니터 (메인 창에서도 동작)
+- [x] AppDelegate.settingsWindowController: window retaining + openSettingsWindow()
+
+#### 상태 관리
+- [x] `summaryServiceMode`: stored property (computed→stored) + custom init(UserDefaults) + setSummaryServiceMode Action에서 직접 저장
+- [x] `showMainWindowOnLaunch`: Settings 필드 + AppReducer.appDidFinishLaunching에서 로드
+- [x] `alwaysOnTop`: AppReducer/Settings에서 제거, 3개 창(VideoDownload/BatchDownload/ChannelDownload) 로컬 `@State`로 전환
+
+#### UI 세부
+- [x] 섹션 헤더: 9pt → 12pt semibold, 상하 여백 증가
+- [x] 설명문: 8pt → 11pt, lineLimit(1) + .trailing 정렬
+- [x] 창 하단: AI 요약 우선순위 안내 ("yTeaser 소진 시 Gemini 전환, 키 없으면 미동작")
+
+#### Removed
+- [x] `SummaryServiceMode` enum 완전 제거 (`Settings.swift`)
+- [x] `summaryServiceModeKey` 제거 (`Constants.swift`)
+- [x] `summaryServiceMode` State/Action/init 제거 (`SettingsReducer.swift`)
+- [x] Reducer 모드 분기 제거 — 항상 yTeaser 먼저 호출, `quotaExceeded` 시 Gemini fallback (`LibraryReducer.swift`, `HomeReducer.swift`)
+
+#### Infrastructure
+- [x] `SettingsTab` enum: `Models/Settings.swift` 신규
+- [x] `SettingsRow<Control>`: 제네릭 뷰 컴포넌트 (`SettingsView.swift`)
+- [x] `Constants.showMainWindowOnLaunchKey` 저장 키 추가
+- [x] `SummarizationService.SummaryError.quotaExceeded` 케이스 추가
+
+### v2.3.0 — SponsorBlock + 기능 다듬기 (2026-07-16) ⚡
+
+#### SponsorBlock + 메타데이터 임베딩
+- [x] SponsorBlock: yt-dlp `--sponsorblock-remove all` 플래그 추가
+- [x] 메타데이터/섬네일 임베딩: yt-dlp `--embed-metadata --embed-thumbnail` 플래그 추가
+- [x] `Settings.sponsorBlock` + `Settings.embedMetadata` Bool 필드 (기본값 true)
+- [x] 시스템 탭에 토글 2개 추가
+- [x] `DownloadManager.buildDownloadArgs()` + `YouTubeDLService.buildDownloadArgs()` 양쪽 적용
+
+#### 다운로드 큐 개별 제어
+- [x] DownloadRow: 상태별 액션 버튼 추가 (다운로드중→일시정지, 일시정지→재개, 실패→재시도)
+- [x] 실패 시 에러 메시지 간략 표시
+
+#### 에러 메시지 래핑
+- [x] `ErrorMessageMapper` 유틸리티: yt-dlp 공통 에러 → 한글 친화적 메시지 매핑
+- [x] `DownloadManager.swift` completionHandler + `YouTubeDLService.swift` 에러 throw 적용
+
+#### 라이브러리 벌크 액션
+- [x] `revealSelectedInFinder`, `openSelected` Action 추가
+- [x] SelectionBar에 "Finder에서 보기", "열기" 버튼 추가 (GridView + ListView 양쪽)
+
+#### 메뉴바 상태 개선
+- [x] 메뉴 드롭다운에 큐 요약 정보 표시 (다운로드 중/완료/대기 개수 + 속도 + ETA)
+
+#### 새 파일
+- [x] `Services/ErrorMessageMapper.swift`
 
 ## 제외된 기능 (Cancelled)
 

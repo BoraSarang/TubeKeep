@@ -84,6 +84,16 @@ actor LibraryCacheService {
         saveItems(items)
     }
 
+    func updateItem(_ item: LibraryItem) {
+        var items = loadItems()
+        if let idx = items.firstIndex(where: { $0.id == item.id }) {
+            items[idx] = item
+        } else {
+            items.append(item)
+        }
+        saveItems(items)
+    }
+
     func updateChannelUploadIndices(channelId: String, _ updates: [(videoId: String, uploadIndex: Int)]) {
         let items = loadItems()
         let updated = items.map { item -> LibraryItem in

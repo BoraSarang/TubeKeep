@@ -27,6 +27,10 @@ struct HomeReducer {
         var errorMessage: String?
         var lastAutoFetchedURL: String = ""
         var clipboardMonitoring: Bool = true
+        var summaryText: String?
+        var summaryLoading = false
+        var showSummaryPopover = false
+        var showGeminiKeyAlert = false
 
         var selectedFormat: Format? {
             guard let id = selectedFormatId else { return nil }
@@ -60,6 +64,13 @@ struct HomeReducer {
         case addToQueueTapped
         case addToQueueResponse(DownloadItem)
         case playlistSelection(PresentationAction<PlaylistSelectionReducer.Action>)
+        case requestSummary
+        case summaryLoaded(String)
+        case summaryFailed(String)
+        case toggleSummaryPopover
+        case dismissSummary
+        case setGeminiKeyAlert(Bool)
+        case openSettingsForGeminiKey
         case clearError
         case resetInfo
         case toggleClipboardMonitoring
@@ -204,6 +215,72 @@ struct HomeReducer {
 
             case .playlistSelection:
                 return .none
+
+            case .requestSummary:
+                guard let info = state.videoInfo else { return .none }
+                let videoId = info.id
+                let title = info.title
+                let channel = info.channel
+                state.summaryLoading = true
+                state.summaryText = nil
+                state.showSummaryPopover = true
+                return .run { send in
+                    let service = SummarizationService()
+                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    do {
+                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
+                        await send(.summaryLoaded("\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                    } catch let error as SummarizationService.SummaryError {
+                        if case .quotaExceeded = error, !apiKey.isEmpty {
+                            do {
+                                let result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
+                                await send(.summaryLoaded("\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                            } catch {
+                                await send(.summaryFailed(error.localizedDescription))
+                            }
+                        } else {
+                            if case .quotaExceeded = error {
+                                await send(.setGeminiKeyAlert(true))
+                            }
+                            await send(.summaryFailed(error.localizedDescription))
+                        }
+                    } catch {
+                        await send(.summaryFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .summaryLoaded(text):
+                state.summaryLoading = false
+                state.summaryText = text
+                return .none
+
+                case let .summaryFailed(error):
+                state.summaryLoading = false
+                state.summaryText = "요약 실패\n\n\(error)"
+                return .none
+
+            case .toggleSummaryPopover:
+                if state.summaryText == nil && !state.summaryLoading {
+                    return .send(.requestSummary)
+                }
+                state.showSummaryPopover.toggle()
+                return .none
+
+            case .dismissSummary:
+                state.showSummaryPopover = false
+                state.summaryText = nil
+                state.summaryLoading = false
+                return .none
+
+            case let .setGeminiKeyAlert(show):
+                state.showGeminiKeyAlert = show
+                return .none
+
+            case .openSettingsForGeminiKey:
+                state.showGeminiKeyAlert = false
+                return .run { _ in await MainActor.run {
+                    NotificationCenter.default.post(name: Constants.openSettingsWindowNotification, object: nil)
+                }}
 
             case .clearError:
                 state.errorMessage = nil

@@ -152,6 +152,29 @@ yt-dlp를 백엔드 엔진으로 사용, SwiftUI + TCA 아키텍처.
 - 각 window 하단에 동작 로그 패널 (자동 스크롤, 텍스트 복사 가능)
 - 창 생성/재사용/포커스 등 주요 이벤트 기록
 
+### 14. Discover 탭 (v2.0.0)
+- 사이드바 Library/Discover 네비게이션 전환
+- 8개 카테고리: 전체/음악/기술/게임/뉴스/스포츠/엔터테인먼트/교육
+- yt-dlp `ytsearch` 기반 트렌딩 영상 검색 + 30분 캐시
+- 호버 시 다운로드/AI 요약 버튼
+- 원클릭 다운로드 큐 추가
+- 오프라인 시 안내 화면
+
+### 15. AI 영상 요약 (v2.0.0/~1, Ollama)
+- **Discover/트랜드**: AI 요약 버튼 → `.popover` 팝오버 (로딩/결과/실패)
+- **Library/보관함**: 좌클릭 메뉴 "AI 요약" → `.sheet` 모달
+- **Home/다운로더**: AI 요약 버튼 → `.popover`
+- 모두 동일한 디자인: ProgressView(로딩) / 개요+핵심포인트(결과) / 에러 메시지(실패)
+- 자막(VTT/SRT) → Ollama LLM 요약 (개요 + 핵심 포인트)
+- LibraryItem.summary 저장, 오프라인에서도 기존 영상 요약 가능
+- Local file: 같은 디렉토리 자막 파일 검색 → 없으면 YouTube 자막 다운로드 fallback
+- 의존성: Ollama (`ollama pull llama3.2`)
+
+### 16. AI 자동 태깅 (v2.0.0, Ollama)
+- 다운로드 완료 시 title+channel 기반 자동 분류
+- Ollama 분류 (우선) + 키워드 기반 fallback
+- 10개 카테고리 지원
+
 ---
 
 ## 제외된 기능
@@ -168,23 +191,23 @@ yt-dlp를 백엔드 엔진으로 사용, SwiftUI + TCA 아키텍처.
 
 | 항목 | 최소 | 권장 |
 |------|------|------|
-| **macOS 버전** | 13.0 (Ventura, 2022) | 14.0+ (Sonoma) |
-| **칩셋** | Apple Silicon (M1/M2/M3/M4) | Apple Silicon |
+| **macOS 버전** | 26.0 (2026) | 26.5+ |
+| **칩셋** | Apple Silicon (M1/M2/M3/M4) | Apple Silicon (M4+) |
 | **Intel Mac** | ❌ 미지원 (ARM64-only 빌드) | — |
-| **Swift** | 5.9+ | 5.10+ |
-| **Xcode** | 빌드 시: CLT 15.0+ / 유니버셜 빌드 시: Xcode 15.0+ | Xcode 16.0+ |
-| **SwiftUI** | macOS 13.0+ | — |
+| **Swift** | 6.0+ | 6.3+ |
+| **Xcode** | CLT 17.0+ (SPM 6.2) | Xcode 17.0+ |
+| **SwiftUI** | macOS 26.0+ | — |
 | **TCA** | 1.10+ | — |
 | **런타임 의존성** | yt-dlp + ffmpeg (앱 번들에 포함) | — |
+| **선택 의존성** | Ollama (`ollama pull llama3.2`) | — |
 | **빌드 아키텍처** | ARM64 (Apple Silicon 전용) | — |
 | **메모리** | 256 MB | 512 MB+ |
 | **디스크** | 50 MB (앱) + 다운로드 저장 공간 | — |
 
 ### 빌드 환경
-- SPM (`swift-tools-version: 5.9`)
+- SPM (`swift-tools-version: 6.2`)
 - `bash build_and_run.sh debug` (또는 release)
 - Apple Silicon Mac에서 ARM64-only 바이너리로 빌드
-- Intel Mac 지원은 Apple Silicon 호스트에서 `swift build --arch arm64 --arch x86_64`로 유니버셜 빌드 필요 (Xcode.app 필요)
 - 모든 리소스(yt-dlp, ffmpeg)는 앱 번들 `Contents/Resources`에 포함
 
 ### 앱 번들 포함 항목

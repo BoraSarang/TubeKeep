@@ -58,7 +58,7 @@ struct ChannelDownloadCache {
     private static let newVideosKey = "channelsNewVideos"
     private static let seenVideosKey = "channelsSeenVideoIds"
 
-    private static var videoCache: [String: [ChannelVideoItem]] = [:]
+    private nonisolated(unsafe) static var videoCache: [String: [ChannelVideoItem]] = [:]
 
     static func cachedVideos(channelId: String) -> [ChannelVideoItem]? {
         if let cached = videoCache[channelId] { return cached }
@@ -140,6 +140,35 @@ struct ChannelDownloadCache {
             dict[channelName] = Array(existing)
             guard let data = try? JSONEncoder().encode(dict) else { return }
             UserDefaults.standard.set(data, forKey: cacheKey)
+        }
+    }
+
+    static func renameZeroIndexedFiles(channelName: String, videos: [ChannelVideoItem], totalCount: Int) {
+        let folder = Constants.sanitizeFolderName(channelName)
+        let channelDir = "\(Constants.channelStorageDirectory)/\(folder)"
+        guard FileManager.default.fileExists(atPath: channelDir),
+              let files = try? FileManager.default.contentsOfDirectory(atPath: channelDir)
+        else { return }
+
+        for file in files {
+            guard file.hasPrefix("000 - ") else { continue }
+            let withoutExt = (file as NSString).deletingPathExtension
+            guard let lastDot = withoutExt.lastIndex(of: "."),
+                  let ext = file.components(separatedBy: ".").last
+            else { continue }
+            let videoId = String(withoutExt[withoutExt.index(after: lastDot)...])
+
+            guard let video = videos.first(where: { $0.id == videoId }) else { continue }
+            let correctIndex = totalCount - video.playlistIndex + 1
+            guard correctIndex > 0 else { continue }
+
+            let suffix = String(file.dropFirst(6))
+            let newName = "\(String(format: "%03d", correctIndex)) - \(suffix)"
+            let oldPath = "\(channelDir)/\(file)"
+            let newPath = "\(channelDir)/\(newName)"
+
+            guard !FileManager.default.fileExists(atPath: newPath) else { continue }
+            try? FileManager.default.moveItem(atPath: oldPath, toPath: newPath)
         }
     }
 

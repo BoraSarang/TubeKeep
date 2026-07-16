@@ -11,7 +11,6 @@ struct AppReducer {
         var settings = SettingsReducer.State()
         var statusBar = StatusBarReducer.State()
         var library = LibraryReducer.State()
-        var alwaysOnTop: Bool = false
     }
 
     enum Action: Equatable {
@@ -20,9 +19,9 @@ struct AppReducer {
         case settings(SettingsReducer.Action)
         case statusBar(StatusBarReducer.Action)
         case library(LibraryReducer.Action)
-        case toggleAlwaysOnTop
         case clipboardDetected(String)
         case appDidFinishLaunching
+        case discoverAddToQueue(DownloadItem)
     }
 
     var body: some ReducerOf<Self> {
@@ -44,17 +43,6 @@ struct AppReducer {
 
         Reduce { state, action in
             switch action {
-            case .toggleAlwaysOnTop:
-                state.alwaysOnTop.toggle()
-                let settings = state.settings.settings
-                var updated = settings
-                updated.alwaysOnTop = state.alwaysOnTop
-                if let data = try? JSONEncoder().encode(updated),
-                   let json = String(data: data, encoding: .utf8) {
-                    UserDefaults.standard.set(json, forKey: Constants.settingsSaveKey)
-                }
-                return .none
-
             case let .clipboardDetected(url):
                 guard state.home.clipboardMonitoring else { return .none }
                 return .send(.home(.autoFetchInfo(url)))
@@ -88,9 +76,6 @@ struct AppReducer {
                             if settings.clipboardMonitoring {
                                 // already true by default
                             }
-                            if settings.alwaysOnTop {
-                                await send(.toggleAlwaysOnTop)
-                            }
                             await send(.settings(.setDefaultResolution(settings.defaultResolution)))
                             await send(.settings(.setMaxRetries(settings.maxRetries)))
                             if settings.launchAtLogin {
@@ -99,6 +84,15 @@ struct AppReducer {
                             await send(.settings(.setMaxUploadCheck(settings.maxUploadCheck)))
                             if settings.skipIndexOnFailure {
                                 await send(.settings(.toggleSkipIndexOnFailure))
+                            }
+                            if !settings.showMainWindowOnLaunch {
+                                await send(.settings(.toggleShowMainWindowOnLaunch))
+                            }
+                            if !settings.sponsorBlock {
+                                await send(.settings(.toggleSponsorBlock))
+                            }
+                            if !settings.embedMetadata {
+                                await send(.settings(.toggleEmbedMetadata))
                             }
                         }
                     }
@@ -142,7 +136,7 @@ struct AppReducer {
                 }
 
                 // index=0이면 먼저 fetch 후 startDownload (race condition 방지)
-                if mutableItem.channelUploadIndex == 0 {
+                if mutableItem.channelUploadIndex == 0, mutableItem.isChannelDownload {
                     let capturedItem = mutableItem
                     return .run { send in
                         let service = UploadOrderService()
@@ -245,6 +239,7 @@ struct AppReducer {
                     return .run { send in
                         if let li = libraryItem {
                             await LibraryCacheService.shared.addItem(li)
+                            await send(.library(.tagItem(videoId: li.id, title: li.title, channel: li.channelName)))
                         }
                         await send(.library(.loadFromDisk))
                         await send(.library(.calculateDiskUsage))
@@ -252,7 +247,16 @@ struct AppReducer {
                 }
                 return .none
 
-            case .downloadQueue(.removeItem), .downloadQueue(.retryAllFailed):
+                case .downloadQueue(.removeItem), .downloadQueue(.retryAllFailed):
+                state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
+                state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
+                state.statusBar.activeCount = state.downloadQueue.activeCount
+                state.statusBar.totalCount = state.downloadQueue.items.count
+                state.statusBar.completedCount = state.downloadQueue.completedCount
+                state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                return .none
+
+            case .downloadQueue(.startDownload), .downloadQueue(.pauseDownload), .downloadQueue(.resumeDownload):
                 state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
                 state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
                 state.statusBar.activeCount = state.downloadQueue.activeCount
@@ -304,6 +308,47 @@ struct AppReducer {
                 return .none
 
             case .library(.itemsLoaded):
+                return .none
+
+            case let .discoverAddToQueue(item):
+                guard !state.downloadQueue.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
+                    return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 목록에 있습니다", type: .info))))
+                }
+                var mutableItem = item
+                if let path = mutableItem.checkExistingFile(
+                    storageDirectory: state.settings.storageDirectory,
+                    template: state.settings.filenameTemplate
+                ) {
+                    mutableItem.status = .completed
+                    mutableItem.outputPath = path
+                }
+                state.downloadQueue.items.append(mutableItem)
+                state.statusBar.totalCount = state.downloadQueue.items.count
+                let shouldStart = state.downloadQueue.activeCount < state.downloadQueue.maxConcurrent
+                let itemId = mutableItem.id
+
+                if mutableItem.status == .completed {
+                    return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info))))
+                }
+
+                if shouldStart {
+                    return .send(.downloadQueue(.startDownload(itemId)))
+                }
+                return .none
+
+            case .library(.showSummary):
+                return .none
+
+            case .library(.summaryResult):
+                return .none
+
+            case .library(.summaryFailed):
+                return .none
+
+            case .library(.tagItem):
+                return .none
+
+            case .library(.itemTagged):
                 return .none
 
             default:

@@ -14,11 +14,11 @@ actor YouTubeDLService {
             case .notInstalled:
                 return "yt-dlp가 설치되지 않았습니다.\n터미널에 'brew install yt-dlp'를 입력해주세요."
             case let .infoFetchFailed(msg):
-                return "정보 조회 실패: \(msg)"
+                return "정보 조회 실패: \(ErrorMessageMapper.map(msg))"
             case let .downloadFailed(msg):
-                return "다운로드 실패: \(msg)"
+                return "다운로드 실패: \(ErrorMessageMapper.map(msg))"
             case let .playlistFetchFailed(msg):
-                return "재생목록 조회 실패: \(msg)"
+                return "재생목록 조회 실패: \(ErrorMessageMapper.map(msg))"
             }
         }
     }
@@ -191,12 +191,16 @@ actor YouTubeDLService {
         item: DownloadItem,
         outputDir: String,
         limitRate: String? = nil,
+        sponsorBlock: Bool = true,
+        embedMetadata: Bool = true,
         progressHandler: (@Sendable (String) -> Void)? = nil
     ) -> AsyncThrowingStream<String, Error> {
         let args = buildDownloadArgs(
             item: item,
             outputDir: outputDir,
-            limitRate: limitRate
+            limitRate: limitRate,
+            sponsorBlock: sponsorBlock,
+            embedMetadata: embedMetadata
         )
 
         return AsyncThrowingStream { continuation in
@@ -222,7 +226,9 @@ actor YouTubeDLService {
     private func buildDownloadArgs(
         item: DownloadItem,
         outputDir: String,
-        limitRate: String?
+        limitRate: String?,
+        sponsorBlock: Bool = true,
+        embedMetadata: Bool = true
     ) -> [String] {
         let formatId: String = {
             if item.selectedFormat.isVideoOnly {
@@ -253,6 +259,14 @@ actor YouTubeDLService {
 
         if item.audioOnly {
             args += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+        }
+
+        if sponsorBlock {
+            args += ["--sponsorblock-remove", "all"]
+        }
+
+        if embedMetadata {
+            args += ["--embed-metadata", "--embed-thumbnail"]
         }
 
         args.append(item.videoInfo.webpageURL)

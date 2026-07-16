@@ -70,8 +70,31 @@ struct LibraryListView: View {
 
             Spacer()
 
-            Button("전체 선택") {
+            Button {
                 store.send(.library(.selectAll))
+            } label: {
+                Image(systemName: "checkmark.circle")
+                Text("전체 선택")
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+
+            Button {
+                store.send(.library(.revealSelectedInFinder))
+            } label: {
+                Image(systemName: "folder")
+                Text("Finder에서 보기")
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+
+            Button {
+                store.send(.library(.openSelected))
+            } label: {
+                Image(systemName: "play.fill")
+                Text("열기")
             }
             .font(.system(size: 11))
             .buttonStyle(.plain)
@@ -84,8 +107,11 @@ struct LibraryListView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
 
-            Button("선택 삭제") {
+            Button {
                 store.send(.library(.removeSelected))
+            } label: {
+                Image(systemName: "trash")
+                Text("선택 삭제")
             }
             .font(.system(size: 11))
             .buttonStyle(.plain)
@@ -139,6 +165,7 @@ struct LibraryListView: View {
                         onDelete: { store.send(.library(.removeItem(item.id))) },
                         onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                         onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                        onShowSummary: { store.send(.library(.showSummary(item.id))) },
                         onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
                     )
                     .onAppear {
@@ -180,6 +207,7 @@ private struct LibraryListRow: View {
     let onDelete: () -> Void
     let onDownloadSubtitles: () -> Void
     let onChannelDownload: () -> Void
+    let onShowSummary: () -> Void
     let onToggleSelection: () -> Void
 
     var body: some View {
@@ -240,6 +268,7 @@ private struct LibraryListRow: View {
         .leftClickMenu(entries: [
             .action(title: "열기", action: onOpen),
             .separator,
+            .action(title: "AI 요약", action: onShowSummary),
             .action(title: "자막 다운로드", action: onDownloadSubtitles, enabled: !hasSubtitles),
             .action(title: "채널 다운로더 실행", action: onChannelDownload),
             .separator,

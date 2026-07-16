@@ -31,6 +31,20 @@ struct HomeView: View {
             }
             elapsedSeconds = Int(Date().timeIntervalSince(start))
         }
+        .alert("Gemini API 키 필요", isPresented: Binding(
+            get: { store.showGeminiKeyAlert },
+            set: { store.send(.setGeminiKeyAlert($0)) }
+        )) {
+            Button("키 발급 받기") {
+                NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/apikey")!)
+            }
+            Button("설정 열기") {
+                store.send(.openSettingsForGeminiKey)
+            }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해주세요.")
+        }
     }
 
     private var urlInputSection: some View {
@@ -286,7 +300,7 @@ struct HomeView: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
-                .frame(width: 130)
+                .frame(width: 200)
 
                 Spacer()
 
@@ -308,18 +322,93 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
 
-            Button(action: { store.send(.addToQueueTapped) }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.to.line")
-                        .font(.system(size: 11))
-                    Text("다운로드 추가")
-                        .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 8) {
+                Button(action: { store.send(.addToQueueTapped) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.to.line")
+                            .font(.system(size: 11))
+                        Text("다운로드 추가")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 28)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 28)
+                .buttonStyle(.borderedProminent)
+                .disabled(!store.canAddToQueue)
+
+                Button {
+                    store.send(.toggleSummaryPopover)
+                } label: {
+                    HStack(spacing: 4) {
+                        if store.summaryLoading {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        }
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 11))
+                        Text(store.summaryLoading ? "요약 중..." : "AI 요약")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .frame(width: 110)
+                    .frame(height: 28)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!store.canAddToQueue)
+                .popover(isPresented: Binding(
+                    get: { store.showSummaryPopover },
+                    set: { if !$0 { store.send(.dismissSummary) } }
+                ), arrowEdge: .leading) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Label("AI 요약", systemImage: "text.bubble")
+                                .font(.system(size: 16, weight: .semibold))
+                            Spacer()
+                            Button("닫기") {
+                                store.send(.dismissSummary)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
+
+                        if store.summaryLoading {
+                            VStack {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                        .scaleEffect(0.9)
+                                    Text("AI 요약 중...")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else if let text = store.summaryText {
+                            VStack(spacing: 8) {
+                                ScrollView {
+                                    Text(text)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                }
+                                HStack {
+                                    Spacer()
+                                    Button("복사") {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(text, forType: .string)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
+                            }
+                        } else {
+                            Spacer()
+                        }
+                    }
+                    .padding(24)
+                    .frame(width: 380, height: 320)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!store.canAddToQueue)
         }
         .padding(10)
         .background(

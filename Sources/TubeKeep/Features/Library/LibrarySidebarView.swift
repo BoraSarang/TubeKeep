@@ -29,20 +29,36 @@ struct LibrarySidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            searchField
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-
-            Divider()
-
-            filterSection
+            navigationSection
                 .padding(.vertical, 4)
 
             Divider()
 
-            channelList
+            if store.library.sidebarMode == .library {
+                searchField
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
 
-            Divider()
+                Divider()
+
+                filterSection
+                    .padding(.vertical, 4)
+
+                Divider()
+
+                channelList
+            } else {
+                discoverSearchField
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+
+                Divider()
+
+                discoverCategorySection
+                    .padding(.vertical, 4)
+
+                Divider()
+            }
 
             Button {
                 let dir = store.settings.storageDirectory
@@ -84,6 +100,204 @@ struct LibrarySidebarView: View {
             updateChannelNames(store.library.items)
             store.send(.library(.calculateDiskUsage))
         }
+    }
+
+    // MARK: - Navigation
+
+    private var navigationSection: some View {
+        VStack(spacing: 2) {
+            navRow(title: "보관함", icon: "square.grid.2x2", mode: .library)
+            navRow(title: "트랜드", icon: "flame", mode: .discover)
+        }
+    }
+
+    private func navRow(title: String, icon: String, mode: LibrarySidebarMode) -> some View {
+        let isSelected = store.library.sidebarMode == mode
+        return Button {
+            store.send(.library(.setSidebarMode(mode)))
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                    .frame(width: 16)
+                Text(title)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.accentColor : Color.clear)
+            .contentShape(Rectangle())
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+    }
+
+    // MARK: - Discover Search
+
+    private var discoverSearchField: some View {
+        HStack(spacing: 4) {
+            Group {
+                if store.library.discoverSearching {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 14, height: 14)
+
+            TextField("검색...", text: Binding(
+                get: { store.library.discoverSearchText },
+                set: { store.send(.library(.setDiscoverSearchText($0))) }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 12))
+            .onSubmit {
+                store.send(.library(.discoverSearch))
+            }
+
+            if !store.library.discoverSearchText.isEmpty {
+                Button {
+                    store.send(.library(.setDiscoverSearchText("")))
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(Color(.textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    // MARK: - Discover Categories
+
+    @State private var categoryRows: [(category: TrendingCategory, count: Int)] = []
+    @State private var draggedCategoryName: String?
+    @State private var dropTargetCategoryIndex: Int?
+    @AppStorage("discoverCategoryOrder") private var categoryOrderData: Data = Data()
+
+    private var categoryOrder: [String] {
+        get { (try? JSONDecoder().decode([String].self, from: categoryOrderData)) ?? [] }
+        set { categoryOrderData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    private func saveCategoryOrder() {
+        let order = categoryRows.map(\.category.rawValue)
+        if let data = try? JSONEncoder().encode(order) {
+            UserDefaults.standard.set(data, forKey: "discoverCategoryOrder")
+        }
+    }
+
+    private func moveCategory(from source: Int, to destination: Int) {
+        guard source != destination else { return }
+        categoryRows.move(fromOffsets: IndexSet(integer: source), toOffset: destination > source ? destination + 1 : destination)
+        saveCategoryOrder()
+    }
+
+    private func updateCategoryRows() {
+        let order = categoryOrder
+        var sorted: [(TrendingCategory, Int)] = []
+        let all = TrendingCategory.allCases
+        for name in order {
+            if let cat = all.first(where: { $0.rawValue == name }) {
+                sorted.append((cat, store.library.discoverVideos[cat]?.count ?? 0))
+            }
+        }
+        for cat in all {
+            if !sorted.contains(where: { $0.0 == cat }) {
+                sorted.append((cat, store.library.discoverVideos[cat]?.count ?? 0))
+            }
+        }
+        categoryRows = sorted
+    }
+
+    private var discoverCategorySection: some View {
+        VStack(spacing: 0) {
+            Text("카테고리")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(Array(categoryRows.enumerated()), id: \.element.category) { index, row in
+                        categoryRow(row.category, count: row.count, index: index)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .onChange(of: store.library.discoverVideos) { _, _ in
+            updateCategoryRows()
+        }
+        .onAppear {
+            updateCategoryRows()
+        }
+    }
+
+    private func categoryRow(_ category: TrendingCategory, count: Int, index: Int) -> some View {
+        let isSelected = store.library.discoverCategory == category
+        let isDropTarget = dropTargetCategoryIndex == index
+        return HStack(spacing: 6) {
+            Image(systemName: "line.horizontal.3")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .help("드래그하여 순서 변경")
+
+            Image(systemName: category.systemIcon)
+                .font(.system(size: 12))
+                .foregroundStyle(isSelected ? .white : .secondary)
+                .frame(width: 20, height: 20)
+
+            Text(category.rawValue)
+                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : .primary)
+
+            Spacer()
+
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(isSelected ? Color.accentColor : isDropTarget ? Color.accentColor.opacity(0.08) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            store.send(.library(.selectDiscoverCategory(category)))
+        }
+        .contextMenu {
+            Button("위로 이동") {
+                guard index > 0 else { return }
+                moveCategory(from: index, to: index - 1)
+            }
+            .disabled(index == 0)
+            Button("아래로 이동") {
+                guard index < categoryRows.count - 1 else { return }
+                moveCategory(from: index, to: index + 1)
+            }
+            .disabled(index == categoryRows.count - 1)
+        }
+        .onDrag {
+            draggedCategoryName = category.rawValue
+            return NSItemProvider(object: category.rawValue as NSString)
+        }
+        .onDrop(of: [.text], delegate: CategoryDropDelegate(
+            category: category,
+            currentIndex: index,
+            categoryRows: $categoryRows,
+            draggedCategoryName: $draggedCategoryName,
+            dropTargetIndex: $dropTargetCategoryIndex,
+            onMove: moveCategory
+        ))
     }
 
     // MARK: - Search
@@ -348,6 +562,43 @@ private struct ChannelDropDelegate: DropDelegate {
         }
         onMove(fromIdx, currentIndex)
         draggedChannelId = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+private struct CategoryDropDelegate: DropDelegate {
+    let category: TrendingCategory
+    let currentIndex: Int
+    @Binding var categoryRows: [(category: TrendingCategory, count: Int)]
+    @Binding var draggedCategoryName: String?
+    @Binding var dropTargetIndex: Int?
+    let onMove: (Int, Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        dropTargetIndex = currentIndex
+    }
+
+    func dropExited(info: DropInfo) {
+        if dropTargetIndex == currentIndex {
+            dropTargetIndex = nil
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer { dropTargetIndex = nil }
+        guard let draggedName = draggedCategoryName,
+              let fromIdx = categoryRows.firstIndex(where: { $0.category.rawValue == draggedName }),
+              fromIdx != currentIndex
+        else {
+            draggedCategoryName = nil
+            return false
+        }
+        onMove(fromIdx, currentIndex)
+        draggedCategoryName = nil
         return true
     }
 

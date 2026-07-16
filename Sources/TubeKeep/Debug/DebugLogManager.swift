@@ -3,7 +3,7 @@ import Combine
 
 #if DEBUG
 final class DebugLogManager: ObservableObject {
-    static var shared: DebugLogManager?
+    nonisolated(unsafe) static var shared: DebugLogManager?
 
     @Published var logs: [String] = []
     private let dateFormatter: DateFormatter = {

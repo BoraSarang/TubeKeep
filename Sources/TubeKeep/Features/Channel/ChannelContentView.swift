@@ -346,7 +346,7 @@ struct ChannelContentView: View {
                     Text("해상도")
                         .font(.system(size: 11))
                     Picker("", selection: $presetResolution) {
-                        ForEach([144, 240, 360, 480, 720, 1080, 1440, 2160], id: \.self) { h in
+                        ForEach([2160, 1440, 1080, 720, 480, 360, 240, 144], id: \.self) { h in
                             Text("\(h)p").tag(h)
                         }
                     }

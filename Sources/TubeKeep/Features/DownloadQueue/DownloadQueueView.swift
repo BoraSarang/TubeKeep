@@ -344,6 +344,12 @@ struct DownloadRow: View {
                             Text("실패")
                                 .font(.caption)
                                 .foregroundStyle(.red)
+                            if let err = item.errorMessage, !err.isEmpty {
+                                Text(err.prefix(60))
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                            }
                         }
                     }
                 }
@@ -351,16 +357,57 @@ struct DownloadRow: View {
 
             Spacer(minLength: 4)
 
-            Button {
-                store.send(.removeItem(item.id))
-            } label: {
-                Image(systemName: isHovering ? "trash.fill" : "trash")
-                    .font(.system(size: 11))
-                    .foregroundStyle(isHovering ? .red : Color(nsColor: .tertiaryLabelColor))
-                    .frame(width: 20, height: 20)
+            HStack(spacing: 2) {
+                if item.status == .downloading {
+                    Button {
+                        store.send(.pauseDownload(item.id))
+                    } label: {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(.plain)
+                    .help("일시정지")
+                }
+
+                if item.status == .paused {
+                    Button {
+                        store.send(.resumeDownload(item.id))
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.blue)
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(.plain)
+                    .help("재개")
+                }
+
+                if item.status == .failed || item.status == .retrying {
+                    Button {
+                        store.send(.retryDownload(item.id))
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.blue)
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(.plain)
+                    .help("재시도")
+                }
+
+                Button {
+                    store.send(.removeItem(item.id))
+                } label: {
+                    Image(systemName: isHovering ? "trash.fill" : "trash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isHovering ? .red : Color(nsColor: .tertiaryLabelColor))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovering ? 1 : 0.4)
             }
-            .buttonStyle(.plain)
-            .opacity(isHovering ? 1 : 0.4)
         }
         .padding(.vertical, 4)
         .onHover { hovering in

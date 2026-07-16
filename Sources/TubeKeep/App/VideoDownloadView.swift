@@ -3,6 +3,7 @@ import ComposableArchitecture
 
 struct VideoDownloadView: View {
     let store: StoreOf<AppReducer>
+    @State private var alwaysOnTop = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,15 +25,15 @@ struct VideoDownloadView: View {
             .frame(maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .alwaysOnTop(store.alwaysOnTop)
+        .alwaysOnTop(alwaysOnTop)
         .toolbar {
             ToolbarItemGroup {
                 Button {
-                    store.send(.toggleAlwaysOnTop)
+                    alwaysOnTop.toggle()
                 } label: {
-                    Image(systemName: store.alwaysOnTop ? "pin.fill" : "pin")
+                    Image(systemName: alwaysOnTop ? "pin.fill" : "pin")
                 }
-                .help(store.alwaysOnTop ? "최상위 고정 해제" : "항상 최상위로 표시")
+                .help(alwaysOnTop ? "최상위 고정 해제" : "항상 최상위로 표시")
 
                 Button {
                     NSApp.keyWindow?.orderOut(nil)

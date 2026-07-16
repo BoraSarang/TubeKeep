@@ -43,7 +43,8 @@ struct LibraryGridView: View {
                                 onReveal: { store.send(.library(.revealInFinder(item.id))) },
                                 onDelete: { store.send(.library(.removeItem(item.id))) },
                                 onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
-                                onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                                 onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                                 onShowSummary: { store.send(.library(.showSummary(item.id))) },
                                 onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
                             )
                             .onAppear {
@@ -62,6 +63,7 @@ struct LibraryGridView: View {
                 }
             }
         }
+        .overlay(EmptyView())
         .onChange(of: store.library.filteredItems) { _ in
             displayedCount = pageSize
             let newIds = Set(store.library.filteredItems.prefix(displayedCount).map(\.id))
@@ -119,8 +121,31 @@ struct LibraryGridView: View {
 
             Spacer()
 
-            Button("전체 선택") {
+            Button {
                 store.send(.library(.selectAll))
+            } label: {
+                Image(systemName: "checkmark.circle")
+                Text("전체 선택")
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+
+            Button {
+                store.send(.library(.revealSelectedInFinder))
+            } label: {
+                Image(systemName: "folder")
+                Text("Finder에서 보기")
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+
+            Button {
+                store.send(.library(.openSelected))
+            } label: {
+                Image(systemName: "play.fill")
+                Text("열기")
             }
             .font(.system(size: 11))
             .buttonStyle(.plain)
@@ -133,8 +158,11 @@ struct LibraryGridView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
 
-            Button("선택 삭제") {
+            Button {
                 store.send(.library(.removeSelected))
+            } label: {
+                Image(systemName: "trash")
+                Text("선택 삭제")
             }
             .font(.system(size: 11))
             .buttonStyle(.plain)
@@ -202,6 +230,7 @@ struct LibraryGridView: View {
             }
         }
     }
+
 }
 
 // MARK: - Grid Cell
@@ -217,6 +246,7 @@ struct LibraryGridCell: View {
     let onDelete: () -> Void
     let onDownloadSubtitles: () -> Void
     let onChannelDownload: () -> Void
+    let onShowSummary: () -> Void
     let onToggleSelection: () -> Void
     @State private var bounceUp = false
     @State private var isHovering = false
@@ -307,6 +337,7 @@ struct LibraryGridCell: View {
         .leftClickMenu(entries: [
             .action(title: "열기", action: onOpen),
             .separator,
+            .action(title: "AI 요약", action: onShowSummary),
             .action(title: "자막 다운로드", action: onDownloadSubtitles, enabled: !hasSubtitles && !isDownloadingSubtitle),
             .action(title: "채널 다운로더 실행", action: onChannelDownload),
             .separator,
@@ -450,7 +481,7 @@ struct LeftClickMenu: NSViewRepresentable {
 
         @objc func handleClick(_ gesture: NSClickGestureRecognizer) {
             guard let view = gesture.view else { return }
-            let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+            let modifiers = NSEvent.modifierFlags
 
             if modifiers.contains(.command) {
                 onToggleSelection?()
@@ -536,6 +567,7 @@ struct HoverPreviewPanel: NSViewRepresentable {
         var globalMonitor: Any?
         private var lastHideTime: Date = .distantPast
 
+        @MainActor
         func showPanel() {
             guard let positioningView, panel == nil else { return }
             guard Date().timeIntervalSince(lastHideTime) > 0.3 else { return }
@@ -617,6 +649,7 @@ struct HoverPreviewPanel: NSViewRepresentable {
             if let t = checkTimer { RunLoop.main.add(t, forMode: .common) }
         }
 
+        @MainActor
         func hidePanel() {
             lastHideTime = Date()
             checkTimer?.invalidate()

@@ -1,7 +1,7 @@
 import Foundation
 
 enum BookmarkManager {
-    private static var activeURLs: [String: URL] = [:]
+    private nonisolated(unsafe) static var activeURLs: [String: URL] = [:]
     private static let storageDirKey = "storageDirectoryBookmark"
 
     static func saveBookmark(for url: URL) {

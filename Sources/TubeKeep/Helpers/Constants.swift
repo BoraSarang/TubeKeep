@@ -37,10 +37,15 @@ enum Constants {
     static let openChannelWindowNotification = Notification.Name("com.tubekeep.openChannelWindow")
     static let openChannelWithIdNotification = Notification.Name("com.tubekeep.openChannelWithId")
     static let selectChannelNotification = Notification.Name("com.tubekeep.selectChannel")
+    static let openSettingsWindowNotification = Notification.Name("com.tubekeep.openSettingsWindow")
+
     static let librarySaveKey = "downloadLibrary"
     static let libraryViewModeKey = "libraryViewMode"
     static let channelOrderKey = "channelOrder"
     static let downloadQueueKey = "downloadQueue"
+    static let showMainWindowOnLaunchKey = "showMainWindowOnLaunch"
+    static let sponsorBlockKey = "sponsorBlock"
+    static let embedMetadataKey = "embedMetadata"
 
     static func isChannelURL(_ url: String) -> Bool {
         let patterns = [

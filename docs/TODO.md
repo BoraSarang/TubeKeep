@@ -29,6 +29,58 @@
 | T-127 | **디스크 사용량 UI** — LibrarySidebarView 하단 `Finder에서 보기  12.3 GB  ↻` | medium | completed | ✅ |
 | T-128 | **채널 업데이트 알림 개선** — seenVideoIds, 진행률 상태바, DEBUG 로그 출력 위치 변경 | high | completed | ✅ |
 
+## v2.0.1 — AI 요약 팝업 UI 통일 + Discover UX 개선
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-200 | **사이드바 한글화** — Library→보관함, Discover→트랜드 | low | completed | |
+| T-201 | **트랜드 검색창** — 사이드바 검색 필드 | medium | completed | |
+| T-202 | **카테고리 리스트 리디자인** — 드래그 핸들 + SF Symbol + 순서변경 (카운트 제거) | medium | completed | |
+| T-203 | **DiscoverCard overlay 안정화** — ZStack → `.overlay()`로 변경 | high | completed | hover 버튼 레이아웃 영향 제거 |
+| T-204 | **AI 요약 UX 통일** — Discover/Library/Home 모두 popover/sheet로 통일 | high | completed | |
+| T-205 | **Local file 요약 fallback** — 외부 자막 없으면 YouTube 자막 fetch | high | completed | |
+| T-206 | **다운로드 완료 배지 가시성** — Discover 카드 초록 배경 + 캡슐 | low | completed | |
+| T-207 | **LibraryItem 구버전 호환** — tags/summary decodeIfPresent | high | completed | |
+
+## v2.1.0 — Google Gemini API 마이그레이션
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-300 | **Gemini API 키 설정 UI** — SecureField + 발급 링크 (SettingsView) | high | completed | |
+| T-301 | **SettingsReducer + Settings 모델** — geminiAPIKey State/Action | high | completed | |
+| T-302 | **SummarizationService Gemini 마이그레이션** — queryOllama → queryGemini | high | completed | |
+| T-303 | **TaggingService Gemini 마이그레이션** — queryOllama → queryGemini | high | completed | |
+| T-304 | **API 키 체크 알럿** — Library/Discover/Home 3곳 showGeminiKeyAlert + openSettingsForGeminiKey | high | completed | |
+| T-305 | **Constants + AppDelegate** — openSettingsWindowNotification | high | completed | |
+| T-306 | **문서 업데이트** — SETUP_GEMINI.md 신규, SETUP_OLLAMA.md 레거시 표시 | medium | completed | |
+
+## v2.2.0 — 설정 UI 전면 개편 + SummaryServiceMode 제거
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-400 | **4탭 설정 레이아웃** — SettingsTab enum (일반/저장/시스템/AI 요약), 좌 140pt 사이드바 + 우 ScrollView | high | completed | |
+| T-401 | **SettingsRow 컴포넌트** — 제네릭 `VStack { HStack(title, control) + Text(desc, .trailing) }` | high | completed | 기존 3개 헬퍼 통합 |
+| T-402 | **창 크기 560×420 고정** — NSWindow contentMinSize/MaxSize + 리사이즈 불가 | high | completed | |
+| T-403 | **⌘, 단축키 글로벌 모니터** — NSEvent.addLocalMonitorForEvents | high | completed | 메인 창에서도 동작 |
+| T-404 | **summaryServiceMode stored property** — computed→stored 전환, UserDefaults init, 직접 저장 | high | completed | @ObservableState 바인딩 |
+| T-405 | **alwaysOnTop 설정 제거** — AppReducer/Settings 필드 삭제, 3개 창 로컬 `@State` | high | completed | |
+| T-406 | **해상도 Picker 순서 통일** — SettingsView/ChannelContentView/BatchDownloadView 4K→144p | medium | completed | |
+| T-407 | **showMainWindowOnLaunch** — Settings 토글 + AppReducer.appDidFinishLaunching 로드 | medium | completed | |
+| T-408 | **AI 요약 탭 — SummaryServiceMode 제거** — 서비스 드롭다운 삭제, yTeaser/Gemini 고정 배치, 429 시 자동 폴백 | high | completed | `SummaryError.quotaExceeded` 추가 |
+| T-409 | **AI 탭 UI 재구성** — yTeaser(설명+항상사용) / Gemini(API Key 입력+Billing링크) 고정 영역 | high | completed | |
+| T-410 | **설명문 UI 개선** — 8pt→11pt, .trailing 정렬, lineLimit(1), minimumScaleFactor | low | completed | |
+
+## v2.3.0 — SponsorBlock + 기능 다듬기
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-500 | **SponsorBlock** — `--sponsorblock-remove all` 플래그 + 시스템 탭 토글 | high | completed | yt-dlp 내장 |
+| T-501 | **메타데이터/섬네일 임베딩** — `--embed-metadata --embed-thumbnail` + 시스템 탭 토글 | high | completed | |
+| T-502 | **다운로드 큐 개별 제어** — DownloadRow 상태별 pause/resume/retry 버튼 | high | completed | |
+| T-503 | **에러 메시지 래핑** — ErrorMessageMapper + DownloadManager/YouTubeDLService 적용 | medium | completed | 15개 패턴 매핑 |
+| T-504 | **라이브러리 벌크 액션** — revealSelectedInFinder + openSelected + selectionBar 버튼 | high | completed | Grid/List 양쪽 |
+| T-505 | **메뉴바 큐 요약** — 드롭다운에 다운로드 중/완료/대기 개수 + 속도 + ETA | medium | completed | |
+
 ## 제외 (v1.1.0 범위 외)
 
 | 작업 | 사유 |

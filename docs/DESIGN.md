@@ -92,10 +92,20 @@ struct State: Equatable {
     var errorMessage: String?
     var lastAutoFetchedURL: String = ""
     var clipboardMonitoring: Bool
+
+    // v2.0.1: AI 요약 (다운로더)
+    var summaryText: String?
+    var summaryLoading = false
+    var showSummaryPopover = false
 }
 ```
 
 **CancelID**: `.fetch`, `.fetchTimer`
+
+#### v2.0.1 추가 Action
+```
+toggleSummaryPopover / summaryLoaded(String) / summaryFailed(String) / dismissSummary
+```
 
 ### 2.3 DownloadQueueReducer
 
@@ -170,10 +180,34 @@ struct State: Equatable {
     var viewMode: LibraryViewMode = .grid
     var isLoading = false
     var selectedIds: Set<String> = []  // T-112: 다중 선택
+
+    // Discover (v2.0.0)
+    var sidebarMode: LibrarySidebarMode = .library
+    var discoverCategory: TrendingCategory = .all
+    var discoverVideos: [TrendingCategory: [TrendingVideo]] = [:]
+    var discoverLoading = false
+    var discoverError: String?
+    var categoryOrder: [TrendingCategory] = TrendingCategory.allCases
+    var discoverSearchText = ""
+    var discoverSearchResults: [TrendingVideo] = []
+    var discoverSearching = false
+
+    // Discover Summary (v2.0.1)
+    var discoverSummaryVideoId: String?
+    var discoverSummaryText: String?
+    var discoverSummaryLoading = false
+
+    // Library Summary (v2.0.1)
+    var librarySummaryVideoId: String?
+    var librarySummaryText: String?
+    var librarySummaryLoading = false
 }
 ```
 - `viewMode`는 UserDefaults(`libraryViewModeKey`)에 저장되어 재실행 시 유지
 - `selectedIds`: Cmd+클릭으로 토글, selection bar에서 일괄 삭제 시 사용
+- `categoryOrder`: @AppStorage("categoryOrder")로 유지, drag-drop 재정렬 가능
+- `discoverSummary*` — DiscoverCard popover 상태
+- `librarySummary*` — Library .sheet 모달 상태
 
 #### Action
 ```
@@ -182,6 +216,15 @@ setSearchText / setSelectedChannel / setSortOrder / setFilterMode / setViewMode
 openFile / revealInFinder
 downloadSubtitles / subtitleResult        // T-116: 자막 다운로드
 toggleSelection / selectAll / clearSelection  // T-112: 다중 선택
+
+// Discover (v2.0.0)
+setSidebarMode / refreshTrending / refreshCategory
+discoverSearch / discoverSearchResultsLoaded / discoverAddToQueue
+showSummary / summaryResult / summaryFailed
+
+// v2.0.1
+dismissDiscoverSummary
+dismissLibrarySummary
 ```
 
 #### filteredItems computed property
@@ -352,7 +395,17 @@ enum LibraryViewMode: String, Equatable, CaseIterable {
   - 비동기 연산 (Task 내 호출)
   - LibraryReducer.diskUsageBytes에 저장
 
-### 5.6 ChannelFetchService (actor)
+### 5.6 SummarizationService (actor) — v2.0.0/v2.0.1
+- `summarize(videoId:title:channel:)` → `SummaryResult`
+  - `fetchTranscript(videoId:)` — yt-dlp `--write-subs --write-auto-subs`로 자막 다운로드 → VTT/SRT 파싱
+  - `generateSummary(text:title:channel:)` — Ollama `llama3.2` API 호출 → 개요+핵심포인트 파싱
+- `summarizeFromLocalFile(videoPath:title:channel:)` → `SummaryResult`
+  - `extractTranscriptFromLocalFile(videoPath:)` — 같은 디렉토리의 `{videoId}.en.ko.vtt/srt` 검색
+  - **v2.0.1**: 외부 자막 파일 없으면 `fetchTranscript(videoId:)`로 YouTube 자막 다운로드 fallback
+- 의존성: Ollama `http://localhost:11434`, `model: "llama3.2"`
+- 에러 처리: `noSubtitle` / `transcriptionFailed` / `summaryFailed` / `ollamaUnavailable`
+
+### 5.7 ChannelFetchService (actor)
 - `fetchChannelInfo(url:)` → SubscribedChannel
   - videoCount는 UU playlist의 `playlist_count` 사용 (fallback 실패 시 0)
   - 호출자는 `videoCount: 0`인 경우 기존 값을 보존해야 함
@@ -640,7 +693,7 @@ enum Constants {
 | `DownloadQueue/DownloadQueueReducer.swift` | 다운로드 큐 reducer |
 | `DownloadQueue/DownloadQueueView.swift` | 다운로드 큐 UI |
 
-### Services/ (6)
+### Services/ (9)
 | 파일 | 설명 |
 |------|------|
 | `YouTubeDLService.swift` | yt-dlp 정보 조회 actor |
@@ -649,11 +702,14 @@ enum Constants {
 | `LibraryCacheService.swift` | 라이브러리 + 썸네일/아바타 캐시 actor |
 | `ChannelFetchService.swift` | 채널 정보 fetch actor |
 | `UploadOrderService.swift` | 업로드 순번 조회 actor |
+| `TrendingService.swift` | yt-dlp `ytsearch` 기반 트렌딩 검색 + 30분 TTL 캐시 |
+| `SummarizationService.swift` | 자막 추출 → Ollama LLM 요약 |
+| `TaggingService.swift` | Ollama 분류 + 키워드 fallback 자동 태깅 |
 
-### Models/ (8)
+### Models/ (9)
 | 파일 | 설명 |
 |------|------|
-| `LibraryItem.swift` | LibraryItem + SortOrder + FilterMode + ViewMode |
+| `LibraryItem.swift` | LibraryItem + SortOrder + FilterMode + ViewMode (v2.0.1: Custom Codable, tags/summary decodeIfPresent) |
 | `VideoInfo.swift` | YouTube 영상 메타데이터 |
 | `DownloadItem.swift` | 다운로드 작업 모델 |
 | `Format.swift` | 비디오 포맷 |
@@ -661,6 +717,7 @@ enum Constants {
 | `SubscribedChannel.swift` | 구독 채널 모델 |
 | `ChannelModels.swift` | 채널 비디오 + 캐시 |
 | `BatchPreset.swift` | 일괄 다운로드 프리셋 |
+| `TrendingVideo.swift` | 트렌딩 영상 + TrendingCategory 열거형 (systemIcon 프로퍼티) |
 
 ### Helpers/ (2)
 | 파일 | 설명 |

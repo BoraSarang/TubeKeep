@@ -3,7 +3,7 @@ import AppKit
 import ComposableArchitecture
 import os
 
-final class DownloadManager {
+final class DownloadManager: @unchecked Sendable {
     static let shared = DownloadManager()
 
     private let runner = ProcessRunner()
@@ -128,7 +128,7 @@ final class DownloadManager {
                             }
                         }
                     } else {
-                        completionHandler(item.id, false, errMsg ?? "알 수 없는 오류")
+                        completionHandler(item.id, false, ErrorMessageMapper.map(errMsg))
                     }
                 }
             } catch {
@@ -213,6 +213,14 @@ final class DownloadManager {
 
         if item.audioOnly {
             args += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+        }
+
+        if settings.sponsorBlock {
+            args += ["--sponsorblock-remove", "all"]
+        }
+
+        if settings.embedMetadata {
+            args += ["--embed-metadata", "--embed-thumbnail"]
         }
 
         args.append(item.videoInfo.webpageURL)

@@ -41,9 +41,9 @@ struct BatchDownloadView: View {
     @State private var showFullLog = false
 
     private let resolutionOptions: [(label: String, value: Int)] = [
-        ("144p", 144), ("240p", 240), ("360p", 360),
-        ("480p", 480), ("720p", 720), ("1080p", 1080),
-        ("2K", 1440), ("4K", 2160),
+        ("4K", 2160), ("2K", 1440),
+        ("1080p", 1080), ("720p", 720), ("480p", 480),
+        ("360p", 360), ("240p", 240), ("144p", 144),
     ]
 
     @State private var selectedResolution: Int = Constants.defaultResolution

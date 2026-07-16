@@ -17,6 +17,7 @@
 | `TODO.md` | 작업 추적 목록 | 세부 할 일 목록 (상태: pending/in_progress/completed/cancelled) |
 | `AGENTS.md` | AI 에이전트 가이드 | 파일 설명, 업데이트 규칙, 작업 지침 |
 | `BRAND.md` | 브랜드 아이덴티티 | 앱 이름, 슬로건, 브랜드 가치, 무드 |
+| `UI_DESIGN.md` | UI 설계 문서 | 사이드바 네비게이션, Discover 탭, AI 요약 UI |
 
 ---
 

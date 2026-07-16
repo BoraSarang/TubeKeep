@@ -7,7 +7,7 @@ import ComposableArchitecture
 struct SettingsReducer {
     @ObservableState
     struct State: Equatable {
-        var isExpanded: Bool = true
+        var selectedTab: SettingsTab = .downloads
         var concurrentDownloads: Int = Constants.defaultConcurrentDownloads
         var storageDirectory: String = Constants.defaultStorageDirectory
         var filenameTemplate: String = Constants.defaultFilenameTemplate
@@ -19,6 +19,13 @@ struct SettingsReducer {
         var launchAtLogin: Bool = false
         var maxUploadCheck: Int = Constants.defaultMaxUploadCheck
         var skipIndexOnFailure: Bool = false
+        var showMainWindowOnLaunch: Bool = true
+        var sponsorBlock: Bool = true
+        var embedMetadata: Bool = true
+        var geminiAPIKey: String {
+            get { UserDefaults.standard.string(forKey: "geminiAPIKey") ?? "" }
+            set { UserDefaults.standard.set(newValue, forKey: "geminiAPIKey") }
+        }
 
         var settings: Settings {
             Settings(
@@ -32,13 +39,16 @@ struct SettingsReducer {
                 maxRetries: maxRetries,
                 launchAtLogin: launchAtLogin,
                 maxUploadCheck: maxUploadCheck,
-                skipIndexOnFailure: skipIndexOnFailure
+                skipIndexOnFailure: skipIndexOnFailure,
+                showMainWindowOnLaunch: showMainWindowOnLaunch,
+                sponsorBlock: sponsorBlock,
+                embedMetadata: embedMetadata
             )
         }
     }
 
     enum Action: Equatable {
-        case toggleExpanded
+        case setSelectedTab(SettingsTab)
         case setConcurrentDownloads(Int)
         case selectStorageDirectory
         case storageDirectorySelected(String)
@@ -52,14 +62,18 @@ struct SettingsReducer {
         case setLaunchAtLogin(Bool)
         case setMaxUploadCheck(Int)
         case toggleSkipIndexOnFailure
+        case toggleShowMainWindowOnLaunch
+        case toggleSponsorBlock
+        case toggleEmbedMetadata
+        case setGeminiAPIKey(String)
         case saveSettings
     }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .toggleExpanded:
-                state.isExpanded.toggle()
+            case let .setSelectedTab(tab):
+                state.selectedTab = tab
                 return .none
 
             case let .setConcurrentDownloads(value):
@@ -147,6 +161,22 @@ struct SettingsReducer {
             case .toggleSkipIndexOnFailure:
                 state.skipIndexOnFailure.toggle()
                 return .send(.saveSettings)
+
+            case .toggleShowMainWindowOnLaunch:
+                state.showMainWindowOnLaunch.toggle()
+                return .send(.saveSettings)
+
+            case .toggleSponsorBlock:
+                state.sponsorBlock.toggle()
+                return .send(.saveSettings)
+
+            case .toggleEmbedMetadata:
+                state.embedMetadata.toggle()
+                return .send(.saveSettings)
+
+            case let .setGeminiAPIKey(key):
+                state.geminiAPIKey = key
+                return .none
 
             case .saveSettings:
                 return .run { [settings = state.settings] _ in

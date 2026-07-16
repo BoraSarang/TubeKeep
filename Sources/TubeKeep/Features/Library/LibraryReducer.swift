@@ -2,6 +2,11 @@ import Foundation
 import AppKit
 import ComposableArchitecture
 
+enum LibrarySidebarMode: String, Equatable {
+    case library = "Library"
+    case discover = "Discover"
+}
+
 @Reducer
 struct LibraryReducer {
     @ObservableState
@@ -19,6 +24,31 @@ struct LibraryReducer {
         var subtitleToast: ToastMessage?
         var subtitleToastVideoId: String?
         var diskUsageBytes: Int64 = 0
+
+        // Navigation
+        var sidebarMode: LibrarySidebarMode = .library
+
+        // Discover
+        var discoverCategory: TrendingCategory = .all
+        var discoverVideos: [TrendingCategory: [TrendingVideo]] = [:]
+        var discoverLoading: Bool = false
+        var discoverError: String?
+        var discoverSearchText = ""
+        var discoverSearchResults: [TrendingVideo] = []
+        var discoverSearching = false
+
+        // Discover Summary
+        var discoverSummaryVideoId: String?
+        var discoverSummaryText: String?
+        var discoverSummaryLoading = false
+
+        // Library Summary
+        var librarySummaryVideoId: String?
+        var librarySummaryText: String?
+        var librarySummaryLoading = false
+
+        // Gemini API Key Alert
+        var showGeminiKeyAlert = false
 
         init() {
             let saved = UserDefaults.standard.string(forKey: Constants.libraryViewModeKey) ?? "grid"
@@ -91,6 +121,8 @@ struct LibraryReducer {
         case removeItem(String)
         case removeItemsByChannel(channelId: String, channelName: String)
         case removeSelected
+        case revealSelectedInFinder
+        case openSelected
         case setSearchText(String)
         case setSelectedChannel(String?)
         case setSortOrder(LibrarySortOrder)
@@ -107,6 +139,38 @@ struct LibraryReducer {
         case openChannelDownload(channelId: String, channelName: String)
         case calculateDiskUsage
         case diskUsageUpdated(Int64)
+
+        // Navigation
+        case setSidebarMode(LibrarySidebarMode)
+
+        // Discover
+        case selectDiscoverCategory(TrendingCategory)
+        case fetchTrending
+        case trendingLoaded(category: TrendingCategory, videos: [TrendingVideo])
+        case trendingFailed(String)
+        case refreshTrending
+
+        // Discover Search
+        case setDiscoverSearchText(String)
+        case discoverSearch
+        case discoverSearchLoaded([TrendingVideo])
+        case discoverSearchFailed(String)
+        case discoverRequestSummary(videoId: String, title: String, channel: String)
+        case discoverSummaryLoaded(text: String)
+        case discoverSummaryFailed(String)
+        case discoverDismissSummary
+
+        // Summary
+        case showSummary(String)
+        case summaryResult(videoId: String, overview: String, keyPoints: [String])
+        case summaryFailed(videoId: String, error: String)
+        case dismissLibrarySummary
+        case setGeminiKeyAlert(Bool)
+        case openSettingsForGeminiKey
+
+        // Tagging
+        case tagItem(videoId: String, title: String, channel: String)
+        case itemTagged(videoId: String, tag: String)
     }
 
     static func hasSubtitles(for filePath: String) -> Bool {
@@ -200,6 +264,24 @@ struct LibraryReducer {
                     },
                     .send(.calculateDiskUsage)
                 )
+
+            case .revealSelectedInFinder:
+                let items = state.items.filter { state.selectedIds.contains($0.id) }
+                return .run { _ in await MainActor.run {
+                    for item in items {
+                        let url = URL(fileURLWithPath: item.filePath)
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                }}
+
+            case .openSelected:
+                let items = state.items.filter { state.selectedIds.contains($0.id) }
+                return .run { _ in await MainActor.run {
+                    for item in items {
+                        let url = URL(fileURLWithPath: item.filePath)
+                        NSWorkspace.shared.open(url)
+                    }
+                }}
 
             case .toggleSelection(let id):
                 if state.selectedIds.contains(id) {
@@ -356,6 +438,226 @@ struct LibraryReducer {
                 }
             case let .diskUsageUpdated(bytes):
                 state.diskUsageBytes = bytes
+                return .none
+
+            // Navigation
+            case let .setSidebarMode(mode):
+                state.sidebarMode = mode
+                if mode == .discover, state.discoverVideos.isEmpty {
+                    return .send(.fetchTrending)
+                }
+                return .none
+
+            // Discover
+            case let .selectDiscoverCategory(category):
+                state.discoverCategory = category
+                if state.discoverVideos[category] == nil {
+                    return .send(.fetchTrending)
+                }
+                return .none
+
+            case .fetchTrending:
+                state.discoverLoading = true
+                state.discoverError = nil
+                return .run { [category = state.discoverCategory] send in
+                    let service = TrendingService()
+                    do {
+                        let videos = try await service.fetch(category: category)
+                        await send(.trendingLoaded(category: category, videos: videos))
+                    } catch {
+                        await send(.trendingFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .trendingLoaded(category, videos):
+                state.discoverLoading = false
+                state.discoverVideos[category] = videos
+                return .none
+
+            case let .trendingFailed(error):
+                state.discoverLoading = false
+                state.discoverError = error
+                return .none
+
+            case .refreshTrending:
+                state.discoverVideos.removeAll()
+                state.discoverSearchText = ""
+                state.discoverSearchResults = []
+                return .send(.fetchTrending)
+
+            // Discover Search
+            case let .setDiscoverSearchText(text):
+                state.discoverSearchText = text
+                if text.isEmpty {
+                    state.discoverSearchResults = []
+                    state.discoverSearching = false
+                }
+                return .none
+
+            case .discoverSearch:
+                let query = state.discoverSearchText
+                guard !query.isEmpty else { return .none }
+                state.discoverSearching = true
+                state.discoverError = nil
+                return .run { send in
+                    let service = TrendingService()
+                    do {
+                        let videos = try await service.search(query: query)
+                        await send(.discoverSearchLoaded(videos))
+                    } catch {
+                        await send(.discoverSearchFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .discoverSearchLoaded(videos):
+                state.discoverSearching = false
+                state.discoverSearchResults = videos
+                return .none
+
+            case let .discoverSearchFailed(error):
+                state.discoverSearching = false
+                state.discoverError = error
+                return .none
+
+            // Discover Summary
+            case let .discoverRequestSummary(videoId, title, channel):
+                state.discoverSummaryVideoId = videoId
+                state.discoverSummaryLoading = true
+                state.discoverSummaryText = nil
+                return .run { send in
+                    let service = SummarizationService()
+                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    do {
+                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
+                        await send(.discoverSummaryLoaded(text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                    } catch let error as SummarizationService.SummaryError {
+                        if case .quotaExceeded = error, !apiKey.isEmpty {
+                            do {
+                                let result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
+                                await send(.discoverSummaryLoaded(text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                            } catch {
+                                await send(.discoverSummaryFailed(error.localizedDescription))
+                            }
+                        } else {
+                            if case .quotaExceeded = error {
+                                await send(.setGeminiKeyAlert(true))
+                            }
+                            await send(.discoverSummaryFailed(error.localizedDescription))
+                        }
+                    } catch {
+                        await send(.discoverSummaryFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .discoverSummaryLoaded(text):
+                state.discoverSummaryLoading = false
+                state.discoverSummaryText = text
+                return .none
+
+            case let .discoverSummaryFailed(error):
+                state.discoverSummaryLoading = false
+                state.discoverSummaryText = "요약 실패\n\n\(error)"
+                return .none
+
+            case .discoverDismissSummary:
+                state.discoverSummaryVideoId = nil
+                state.discoverSummaryText = nil
+                state.discoverSummaryLoading = false
+                return .none
+
+            // Summary
+            case let .showSummary(videoId):
+                guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+                state.librarySummaryVideoId = videoId
+                state.librarySummaryLoading = true
+                state.librarySummaryText = nil
+                let title = item.title
+                let channel = item.channelName
+                let filePath = item.filePath
+                return .run { send in
+                    let service = SummarizationService()
+                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    do {
+                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
+                        await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints))
+                    } catch let error as SummarizationService.SummaryError {
+                        if case .quotaExceeded = error, !apiKey.isEmpty {
+                            do {
+                                let result: SummarizationService.SummaryResult
+                                if FileManager.default.fileExists(atPath: filePath) {
+                                    result = try await service.summarizeFromLocalFile(videoPath: filePath, title: title, channel: channel, apiKey: apiKey)
+                                } else {
+                                    result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
+                                }
+                                await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints))
+                            } catch {
+                                await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                            }
+                        } else {
+                            if case .quotaExceeded = error {
+                                await send(.setGeminiKeyAlert(true))
+                            }
+                            await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                        }
+                    } catch {
+                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                    }
+                }
+
+            case let .summaryResult(videoId, overview, keyPoints):
+                state.librarySummaryLoading = false
+                let joined = "\(overview)\n\n" + keyPoints.map { "• \($0)" }.joined(separator: "\n")
+                state.librarySummaryText = joined
+                if let idx = state.items.firstIndex(where: { $0.id == videoId }) {
+                    state.items[idx].summary = joined
+                    let updated = state.items[idx]
+                    return .run { _ in
+                        await LibraryCacheService.shared.updateItem(updated)
+                    }
+                }
+                return .none
+
+            case let .summaryFailed(videoId, error):
+                state.librarySummaryLoading = false
+                state.librarySummaryText = "요약 실패\n\n\(error)"
+                if let idx = state.items.firstIndex(where: { $0.id == videoId }) {
+                    state.items[idx].summary = "요약 실패: \(error)"
+                }
+                return .none
+
+            case .dismissLibrarySummary:
+                state.librarySummaryVideoId = nil
+                state.librarySummaryText = nil
+                state.librarySummaryLoading = false
+                return .none
+
+            case let .setGeminiKeyAlert(show):
+                state.showGeminiKeyAlert = show
+                return .none
+
+            case .openSettingsForGeminiKey:
+                state.showGeminiKeyAlert = false
+                return .run { _ in await MainActor.run {
+                    NotificationCenter.default.post(name: Constants.openSettingsWindowNotification, object: nil)
+                }}
+
+            // Tagging
+            case let .tagItem(videoId, title, channel):
+                return .run { send in
+                    let service = TaggingService()
+                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    let tag = await service.classify(title: title, channel: channel, apiKey: apiKey)
+                    await send(.itemTagged(videoId: videoId, tag: tag))
+                }
+
+            case let .itemTagged(videoId, tag):
+                if let idx = state.items.firstIndex(where: { $0.id == videoId }) {
+                    state.items[idx].tags = [tag]
+                    let updated = state.items[idx]
+                    return .run { _ in
+                        await LibraryCacheService.shared.updateItem(updated)
+                    }
+                }
                 return .none
             }
         }
