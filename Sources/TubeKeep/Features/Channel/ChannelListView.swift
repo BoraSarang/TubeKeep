@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AppKit
 
 private struct RowFrameKey: PreferenceKey {
     nonisolated(unsafe) static var defaultValue: [Int: CGRect] = [:]
@@ -95,6 +96,12 @@ struct ChannelListView: View {
                             .contentShape(Rectangle())
                             .onTapGesture { onSelect(channel) }
                         .contextMenu {
+                            Button("Finder에서 채널 폴더 열기") {
+                                let folder = Constants.sanitizeFolderName(channel.name)
+                                let path = "\(Constants.channelStorageDirectory)/\(folder)"
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+                            }
+                            Divider()
                             Button("채널 삭제") { onDelete(channel) }
                         }
                         .onDrag {
