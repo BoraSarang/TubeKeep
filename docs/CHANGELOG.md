@@ -18,9 +18,10 @@
   - GridView / ListView 양쪽 selectionBar 동시 적용
   - Cmd+Click 선택 수정 (`NSApp.currentEvent` → `NSEvent.modifierFlags`)
 - **메뉴바 큐 요약**: 우클릭/클릭 메뉴에 다운로드 중/완료/대기 개수 + 속도 + ETA 표시
-  - `RunLoop.common` 모드 타이머 + `menu.itemChanged()`로 열린 메뉴 실시간 갱신
-  - `startDownload`/`pauseDownload`/`resumeDownload` 시 statusBar 동기화 추가
+  - `RunLoop.common` 모드 타이머 + `menu.itemChanged()` 실시간 갱신
+  - `startDownload`/`pauseDownload`/`resumeDownload` 시 statusBar 동기화
 - **Home AI 요약 팝오버**: Discover/Library와 동일한 디자인으로 통일 (380×320, ScrollView, 복사 버튼)
+- **채널 목록 우클릭 메뉴**: "Finder에서 채널 폴더 열기" 추가
 - **순번 인덱스 개선**: 일반 URL 다운로드는 `fetchUploadIndex` 건너뜀 → `000 - ` prefix 저장
 - **채널 새로고침 시 파일 rename**: `000 - ` prefix 파일을 올바른 순번으로 자동 변경
 - **해상도 Picker 폭 증가**: 130pt → 200pt (긴 포맷 라벨 대응)

@@ -333,6 +333,9 @@
 - [x] 종료코드 + 파일 존재 여부 모두 확인 → thumbnail/sponsorblock post-processing non-zero exit에도 성공 처리
 - [x] 완료 핸들러에 outputPath 전달 → LibraryItem.filePath에 실제 경로 사용
 
+#### 채널 다운로더 메뉴
+- [x] 채널 목록 우클릭 → "Finder에서 채널 폴더 열기" 추가
+
 #### 새 파일
 - [x] `Services/ErrorMessageMapper.swift`
 - [x] `docs/TEST.md` — v2.3.0 테스트 명세서
