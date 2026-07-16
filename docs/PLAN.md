@@ -328,6 +328,11 @@
 - [x] 해상도 Picker 130pt → 200pt (긴 포맷 라벨 대응)
 - [x] Discover 검색 아이콘: `Group { }.frame(width:14, height:14)`으로 레이아웃 안정화
 
+#### 다운로드 실패 판정 버그 수정 (v2.3.0-post)
+- [x] `--print-to-file after_move:filepath` 인자 추가 → 실제 출력 경로 추적
+- [x] 종료코드 + 파일 존재 여부 모두 확인 → thumbnail/sponsorblock post-processing non-zero exit에도 성공 처리
+- [x] 완료 핸들러에 outputPath 전달 → LibraryItem.filePath에 실제 경로 사용
+
 #### 새 파일
 - [x] `Services/ErrorMessageMapper.swift`
 - [x] `docs/TEST.md` — v2.3.0 테스트 명세서

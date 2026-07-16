@@ -37,6 +37,9 @@
 - 메뉴 열린 상태에서 큐 정보 실시간 갱신 안 되던 문제 수정
 - Discover 검색 Enter 시 아이콘 레이아웃 깨짐 수정
 - 영상 다운로더 해상도 Picker 라벨 잘림 수정
+- **다운로드 성공해도 "실패"로 표시되는 문제 수정**: yt-dlp가 thumbnail/sponsorblock/post-processing 단계에서 non-zero exit code를 반환해도 실제 파일이 생성되었으면 성공으로 처리
+  - `--print-to-file after_move:filepath`로 실제 출력 경로 추적
+  - 종료 코드 + 파일 존재 여부 모두 확인하여 판단
 
 ## v2.2.0 (2026-07-16) — 설정 UI 전면 개편 (OpenCode Desktop 스타일)
 
