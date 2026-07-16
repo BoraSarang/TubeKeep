@@ -167,3 +167,23 @@
 | T-19 | 자동 업데이트 (Sparkle) | 범위 외 |
 | T-20 | macOS Notification Center 배너 | 메뉴바 badge로 충분 |
 | T-21 | 브라우저 확장 | 클립보드 감시로 대체 |
+
+## v2.3.0 — SponsorBlock + 기능 다듬기 (2026-07-16) 🏁
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-200 | SponsorBlock 지원 (시스템 탭 토글) | high | completed | TC-01 ⬜ |
+| T-201 | 메타데이터/섬네일 임베딩 | high | completed | TC-02 ✅ |
+| T-202 | 다운로드 큐 개별 제어 | high | completed | TC-03 ✅ |
+| T-203 | ErrorMessageMapper 한글화 (15패턴) | medium | completed | TC-04 ✅ |
+| T-204 | 라이브러리 벌크 액션 (Finder/열기/선택) | medium | completed | TC-05 ✅ |
+| T-205 | 메뉴바 큐 요약 (실시간 갱신) | medium | completed | TC-06 ✅ |
+| T-206 | 설정 지속성 | medium | completed | TC-07 ✅ |
+| T-207 | 회귀 테스트 (11/11) | high | completed | TC-08 ✅ |
+| T-208 | Discover 검색 아이콘 레이아웃 안정화 | low | completed | ✅ |
+| T-209 | 해상도 Picker 130pt→200pt | low | completed | ✅ |
+| T-210 | 순번 인덱스 개선 (000 prefix, 채널 rename) | medium | completed | ✅ |
+| T-211 | Home AI 요약 팝오버 디자인 통일 | low | completed | ✅ |
+| T-212 | Cmd+Click 선택 수정 (NSEvent.modifierFlags) | medium | completed | ✅ |
+| T-213 | StatusBar 다운로드 동기화 (start/pause/resume) | medium | completed | ✅ |
+| T-214 | 메뉴바 Timer RunLoop.common 등록 + itemChanged | medium | completed | ✅ |

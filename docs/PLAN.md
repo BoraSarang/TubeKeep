@@ -11,7 +11,7 @@
 | M5: 라이브러리 대시보드 | ✅ 완료 | Photos 스타일 메인 창, 그리드/목록 뷰, 검색/필터/정렬, 좌클릭 메뉴 |
 | **v1.0.0** | 🏁 **릴리스** | Git tag `v1.0.0`, `~/Applications/VideoDownloader.app` → `TubeKeep.app` |
 | **v1.1.0** | 🏁 **전체 완료** | ✅자막 ✅hover툴팁 ✅다중선택삭제 ✅채널순서변경 ✅채널추가버튼 ✅폴더열기 ✅URL Scheme ✅채널업데이트+뱃지클릭+new표시 ✅큐영속성 ✅업로드날짜정렬 ✅단일앱복원 ✅DebugLogView ✅설정창분리(⌘,) ✅뷰이름정리 ✅alwaysOnTop비활성화 ✅설정공유상태화 ✅워닝0 |
-| **v2.0.0** | 🏁 **완료** (본 문서 참조) | ✅Discover 탭 ✅AI 영상 요약 ✅AI 자동 태깅 ✅Swift 6 동시성 ✅macOS 26+ ✅사이드바 네비게이션 |
+| **v2.0.0—v2.3.0** | 🏁 **릴리스** | Discover 탭, AI 요약/태깅, Gemini, 설정 UI 개편, SponsorBlock 등 (2026-07-16) |
 
 ---
  
@@ -290,7 +290,7 @@
 - [x] `Constants.showMainWindowOnLaunchKey` 저장 키 추가
 - [x] `SummarizationService.SummaryError.quotaExceeded` 케이스 추가
 
-### v2.3.0 — SponsorBlock + 기능 다듬기 (2026-07-16) ⚡
+### v2.3.0 — SponsorBlock + 기능 다듬기 (2026-07-16) 🏁
 
 #### SponsorBlock + 메타데이터 임베딩
 - [x] SponsorBlock: yt-dlp `--sponsorblock-remove all` 플래그 추가
@@ -309,13 +309,38 @@
 
 #### 라이브러리 벌크 액션
 - [x] `revealSelectedInFinder`, `openSelected` Action 추가
-- [x] SelectionBar에 "Finder에서 보기", "열기" 버튼 추가 (GridView + ListView 양쪽)
+- [x] SelectionBar에 "Finder에서 보기", "열기" 버튼 + SF Symbol 아이콘 추가 (GridView + ListView 양쪽)
+- [x] Cmd+Click 선택 감지 `NSApp.currentEvent` → `NSEvent.modifierFlags`로 수정
 
 #### 메뉴바 상태 개선
 - [x] 메뉴 드롭다운에 큐 요약 정보 표시 (다운로드 중/완료/대기 개수 + 속도 + ETA)
+- [x] `startDownload`/`pauseDownload`/`resumeDownload` 시 statusBar 동기화
+- [x] `RunLoop.main.common` 모드 타이머 + `menu.itemChanged()` 실시간 갱신
+
+#### Home AI 요약 팝오버 디자인 통일
+- [x] Discover/Library와 동일한 380×320 고정, ScrollView 결과, 복사 버튼
+
+#### 순번 인덱스 개선
+- [x] `isChannelDownload`일 때만 `fetchUploadIndex` 호출
+- [x] `renameZeroIndexedFiles`: 채널 새로고침 시 `000 - ` prefix 파일을 올바른 순번으로 rename
+
+#### UI 조정
+- [x] 해상도 Picker 130pt → 200pt (긴 포맷 라벨 대응)
+- [x] Discover 검색 아이콘: `Group { }.frame(width:14, height:14)`으로 레이아웃 안정화
 
 #### 새 파일
 - [x] `Services/ErrorMessageMapper.swift`
+- [x] `docs/TEST.md` — v2.3.0 테스트 명세서
+
+#### 테스트 (TC-01~TC-08)
+- [x] TC-02 메타데이터/섬네일 임베딩 ✅
+- [x] TC-03 큐 개별 제어 ✅
+- [x] TC-04 에러 메시지 ✅
+- [x] TC-05 라이브러리 벌크 액션 ✅
+- [x] TC-06 메뉴바 큐 요약 ✅
+- [x] TC-07 설정 지속성 ✅
+- [x] TC-08 회귀 테스트 (11/11) ✅
+- [x] TC-01 SponsorBlock ⬜ 스킵 (영상 미확보)
 
 ## 제외된 기능 (Cancelled)
 
