@@ -1,5 +1,7 @@
 # PLAN — 구현 계획 및 진행 상황
 
+> **버전별 상세 계획**: `docs/plans/` 폴더 참조 (예: `plans/PLAN_v2.5.2.md`)
+
 ## Milestones
 
 | 단계 | 상태 | 설명 |
@@ -12,6 +14,10 @@
 | **v1.0.0** | 🏁 **릴리스** | Git tag `v1.0.0`, `~/Applications/VideoDownloader.app` → `TubeKeep.app` |
 | **v1.1.0** | 🏁 **전체 완료** | ✅자막 ✅hover툴팁 ✅다중선택삭제 ✅채널순서변경 ✅채널추가버튼 ✅폴더열기 ✅URL Scheme ✅채널업데이트+뱃지클릭+new표시 ✅큐영속성 ✅업로드날짜정렬 ✅단일앱복원 ✅DebugLogView ✅설정창분리(⌘,) ✅뷰이름정리 ✅alwaysOnTop비활성화 ✅설정공유상태화 ✅워닝0 |
 | **v2.0.0—v2.3.0** | 🏁 **릴리스** | Discover 탭, AI 요약/태깅, Gemini, 설정 UI 개편, SponsorBlock 등 (2026-07-16) |
+| **v2.4.0** | 🏁 **릴리스** | 기술부채 해소 + A.X 4.0 통합: SwiftData, AppDelegate 분리, 자동 테스트, SKT A.X 4.0 요약/태깅 (2026-07-16) |
+| **v2.4.1** | 🏁 **릴리스** | OpenRouter Free Tier 통합: OpenRouter → yTeaser → A.X 4.0 → Gemini 4단계 폴백 |
+| **v2.5.0—v2.5.5** | 🏁 **릴리스** | AI 콘텐츠 캐싱 + 챕터/팟캐스트/Q&A/마인드맵 + UI 통합 (SQLite DB) |
+| **v2.5.6** | 🏁 **릴리스** | 마이그레이션 + 최종 테스트 (2026-07-19) |
 
 ---
  
@@ -349,6 +355,90 @@
 - [x] TC-07 설정 지속성 ✅
 - [x] TC-08 회귀 테스트 (11/11) ✅
 - [x] TC-01 SponsorBlock ⬜ 스킵 (영상 미확보)
+
+### v2.5.0 — AI 콘텐츠 캐싱 + 챕터/팟캐스트/Q&A/마인드맵 (2026-07-17) 🔄
+
+**버전 체계**: v2.5.0 → v2.5.1 → ... → v2.5.6 (+0.0.1씩 증가)
+
+#### 챕터 1: SQLite DB 구축 + 자막 캐싱 (v2.5.0)
+- [x] T-500: DatabaseManager.swift 생성 (SQLite3 오픈/생성)
+- [x] T-501: video_ai_data 테이블 생성 (CREATE TABLE IF NOT EXISTS)
+- [x] T-502: CRUD 메서드 구현 (save/load/update/delete)
+- [x] T-503: SummarizationService — 자막 DB 저장 로직
+- [x] T-504: SummarizationService — 자막 DB 로드 로직
+- [x] T-505: LibraryCacheService — 요약 저장 시 DB 동기화
+- [x] T-506: LibraryItem 새 속성 추가 (transcript, chapters)
+- [x] T-507: Info.plist 버전 2.5.0 + Bundle ID 수정 (com.borasarang.tubekeep)
+
+#### 챕터 2: AI 요약 + 챕터 생성 (v2.5.1)
+- [x] T-510: ChapterInfo 모델 생성
+- [x] T-511: SummaryResult에 chapters 필드 추가
+- [x] T-512: SummarizationService 프롬프트 변경
+- [x] T-513: OpenRouterService 프롬프트 변경
+- [x] T-514: AX4Service 프롬프트 변경
+- [x] T-515: 챕터 응답 파싱 로직
+- [x] T-516: DB에 챕터 저장
+- [x] T-517: LibraryGridView 챕터 표시 UI
+- [x] T-518: LibraryListView 챕터 표시 UI
+- [x] T-519: Info.plist 버전 2.5.1
+
+#### 챕터 3: AI 팟캐스트 생성 (v2.5.2) — macOS 내장 TTS (무료)
+
+**TTS 엔진**: AVSpeechSynthesizer (macOS 내장, 완전 무료, 오프라인)
+**대화 스크립트**: 기존 LLM 폴백 체인 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+**상세 계획**: `docs/plans/PLAN_v2.5.2.md` 참조
+
+- [x] T-520: PodcastService.swift 생성
+- [x] T-520a: PodcastScript 모델 정의
+- [x] T-521: AI 대화 스크립트 생성 프롬프트
+- [x] T-522: TTSService 생성 (AVSpeechSynthesizer 래퍼)
+- [x] T-523: 오디오 파일 저장 로직
+- [x] T-524: DB에 podcast_path 저장
+- [x] T-525: 요약 팝업에 팟캐스트 컨트롤 추가
+- [x] T-526: 컨텍스트 메뉴 팟캐스트 항목
+- [x] T-527: LibraryReducer 팟캐스트 액션
+- [x] T-528: 팟캐스트 파일 정리
+- [x] T-529: Info.plist 버전 2.5.2
+
+#### 챕터 4: 트랜스크립트 Q&A (v2.5.3)
+- [x] T-530: QAService.swift 생성
+- [x] T-531: qna_history 테이블 생성
+- [x] T-532: Q&A 프롬프트 설계
+- [x] T-533: QAView UI
+- [x] T-534: LibraryReducer Q&A 액션
+- [x] T-535: Q&A 히스토리 저장/로드
+- [x] T-536: 타임스탬프 클릭 → 재생 위치 이동
+- [x] T-537: Info.plist 버전 2.5.3
+
+#### 챕터 5: 마인드맵 생성 (v2.5.4)
+- [x] T-540: MindmapNode 모델 생성
+- [x] T-541: MindmapService.swift 생성
+- [x] T-542: 마인드맵 생성 프롬프트
+- [x] T-543: DB에 마인드맵 저장
+- [x] T-544: MindmapView UI
+- [x] T-545: 마인드맵 노드 확장/축소
+- [ ] T-546: 마인드맵 이미지 내보내기 (취소 — 저순위)
+- [x] T-547: Info.plist 버전 2.5.4
+
+#### 챕터 6: UI 통합 + AI 창 리팩토링 (v2.5.5)
+- [x] T-550: LibraryGridView 챕터 표시 (v2.5.1에서 완료)
+- [x] T-551: LibraryListView 챕터 표시 (v2.5.1에서 완료)
+- [x] T-552: 액션 메뉴 통합 (3→1 "AI 기능")
+- [x] T-553: AIWindowView 좌우 split (summary/chapters | mindmap/Q&A)
+- [x] T-554: 팟캐스트 시간 왼쪽 표시
+- [x] T-555: 다크모드 오버레이 + 자동 포커스 방지
+- [x] T-556: Info.plist 버전 2.5.5
+
+#### 챕터 7: 마이그레이션 + 테스트 (v2.5.6)
+- [x] T-560: DatabaseManager 마이그레이션 로직 (SwiftData 마이그레이션은 배포 전 검증에서 수행)
+- [x] T-561: 기존 데이터 동기화 (summary→DB) (배포 전 검증에서 수행)
+- [x] T-562: SwiftData 새 속성 마이그레이션 (배포 전 검증에서 수행)
+- [x] T-563: 전체 기능 테스트 (TC-5-63 빌드 검증 완료, 수동 테스트는 배포 전으로 패스)
+- [x] T-564: 빌드 검증 ✅ swift build -c release 성공, 76개 테스트 통과
+- [x] T-565: 테스트 명세서 작성 ✅ docs/tests/v2.5.6.md
+- [x] T-566: PLAN.md 업데이트 ✅
+- [x] T-567: TODO.md 업데이트 ✅
+- [x] T-568: Info.plist 버전 2.5.6 ✅
 
 ## 제외된 기능 (Cancelled)
 

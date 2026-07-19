@@ -93,7 +93,7 @@ struct LibrarySidebarView: View {
             .buttonStyle(.plain)
         }
         .background(Color(.windowBackgroundColor))
-        .onChange(of: store.library.items) { newItems in
+        .onChange(of: store.library.items) { _, newItems in
             updateChannelNames(newItems)
         }
         .onAppear {
@@ -523,7 +523,7 @@ struct LibrarySidebarView: View {
         guard avatarImages[channelId] == nil else { return }
         let service = LibraryCacheService.shared
         Task {
-            if let cached = await service.cachedAvatar(for: channelId) {
+            if let cached = service.cachedAvatar(for: channelId) {
                 await MainActor.run { avatarImages[channelId] = cached }
                 return
             }
@@ -611,7 +611,7 @@ private struct CategoryDropDelegate: DropDelegate {
 
     private func updateChannelNames(_ items: [LibraryItem]) {
         Task {
-            let names = await LibraryCacheService.shared.channelNames(from: items)
+            let names = LibraryCacheService.shared.channelNames(from: items)
             await MainActor.run {
                 let order = channelOrder
                 channelNames = names.sorted { a, b in

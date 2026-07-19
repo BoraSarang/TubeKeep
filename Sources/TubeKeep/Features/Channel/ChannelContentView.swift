@@ -70,7 +70,7 @@ struct ChannelContentView: View {
                     Image(systemName: "arrow.down.doc")
                         .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
-                    Text("채널을 선택하거나 추가해주세요")
+                    Text("채널을 선택하거나 추가해 주세요")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                         .font(.system(size: 13))

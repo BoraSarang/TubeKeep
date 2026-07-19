@@ -1,5 +1,151 @@
 # CHANGELOG
 
+## v2.5.6 (2026-07-19) — 마이그레이션 + 최종 테스트 ✅ 완료
+
+### Testing
+- **자동화 테스트 21개 추가**: MindmapNodeTests(8), QAModelTests(6), PodcastModelTests(7)
+  - 샘플 JSON 테스트 데이터 기반 모델 인코딩/디코딩 검증
+  - MindmapNode UUID 버그 수정 검증 (id 없는 JSON 디코딩)
+- **총 76개 테스트 전원 통과** (기존 55 + 신규 21)
+- **release 빌드 성공** (1개 기존 경고, TTSService @preconcurrency)
+- **수동 테스트 패스**: 배포 전 최종 검증에서 수행 예정
+
+### Infrastructure
+- **Info.plist**: v2.5.6 (build 7)
+- **MindmapNode Equatable**: id 무시하도록 custom `==` 구현 (label/children만 비교)
+
+## v2.5.5 (2026-07-19) — AI 창 UI 통합 + 마인드맵 보기 ✅ 완료
+
+### New Features
+- **마인드맵 보기**: AI 창 내 expandable/collapsible 트리 뷰 (MindmapTreeView, MindmapNodeView)
+- **마인드맵 생성/캐싱**: OpenRouter API → JSON 파싱 → DB 저장, showSummary 시 자동 로드
+
+### UI Changes
+- **AI 요약 팝업 → AIWindowView**: summary+chapters(좌) / mindmap+Q&A(우) 좌우 split 레이아웃
+- **컨텍스트 메뉴 통합**: "AI 요약정보 보기" / "AI 팟캐스트" / "AI Q&A" 3개 → "AI 기능" 단일 메뉴 (sparkles icon)
+- **QAInputBar 이동**: AIWindowView 하단 → qnaSection 상단 (title 아래)
+- **팟캐스트 시간 표시**: 플레이 버튼 오른쪽 → 왼쪽으로 이동
+- **요약 로딩 오버레이 다크모드 대응**: Color.white → .regularMaterial
+- **QAInputBar 자동 포커스 방지**: @FocusState optional nil + AppDelegate makeFirstResponder(nil)
+- **미사용 코드 제거**: MindmapButtonView 삭제
+
+### Bug Fixes
+- **MindmapNode UUID 디코딩 오류 수정**: JSON에 id 필드 없어 파싱 실패 → CodingKeys에서 id 제외, init(from:)에서 UUID() 기본값
+
+### Infrastructure
+- **MindmapService.swift**: 마인드맵 생성/파싱/DB 저장 서비스
+- **MindmapModels.swift**: MindmapNode 모델 (재귀적 Codable)
+- **LibraryReducer mindmap 액션**: generateMindmap / mindmapResult / mindmapFailed / toggleMindmap
+
+## v2.5.4 (2026-07-19) — 마인드맵 생성 (v2.5.5와 통합)
+
+v2.5.4의 마인드맵 기능은 v2.5.5에서 AI 창 UI 통합과 함께 구현됨.
+자세한 내용은 v2.5.5 항목 참조.
+
+## v2.5.3 (2026-07-19) — 트랜스크립트 Q&A ✅ 완료
+
+### New Features
+- **트랜스크립트 Q&A**: 영상 자막 기반 질문/답변 기능
+  - QAService: OpenRouter → yTeaser → A.X 4.0 → Gemini 폴백 체인
+  - qna_history DB 테이블: 질문/답변/타임스탬프 저장/로드
+  - 타임스탬프 클릭 → 영상 재생 위치 이동
+- **QAView UI**: 질문 입력 → 답변 표시 + 히스토리 목록
+
+### Infrastructure
+- **QAService.swift**: Q&A 생성 서비스 (actor, 폴백 체인)
+- **qna_history 테이블**: DatabaseManager에 qna_history CRUD 추가
+- **LibraryReducer Q&A 액션**: askQuestion / questionResult / questionFailed / clearQAHistory
+
+## v2.5.2 (2026-07-18) — AI 팟캐스트 생성 (macOS 내장 TTS) ✅ 완료
+
+### New Features
+- **AI 팟캐스트 생성**: 자막을 분석하여 2인 대화형 팟캐스트를 자동 생성
+  - 대화 스크립트 생성: 기존 LLM 폴백 체인 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+  - TTS 변환: macOS 내장 AVSpeechSynthesizer 사용 (완전 무료, 오프라인)
+  - 한국어 음성 지원 (Yuna, Siwoo 등)
+  - 팟캐스트 생성/재생/삭제 기능
+
+### UI Changes
+- **요약 팝업에 팟캐스트 컨트롤 추가**: 재생/일시정지/정지 버튼 + 진행 바
+- **컨텍스트 메뉴 팟캐스트 항목**: 팟캐스트 만들기/듣기/삭제
+
+### Infrastructure
+- **PodcastService.swift**: 팟캐스트 생성 서비스 (actor)
+- **TTSService**: AVSpeechSynthesizer 래퍼
+- **팟캐스트 저장 위치**: `~/Documents/TubeKeep/Podcasts/{videoId}/`
+- **DB 연동**: `podcast_path` 컬럼 활용
+
+## v2.5.1 (2026-07-18) — AI 요약 + 챕터 생성 ✅ 완료
+
+### New Features
+- **챕터 생성**: AI 요약 시 자동으로 챕터(구간) 정보 생성
+  - SummaryResult.chapters 필드 추가
+  - 모든 LLM 서비스(OpenRouter/yTeaser/A.X 4.0/Gemini) 프롬프트에 챕터 형식 추가
+  - 챕터 응답 파싱 로직 (타임스탬프 + 제목)
+
+### UI Changes
+- **LibraryGridView 챕터 표시**: 썸네일 하단 챕터 리스트
+- **LibraryListView 챕터 표시**: 목록 행에 챕터 표시
+
+### Infrastructure
+- **ChapterInfo 모델**: Codable, Identifiable (startTime, title, endTime)
+- **DB 챕터 저장**: DatabaseManager에 chapters 컬럼 저장/로드
+
+## v2.5.0 (2026-07-18) — SQLite DB 구축 + 자막 DB 저장 + AI 요약 캐싱
+
+### New Features
+- **AI 요약 DB 캐싱**: 요청 시 SQLite에서 기존 요약 확인 → 있으면 API 호출 없이 즉시 표시
+  - `summarizeVideo()` API 폴백 체인 진입 전 DB 캐시 확인
+  - `.showSummary` 시 `item.summary` 먼저 확인
+  - 요약 생성 후 `DatabaseManager.updateSummary()`로 SQLite 저장
+- **자막 가용성 DB 체크**: `hasSubtitles()`가 파일시스템 대신 SQLite에서 transcript 존재 여부 확인
+
+### Bug Fixes
+- **키보드 단축키 한글 레이아웃 호환**: `event.charactersIgnoringModifiers` → `event.keyCode`로 변경
+  - 한글 키보드에서 `c`→`ㅍ`, `v`→`ㅇ` 등으로 매핑되어 단축키 미동작
+  - `keyCode`는 레이어와 관계없이 고정 (0=A, 7=X, 8=C, 9=V, 49=,)
+- **디버그 로그 초기화 시점**: `DebugLogManager.shared`를 `applicationDidFinishLaunching` 즉시 초기화
+
+### Infrastructure
+- **자막 파일 → DB 저장으로 전환**: `.vtt`/`.srt` 파일을 디스크에 저장하지 않고 SQLite DB에 저장
+  - `LibraryReducer.downloadSubtitles`: 임시 디렉토리에 다운로드 → 파싱 → DB 저장 → 파일 삭제
+  - `DownloadManager`: 비디오 다운로드 시 자막도 DB 저장 + 디스크 파일 정리
+  - `SummarizationService.parseVTT`/`parseSRT`를 `static func`으로 변경하여 공유
+- **기존 자막 파일 마이그레이션**: 디스크에 남아있던 17개 `.vtt` 파일을 DB에 저장 후 삭제
+
+## v2.4.0 (2026-07-16) — 기술부채 해소 + SwiftData 전환 + A.X 4.0 통합
+
+**macOS 14+ 전용** | Swift 6.3 | SPM 6.2
+
+### New Features
+- **SKT A.X 4.0 AI 요약/태깅 통합**: 한국어 특화 LLM으로 요약/태깅 품질 향상
+  - A.X 4.0 → yTeaser → Gemini 3단계 무료→유료 폴백 체인
+  - 설정에서 A.X 4.0 API 키 관리 (공개 키 기본값 제공)
+  - AI 요약 설정 탭 분리 (A.X 4.0 / Gemini)
+
+### Breaking Changes
+- **최소 macOS 버전 14.0으로 상향**: SwiftData 지원을 위한 변경 (이전: macOS 13+)
+
+### Infrastructure
+- **SwiftData 마이그레이션**: `LibraryItem`, `SubscribedChannel`을 UserDefaults → SwiftData `@Model` 클래스로 전환
+  - `PersistenceController` 싱글톤 추가 (`ModelContainer` 관리)
+  - `LibraryCacheService`를 actor → `@MainActor` 클래스로 변경, SwiftData 기반 CRUD로 재작성
+  - `SubscribedChannel.loadAll()`/`saveAll()` → SwiftData `FetchDescriptor` 기반으로 변경
+  - UserDefaults → SwiftData 자동 마이그레이션 (`SwiftDataMigration.migrateIfNeeded`)
+- **AppDelegate 분리**: 1056줄 → 536줄 (49% 감소)
+  - `StatusBarManager.swift`: 상태바 + 메뉴 + 큐 요약 추출
+  - `ClipboardMonitor.swift`: 클립보드 감시 + 알림 패널 추출
+  - `ChannelUpdateService.swift`: 채널 업데이트 폴링 추출
+- **Gemini API 백오프 통합**: `SummarizationService.summarizeVideo()` unified 메서드 추가 (yTeaser→Gemini 폴백 일원화)
+  - `TaggingService.queryGemini`에 4회 재시도 + 선형 백오프 추가
+  - HomeReducer, LibraryReducer 중복 폴백 로직 3곳 제거
+- **자동 테스트 55개 추가**: ErrorMessageMapperTests(23), DownloadItemTests(17), ConstantsTests(15)
+
+### v2.5.0 예정
+- 모듈 분리 (TubeKeepCore + TubeKeep)
+
+---
+
 ## v2.3.0 (2026-07-16) — SponsorBlock + 기능 다듬기
 
 **macOS 26+ 전용** | Swift 6.3 | SPM 6.2

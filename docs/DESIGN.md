@@ -2,16 +2,15 @@
 
 ## 1. 아키텍처 개요
 
-- **UI**: SwiftUI (macOS 13+)
+- **UI**: SwiftUI (macOS 14+)
 - **아키텍처**: TCA 1.10 (The Composable Architecture)
 - **백엔드**: yt-dlp (Process 호출)
 - **메뉴바**: 순수 AppKit (NSStatusBar + NSView)
-- **SPM** 모듈, swift-tools-version: 5.9
-- **단일 .app**: `TubeKeep.app` (LSUIElement)
-- **지원 칩셋**: Apple Silicon (ARM64) 전용 — Intel Mac은 Rosetta 포함 미지원
-- **빌드 아키텍처**: ARM64 only (Apple Silicon 호스트); 유니버셜 빌드 시 Xcode + `--arch arm64 --arch x86_64` 필요
+- **SPM** 모듈, swift-tools-version: 6.2, Swift 5 언어 모드
+- **단일 .app**: `TubeKeep.app` (LSUIElement, com.borasarang.tubekeep)
+- **지원 칩셋**: Apple Silicon (ARM64) 전용
 - **런타임 의존성**: ffmpeg + yt-dlp (앱 번들 `Contents/Resources`에 포함, 번들 우선 → brew → PATH 순서)
-- **데이터 공유**: `UserDefaults(suiteName:)`으로 프로세스 간 공유 (마이그레이션 완료)
+- **영구 저장소**: SQLite (AI 데이터), SwiftData (라이브러리 항목/채널), UserDefaults (설정/캐시)
 - **설정 창**: `AppDelegate.openSettingsWindow()`로 NSWindow 직접 관리 (`TubeKeepApp`은 빈 Scene), ⌘, 단축키 지원
 
 ```
@@ -38,14 +37,16 @@
 
 #### State
 ```swift
-struct State: Equatable {
-    var home = HomeReducer.State()
-    var downloadQueue = DownloadQueueReducer.State()
-    var settings = SettingsReducer.State()
-    var statusBar = StatusBarReducer.State()
-    @Presents var channelDownload: ChannelReducer.State?
-    var library = LibraryReducer.State()
-    var alwaysOnTop: Bool = false
+@Reducer
+struct AppReducer {
+    @ObservableState
+    struct State: Equatable {
+        var home = HomeReducer.State()
+        var downloadQueue = DownloadQueueReducer.State()
+        var settings = SettingsReducer.State()
+        var statusBar = StatusBarReducer.State()
+        var library = LibraryReducer.State()
+    }
 }
 ```
 
@@ -56,25 +57,24 @@ enum Action: Equatable {
     case downloadQueue(DownloadQueueReducer.Action)
     case settings(SettingsReducer.Action)
     case statusBar(StatusBarReducer.Action)
-    case channelDownload(PresentationAction<ChannelReducer.Action>)
     case library(LibraryReducer.Action)
-    case toggleAlwaysOnTop
     case clipboardDetected(String)
     case appDidFinishLaunching
-    case channelFetchInfo(String)
+    case discoverAddToQueue(DownloadItem)
 }
 ```
 
 #### 브릿지 로직
-- `downloadCompleted(id, success)` → `LibraryItem` 생성 → `LibraryCacheService.addItem` → `.library(.loadFromDisk)` 재로드
-- `addToQueueResponse` → id별 `startDownload` 디스패치 (여유 슬롯)
+- `appDidFinishLaunching` → UserDefaults에서 설정 로드, DebugLogManager 초기화, 키보드 단축키 모니터 등록
+- `downloadQueue(.downloadCompleted(id:, success:, outputPath:))` → LibraryItem 생성/저장 → `.library(.loadFromDisk)` 재로드
+- `downloadQueue(.addToQueueResponse(id:))` → 여유 슬롯이 있으면 `startDownload` 디스패치
 - `playlistSelection(.confirmSelection)` → 선택 항목 일괄 추가
-- `channelDownload(.addToQueue)` → downloadQueue.addItems
-- `updateProgress` / `(removeItem|clearCompleted|clearAll)` → statusBar 동기화
+- `downloadQueue(.updateProgress)` / `downloadQueue(.removeItem)` 등 → statusBar 동기화
 - `settings(.setConcurrentDownloads)` → downloadQueue.maxConcurrent 동기화
-- `appDidFinishLaunching` → UserDefaults에서 설정 로드
+- `discoverAddToQueue(DownloadItem)` → 중복 검사 후 downloadQueue.addItems 전송 (채널 인덱스 포함)
+- `clipboardDetected(String)` → 라이브러리 창 상태에 따라 NSPanel 팝오버 또는 다운로더 창 오픈
 
-### 2.2 HomeReducer
+### 2.2 HomeReducer (VideoDownloadView)
 
 ```swift
 @ObservableState
@@ -91,7 +91,6 @@ struct State: Equatable {
     var audioOnly: Bool = false
     var errorMessage: String?
     var lastAutoFetchedURL: String = ""
-    var clipboardMonitoring: Bool
 
     // v2.0.1: AI 요약 (다운로더)
     var summaryText: String?
@@ -128,33 +127,46 @@ struct State: Equatable {
 ```swift
 @ObservableState
 struct State: Equatable {
+    var selectedTab: SettingsTab = .general
+
+    // General
     var concurrentDownloads: Int = 2
-    var outputDirectory: String = "~/Downloads"
-    var filenameTemplate: String = "{channel} - {index} - {title}"
-    var limitRate: Int = 0
-    var playSoundOnComplete: Bool = true
-    var clipboardMonitoring: Bool = true
+    var storageDirectory: String = "~/Documents/TubeKeep"
     var defaultResolution: Int = 480
     var maxRetries: Int = 3
+    var limitRate: Int = 0
+
+    // Storage
+    var filenameTemplate: String = "{channel} - {index} - {title}"
+    var playSoundOnComplete: Bool = true
     var launchAtLogin: Bool = false
+
+    // System
+    var showMainWindowOnLaunch: Bool = false
+    var clipboardMonitoring: Bool = true
     var maxUploadCheck: Int = 500
     var skipIndexOnFailure: Bool = false
 
-    // alwaysOnTop은 영상 다운로더 창 전용 (AppReducer.alwaysOnTop)
-    // 설정 창에서는 비활성화 표시
+    // AI (v2.2.0: SummaryServiceMode 제거, 항상 자동 폴백)
+    var geminiAPIKey: String = ""
+    var openRouterAPIKey: String = ""
+    var ax4APIKey: String = ""
+
+    var sponsorBlock: Bool = true           // v2.3.0
+    var embedMetadata: Bool = true          // v2.3.0
 }
 ```
 
 저장: UserDefaults JSON (`appSettings` 키).
 - `AppReducer`가 전역 공유 상태(`state.settings`)로 관리 → 모든 기능에서 즉시 반영
-- `DownloadQueueReducer`에 `outputDirectory`, `filenameTemplate` 동기화 필드 추가
-- `DownloadManager`에 `updateSettings` 시 별도 캐싱 (`outputDirectory`, `filenameTemplate`)
+- `DownloadQueueReducer`에 `storageDirectory`, `filenameTemplate` 동기화 필드 추가
+- `DownloadManager`에 `updateSettings` 시 별도 캐싱 (`storageDirectory`, `filenameTemplate`)
 
 ### 2.5 StatusBarReducer
 
 ```swift
 struct State: Equatable {
-    var statusText = "대기중"
+    var statusText = "대기 중"
     var downloadSpeed = ""
     var badgeCount = 0
     var hasActiveDownloads = false
@@ -170,61 +182,114 @@ struct State: Equatable {
 
 #### State
 ```swift
-@ObservableState
-struct State: Equatable {
-    var items: [LibraryItem] = []
-    var searchText = ""
-    var selectedChannel: String? = nil
-    var sortOrder: LibrarySortOrder = .dateDesc
-    var filterMode: LibraryFilterMode = .all
-    var viewMode: LibraryViewMode = .grid
-    var isLoading = false
-    var selectedIds: Set<String> = []  // T-112: 다중 선택
+@Reducer
+struct LibraryReducer {
+    @ObservableState
+    struct State: Equatable {
+        var items: [LibraryItem] = []
+        var searchText = ""
+        var selectedChannel: String? = nil
+        var sortOrder: LibrarySortOrder = .dateDesc
+        var filterMode: LibraryFilterMode = .all
+        var viewMode: LibraryViewMode = .grid
+        var isLoading = false
+        var selectedIds: Set<String> = []
+        var subtitleDownloadingIds: Set<String> = []
+        var subtitleAvailableIds: Set<String> = []
+        var summaryAvailableIds: Set<String> = []
+        var diskUsageBytes: Int64 = 0
 
-    // Discover (v2.0.0)
-    var sidebarMode: LibrarySidebarMode = .library
-    var discoverCategory: TrendingCategory = .all
-    var discoverVideos: [TrendingCategory: [TrendingVideo]] = [:]
-    var discoverLoading = false
-    var discoverError: String?
-    var categoryOrder: [TrendingCategory] = TrendingCategory.allCases
-    var discoverSearchText = ""
-    var discoverSearchResults: [TrendingVideo] = []
-    var discoverSearching = false
+        // Navigtion
+        var sidebarMode: LibrarySidebarMode = .library
 
-    // Discover Summary (v2.0.1)
-    var discoverSummaryVideoId: String?
-    var discoverSummaryText: String?
-    var discoverSummaryLoading = false
+        // Discover (v2.0.0)
+        var discoverCategory: TrendingCategory = .all
+        var discoverVideos: [TrendingCategory: [TrendingVideo]] = [:]
+        var discoverLoading = false
+        var discoverError: String?
+        var discoverSearchText = ""
+        var discoverSearchResults: [TrendingVideo] = []
+        var discoverSearching = false
 
-    // Library Summary (v2.0.1)
-    var librarySummaryVideoId: String?
-    var librarySummaryText: String?
-    var librarySummaryLoading = false
+        // Discover Summary (v2.0.1)
+        var discoverSummaryVideoId: String?
+        var discoverSummaryText: String?
+        var discoverSummaryProvider: String?
+        var discoverSummaryLoading = false
+
+        // Library Summary (v2.0.1)
+        var librarySummaryVideoId: String?
+        var librarySummaryText: String?
+        var librarySummaryProvider: String?
+        var librarySummaryLoading = false
+
+        // Podcast (v2.5.2)
+        var podcastGeneratingIds: Set<String> = []
+        var podcastPlayingId: String?
+        var podcastError: String?
+        var podcastAvailableIds: Set<String> = []
+        var podcastLastEngine: String?
+
+        // Q&A (v2.5.3)
+        var qnaHistoryItems: [QAHistoryItem] = []
+        var qnaLoading = false
+        var qnaError: String?
+        var qnaSelectedVideoId: String?
+        var qnaShowSheet = false
+
+        // Mindmap (v2.5.4)
+        var mindmapNode: MindmapNode?
+        var mindmapLoading = false
+        var mindmapError: String?
+        var mindmapShow = false
+
+        // Gemini API Key Alert
+        var showGeminiKeyAlert = false
+    }
 }
 ```
-- `viewMode`는 UserDefaults(`libraryViewModeKey`)에 저장되어 재실행 시 유지
-- `selectedIds`: Cmd+클릭으로 토글, selection bar에서 일괄 삭제 시 사용
-- `categoryOrder`: @AppStorage("categoryOrder")로 유지, drag-drop 재정렬 가능
-- `discoverSummary*` — DiscoverCard popover 상태
-- `librarySummary*` — Library .sheet 모달 상태
 
 #### Action
 ```
-loadFromDisk / itemsLoaded / addItem / removeItem / removeSelected
+loadFromDisk / itemsLoaded / addItem / removeItem / removeItemsByChannel / removeSelected
+revealSelectedInFinder / openSelected
 setSearchText / setSelectedChannel / setSortOrder / setFilterMode / setViewMode
 openFile / revealInFinder
-downloadSubtitles / subtitleResult        // T-116: 자막 다운로드
+downloadSubtitles / subtitleResult / dismissSubtitleToast        // T-116: 자막 다운로드
 toggleSelection / selectAll / clearSelection  // T-112: 다중 선택
+calculateDiskUsage / diskUsageUpdated         // 디스크 사용량
+openChannelDownload(channelId:channelName:)   // 채널 다운로더 열기
 
-// Discover (v2.0.0)
-setSidebarMode / refreshTrending / refreshCategory
-discoverSearch / discoverSearchResultsLoaded / discoverAddToQueue
-showSummary / summaryResult / summaryFailed
+// Discover (v2.0.0/v2.0.1)
+setSidebarMode / selectDiscoverCategory / fetchTrending
+trendingLoaded / trendingFailed / refreshTrending
+setDiscoverSearchText / discoverSearch / discoverSearchLoaded / discoverSearchFailed
+discoverRequestSummary / discoverSummaryLoaded / discoverSummaryFailed
+discoverDismissSummary
 
-// v2.0.1
-dismissDiscoverSummary
-dismissLibrarySummary
+// Summary (v2.5.0/v2.5.1)
+showSummary / resummarize
+summaryResult(videoId:overview:keyPoints:chapters:provider:)
+summaryFailed / dismissLibrarySummary
+
+// Tagging (v2.0.0)
+tagItem / itemTagged
+
+// Podcast (v2.5.2)
+generatePodcast / podcastScriptResult / podcastFailed
+playPodcast / podcastPlaybackUpdate / stopPodcast / deletePodcast
+setPodcastEngine
+
+// Q&A (v2.5.3)
+askQuestion / questionResult / questionFailed
+loadQAHistory / qaHistoryLoaded / deleteQAHistory / clearQAHistory
+setQnASelectedVideoId / setQnAShowSheet
+
+// Mindmap (v2.5.4/v2.5.5)
+generateMindmap / mindmapResult / mindmapFailed / toggleMindmap
+
+// Gemini Key Alert
+setGeminiKeyAlert / openSettingsForGeminiKey
 ```
 
 #### filteredItems computed property
@@ -267,8 +332,7 @@ NSStatusBar.system.statusItem(withLength: 88)
 | 영상 다운로더 | `"downloader"` | 520×480 | 520×300 | 불가 (showsResizeIndicator=false) | 비활성화 |
 | 일괄 다운로더 | `"batch"` | 480×420 | 480×340 | 불가 | 비활성화 |
 | 채널 다운로더 | `"channel"` | 720×520 | 720×400 | 세로만 (maxHeight 9999) | 비활성화 |
-| 설정 | `"settings"` | 480×580 | 480×400 | 가로 고정 (480px), 세로만 가능 | 비활성화 |
-| **설정** | `"settings"` | **480×580** | **480×400** | **세로만 (가로 고정)** | **비활성화** |
+| 설정 | `"settings"` | 560×420 | 560×420 | 고정 (리사이즈 불가) | 비활성화 |
 
 #### FixedWidthWindowController
 - `NSWindowDelegate.windowWillResize(to:)` 구현 → width를 840으로 고정
@@ -312,14 +376,25 @@ NSStatusBar.system.statusItem(withLength: 88)
 
 ### 4.1 LibraryItem
 ```swift
-struct LibraryItem: Identifiable, Equatable, Codable {
-    let id: String          // videoId
-    let title: String
-    let channelId: String
-    let channelName: String
-    let thumbnailURL: String
-    let filePath: String
-    let downloadDate: Date
+@Model
+final class LibraryItem: Identifiable, @unchecked Sendable {
+    @Attribute(.unique) var id: String      // videoId
+    var title: String
+    var channelId: String
+    var channelName: String
+    var thumbnailURL: String
+    var filePath: String
+    var downloadDate: Date
+    var uploadDate: Date?
+    var duration: Int?                       // 초 단위
+    var channelUploadIndex: Int?             // 채널 내 업로드 순서
+    var tags: [String]                       // AI 태깅 결과
+    var summary: String?                     // AI 요약 (캐시)
+
+    // v2.5.0: AI 콘텐츠 캐싱
+    var transcript: String?                  // 자막 텍스트
+    var chapters: Data?                      // 챕터 JSON (Data)
+    var subtitleLanguage: String?
 }
 ```
 
@@ -330,6 +405,10 @@ enum LibrarySortOrder: String, Equatable, CaseIterable {
     case dateAsc = "오래된순"
     case titleAsc = "제목순"
     case channelAsc = "채널순"
+    case uploadDateDesc = "업로드순 (최신)"
+    case uploadDateAsc = "업로드순 (오래된)"
+    case indexAsc = "인덱스순"
+    case indexDesc = "인덱스 역순"
 }
 ```
 
@@ -378,32 +457,74 @@ enum LibraryViewMode: String, Equatable, CaseIterable {
 - `fetchUploadIndex(channelId:videoId:)` → Int?
 - 채널 flat-playlist에서 videoId 위치 검색
 
-### 5.5 LibraryCacheService (actor)
-- **Library 데이터**: `UserDefaults(suiteName: "com.tubekeep.shared")` → `"downloadLibrary"` 키에 `[videoId: LibraryItem]` JSON
-  - `loadItems()` → [LibraryItem]
+### 5.5 LibraryCacheService (@MainActor class, singleton)
+```swift
+@MainActor
+final class LibraryCacheService {
+    static let shared = LibraryCacheService()
+}
+```
+- **SwiftData 기반 CRUD**: LibraryItem/SubscribedChannel을 SwiftData `@Model`로 관리
+  - `loadItems()` → [LibraryItem] (FetchDescriptor)
   - `addItem(LibraryItem)` / `removeItem(id:)`
-  - **동기화**: UserDefaults(suiteName:)으로 데이터 일관성 유지
-- **마이그레이션**: TubeKeep.app 첫 실행 시 `UserDefaults.standard`에 저장된 데이터를 `UserDefaults(suiteName:)`로 자동 이전
+  - `updateItem(id:tags:)` / `updateItem(id:summary:)`
+  - `updateChannelUploadIndices()` — 채널 영상 인덱스 재계산
+- **마이그레이션**: v2.4.0에서 UserDefaults → SwiftData 자동 마이그레이션 (`SwiftDataMigration.migrateIfNeeded()`)
 - **썸네일 캐시**: NSCache(메모리) + `~/Library/Caches/com.tubekeep/thumbnails/` (디스크)
   - `cachedThumbnail(for:)` / `loadThumbnail(from:videoId:)` / `placeholderThumbnail()`
-  - YouTube CDN URL → 다운로드 → 로컬 캐시 → placeholder
 - **아바타 캐시**: 동일 디렉토리 `avatars/` 하위
   - `cachedAvatar(for:)` / `cacheAvatar(for:data:)` / `placeholderAvatar()`
 - **채널명 집계**: `channelNames(from:)` → `[(id, name, count)]`
 - **디스크 사용량**: `calculateDiskUsage()` → Int64 (static)
   - FileManager.enumerator로 `storageDirectory` + `~/Library/Caches/com.tubekeep/` 순회, 파일 크기 합산
-  - 비동기 연산 (Task 내 호출)
   - LibraryReducer.diskUsageBytes에 저장
 
-### 5.6 SummarizationService (actor) — v2.0.0/v2.0.1
-- `summarize(videoId:title:channel:)` → `SummaryResult`
+### 5.6 SummarizationService (actor) — v2.0.0/v2.4.0/v2.4.1/v2.5.0
+- `summarizeVideo(videoId:title:channel:openRouterAPIKey:ax4APIKey:geminiAPIKey:localFilePath:)` → `SummaryResult`
+  - **v2.4.1 폴백 체인**: OpenRouter → yTeaser → A.X 4.0 → Gemini (무료→유료 순서)
+  - 1순위: OpenRouter (`summarizeWithOpenRouter`) — 무료 티어, 모델: `openrouter/free`
+  - 2순위: yTeaser (`summarizeWithYTeaser`) — 무료 50회/일 (IP 기반)
+  - 3순위: A.X 4.0 (`summarizeWithAX4`) — SKT 한국어 특화 LLM, 무료 API
+  - 4순위: Gemini (`summarize`) — Google Gemini API, 유료 (API 키 필요)
   - `fetchTranscript(videoId:)` — yt-dlp `--write-subs --write-auto-subs`로 자막 다운로드 → VTT/SRT 파싱
-  - `generateSummary(text:title:channel:)` — Ollama `llama3.2` API 호출 → 개요+핵심포인트 파싱
-- `summarizeFromLocalFile(videoPath:title:channel:)` → `SummaryResult`
+  - `generateSummary(text:title:channel:)` — LLM API 호출 → 개요+핵심포인트+챕터 파싱
+  - **v2.5.0**: DB 캐시 확인 후 API 호출, 결과를 DB에 저장
+  - **v2.5.1**: 챕터(ChapterInfo) 생성 프롬프트 추가, 챕터 응답 파싱
+- `summarizeFromLocalFile(videoPath:title:channel:openRouterAPIKey:geminiAPIKey:)` → `SummaryResult`
   - `extractTranscriptFromLocalFile(videoPath:)` — 같은 디렉토리의 `{videoId}.en.ko.vtt/srt` 검색
-  - **v2.0.1**: 외부 자막 파일 없으면 `fetchTranscript(videoId:)`로 YouTube 자막 다운로드 fallback
-- 의존성: Ollama `http://localhost:11434`, `model: "llama3.2"`
-- 에러 처리: `noSubtitle` / `transcriptionFailed` / `summaryFailed` / `ollamaUnavailable`
+  - 외부 자막 파일 없으면 `fetchTranscript(videoId:)`로 YouTube 자막 다운로드 fallback
+- 의존성: OpenRouter (`openrouter.ai`), yTeaser (`yteaser.com`), A.X 4.0 (`guest-api.sktax.chat`), Gemini (`generativelanguage.googleapis.com`)
+- 에러 처리: `noSubtitle` / `transcriptionFailed` / `summaryFailed` / `quotaExceeded` / `apiUnavailable`
+
+### 5.6.1 AX4Service (v2.4.0)
+- A.X 4.0 API 클라이언트 (OpenAI 호환 형식)
+- Base URL: `https://guest-api.sktax.chat/v1`
+- 모델: `ax4`
+- 한국어 특화 LLM (KMMLU 78.3점, CLIcK 83.5점)
+
+### 5.6.2 OpenRouterService (v2.4.1)
+- OpenRouter Free Tier API 클라이언트 (OpenAI 호환 형식)
+- Base URL: `https://openrouter.ai/api/v1`
+- 모델: `openrouter/free`
+- 폴백 체인 최상위 우선순위 (무료)
+
+### 5.6.3 DatabaseManager (v2.5.0)
+- SQLite3 기반 AI 데이터 저장소 (singleton)
+- 테이블: `video_ai_data` (video_id, transcript, summary, chapters, mindmap, podcast_path, tags)
+- 테이블: `qna_history` (id, video_id, question, answer, timestamps, created_at)
+- CRUD 메서드: saveVideoAIData / loadVideoAIData / updateTranscript / updateSummary / updateChapters / updateMindmap / updatePodcastPath / saveQnAEntry / loadQnAHistory 등
+
+### 5.6.4 QAService (v2.5.3)
+- 트랜스크립트 기반 Q&A 생성 서비스 (actor)
+- 폴백 체인: OpenRouter → yTeaser → A.X 4.0 → Gemini
+- 질문/답변 + 타임스탬프 응답 파싱
+- Q&A 히스토리 DB 저장/로드/삭제
+
+### 5.6.5 MindmapService (v2.5.4)
+- 마인드맵 생성 서비스 (actor)
+- 폴백 체인: OpenRouter → yTeaser → A.X 4.0 → Gemini
+- JSON 응답 → MindmapNode 트리 파싱 (재귀적, UUID 자동 생성)
+- 생성 결과 DB 저장 + LibraryReducer.mindmapNode에 전달
 
 ### 5.7 ChannelFetchService (actor)
 - `fetchChannelInfo(url:)` → SubscribedChannel
@@ -415,6 +536,22 @@ enum LibraryViewMode: String, Equatable, CaseIterable {
   - 반환: `(videos, videos.count)` — 필터링된 실제 표시 개수
 - `fetchAvatarURL(channelId:)` → String?
 - yt-dlp flat-playlist + dump-json 사용
+
+### 5.8 PodcastService (actor) — v2.5.2
+- `generatePodcastScript(transcript:title:channel:)` → PodcastScript
+  - LLM API 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+  - 2인 대화 스크립트 생성 (진행자A/B)
+  - 15~25개 세그먼트
+- `synthesizeAudio(script:outputDir:)` → String (오디오 파일 경로)
+  - AVSpeechSynthesizer 사용 (macOS 내장, 무료)
+  - 한국어 음성 (ko-KR)
+  - AIFF 형식으로 저장
+- `generatePodcast(videoId:title:channel:transcript:)` → PodcastResult
+  - 전체 파이프라인: 스크립트 생성 → TTS 변환 → 파일 저장
+- `deletePodcast(videoId:)` → Bool
+  - 팟캐스트 디렉토리 + DB 레코드 삭제
+- 저장 위치: `~/Documents/TubeKeep/Podcasts/{videoId}/`
+- 의존성: SummarizationService (LLM API), AVFoundation (TTS)
 
 ---
 
@@ -496,10 +633,11 @@ VStack(spacing: 0)
 
 ### 6.7 설정 뷰 (SettingsView) — 네이티브 설정 창 (⌘,)
 - `AppDelegate.openSettingsWindow()` → NSWindow 직접 생성/관리 (`TubeKeepApp`은 빈 Scene)
-- 메뉴바 "설정..." (⌘,) + 모든 창에서 접근 가능
-- 영상 다운로더/일괄 다운로더/채널 다운로더/라이브러리 모두에서 공통 사용
-- `alwaysOnTop`은 영상 다운로더 창 전용이므로 설정 창에서 비활성화 표시
-- 창 크기: 가로 480px 고정, 세로 580px (`contentMinSize` / `contentMaxSize` / `setContentSize`)
+- 메뉴바 "설정..." (⌘,) + `NSEvent.addLocalMonitorForEvents` 글로벌 모니터로 모든 창에서 접근 가능
+- **v2.2.0**: 4탭 레이아웃 (일반/저장/시스템/AI 요약) — 좌측 140pt 사이드바 + 우측 ScrollView
+- `SettingsRow<Control>` 제네릭 컴포넌트: Title + Description 수직 스택 + Control
+- `SummaryServiceMode` 제거 (v2.2.0) — 항상 OpenRouter → yTeaser → A.X 4.0 → Gemini 자동 폴백
+- 창 크기: 가로 560px 고정, 세로 420px 고정 (리사이즈 불가)
 
 ### 6.4 DownloadQueueView
 - footer: 다운로드 요약
@@ -537,7 +675,7 @@ extension View {
 
 ---
 
-## 7b. DebugLogView (DEBUG 전용)
+## 8. DebugLogView (DEBUG 전용)
 
 ### 목적
 - 각 window의 동작을 실시간 로그로 확인
@@ -661,20 +799,25 @@ enum Constants {
 
 ---
 
-## 9. 파일 목록 (38 Swift 파일)
+## 9. 파일 목록 (61 Swift 파일)
 
-### App/ (5)
+### App/ (9)
 | 파일 | 설명 |
 |------|------|
-| `TubeKeepApp.swift` | `@main` entry point, `SwiftUI.Settings` 씬 연결 |
-| `AppDelegate.swift` | 메뉴바, 4개 윈도우, 단축키, 클립보드, 속도측정 |
+| `TubeKeepApp.swift` | `@main` entry point, 빈 SwiftUI Scene |
+| `AppDelegate.swift` | 메뉴바, 4개 윈도우, 단축키, 클립보드, URL scheme |
 | `AppReducer.swift` | Root TCA reducer, 브릿지 로직 |
 | `VideoDownloadView.swift` | 영상 다운로더 메인 뷰 (Home+Queue) |
 | `StatusBarView.swift` | StatusBarReducer (메뉴바 상태) |
+| `StatusBarManager.swift` | 메뉴바 상태 관리 + 메뉴 구성 (v2.4.0 AppDelegate 분리) |
+| `ClipboardMonitor.swift` | 클립보드 감시 + NSPanel 알림 (v2.4.0 AppDelegate 분리) |
+| `ChannelUpdateService.swift` | 채널 업데이트 30분 타이머 폴링 (v2.4.0 AppDelegate 분리) |
+| `FixedWidthWindowController.swift` | 라이브러리 창 가로 840px 고정 |
 
-### Features/ (16)
+### Features/ (21)
 | 파일 | 설명 |
 |------|------|
+| `AboutView.swift` | 정보 창 |
 | `Home/HomeReducer.swift` | URL 입력 + 정보 조회 reducer |
 | `Home/HomeView.swift` | URL 입력 + 정보 카드 + 포맷 선택 UI |
 | `BatchDownload/BatchDownloadView.swift` | 일괄 다운로더 UI |
@@ -683,75 +826,108 @@ enum Constants {
 | `Channel/ChannelContentView.swift` | 채널 콘텐츠 (헤더+비디오목록+다운로드) |
 | `Channel/ChannelDownloaderView.swift` | 채널 다운로더 창 root |
 | `Channel/ChannelListView.swift` | 채널 목록 사이드바 |
-| `Settings/SettingsReducer.swift` | 설정 reducer |
-| `Settings/SettingsView.swift` | 설정 UI |
-| `Library/LibraryReducer.swift` | 라이브러리 reducer (sort/filter/viewMode) |
-| `Library/MainView.swift` | 라이브러리 root (sidebar + content + toolbar) |
-| `Library/LibrarySidebarView.swift` | 사이드바 (검색/필터/채널목록) |
+| `Settings/SettingsReducer.swift` | 설정 reducer (v2.2.0: 4탭) |
+| `Settings/SettingsView.swift` | 설정 UI (SettingsRow 제네릭 컴포넌트) |
+| `Library/LibraryReducer.swift` | 라이브러리 reducer (v2.5.x: podcast/Q&A/mindmap) |
+| `Library/MainView.swift` | 라이브러리 root (sidebar + toolbar + AIWindowView) |
+| `Library/LibrarySidebarView.swift` | 사이드바 (검색/필터/채널목록/디스크사용량) |
 | `Library/LibraryGridView.swift` | 그리드 모드 + LeftClickMenu + 빈 상태 |
 | `Library/LibraryListView.swift` | 목록 모드 |
+| `Library/QAView.swift` | Q&A UI (v2.5.3) |
+| `Library/MindmapView.swift` | 마인드맵 트리 UI (v2.5.4) |
 | `DownloadQueue/DownloadQueueReducer.swift` | 다운로드 큐 reducer |
 | `DownloadQueue/DownloadQueueView.swift` | 다운로드 큐 UI |
+| `Discover/DiscoverView.swift` | 트렌딩/검색 카드 그리드 (v2.0.0) |
 
-### Services/ (9)
+### Services/ (20)
 | 파일 | 설명 |
 |------|------|
 | `YouTubeDLService.swift` | yt-dlp 정보 조회 actor |
 | `DownloadManager.swift` | 다운로드 프로세스 관리 (OSAllocatedUnfairLock) |
 | `ProcessRunner.swift` | async Process 실행 |
-| `LibraryCacheService.swift` | 라이브러리 + 썸네일/아바타 캐시 actor |
+| `LibraryCacheService.swift` | 라이브러리 CRUD + 썸네일/아바타 캐시 (@MainActor singleton, SwiftData) |
 | `ChannelFetchService.swift` | 채널 정보 fetch actor |
 | `UploadOrderService.swift` | 업로드 순번 조회 actor |
 | `TrendingService.swift` | yt-dlp `ytsearch` 기반 트렌딩 검색 + 30분 TTL 캐시 |
-| `SummarizationService.swift` | 자막 추출 → Ollama LLM 요약 |
-| `TaggingService.swift` | Ollama 분류 + 키워드 fallback 자동 태깅 |
+| `SummarizationService.swift` | OpenRouter → yTeaser → A.X 4.0 → Gemini 4단계 요약 |
+| `TaggingService.swift` | OpenRouter → A.X 4.0 → Gemini → 규칙 기반 자동 태깅 |
+| `AX4Service.swift` | SKT A.X 4.0 API 클라이언트 (OpenAI 호환) |
+| `OpenRouterService.swift` | OpenRouter Free Tier API 클라이언트 (v2.4.1) |
+| `PodcastService.swift` | AI 팟캐스트 생성 (LLM + TTS) |
+| `TTSService.swift` | AVSpeechSynthesizer 래퍼 (한국어 TTS) |
+| `QAService.swift` | Q&A 생성 서비스 (v2.5.3) |
+| `MindmapService.swift` | 마인드맵 생성/파싱/DB 저장 서비스 (v2.5.4) |
+| `DatabaseManager.swift` | SQLite DB 관리 (video_ai_data + qna_history 테이블) |
+| `PersistenceController.swift` | SwiftData ModelContainer 관리 (v2.4.0) |
+| `SwiftDataMigration.swift` | UserDefaults → SwiftData 자동 마이그레이션 (v2.4.0) |
+| `EdgeTTSClient.swift` | Edge TTS API 클라이언트 (실험적) |
+| `ErrorMessageMapper.swift` | yt-dlp 에러 메시지 한글 매핑 (v2.3.0) |
 
-### Models/ (9)
+### Models/ (12)
 | 파일 | 설명 |
 |------|------|
-| `LibraryItem.swift` | LibraryItem + SortOrder + FilterMode + ViewMode (v2.0.1: Custom Codable, tags/summary decodeIfPresent) |
+| `LibraryItem.swift` | `@Model class` — SwiftData 영구 저장 (sortOrder/filterMode/viewMode enum 포함) |
 | `VideoInfo.swift` | YouTube 영상 메타데이터 |
 | `DownloadItem.swift` | 다운로드 작업 모델 |
 | `Format.swift` | 비디오 포맷 |
-| `Settings.swift` | 설정 모델 |
-| `SubscribedChannel.swift` | 구독 채널 모델 |
+| `Settings.swift` | 설정 모델 (SettingsTab enum 포함) |
+| `SubscribedChannel.swift` | `@Model class` — 구독 채널 SwiftData 모델 |
 | `ChannelModels.swift` | 채널 비디오 + 캐시 |
 | `BatchPreset.swift` | 일괄 다운로드 프리셋 |
-| `TrendingVideo.swift` | 트렌딩 영상 + TrendingCategory 열거형 (systemIcon 프로퍼티) |
+| `TrendingVideo.swift` | 트렌딩 영상 + TrendingCategory 열거형 (systemIcon) |
+| `PodcastModels.swift` | PodcastScript, PodcastSegment, PodcastResult |
+| `QAModels.swift` | QAResponse, QATimestamp, QAHistoryItem |
+| `MindmapModels.swift` | MindmapNode (재귀적 Codable, Custom CodingKeys) |
 
-### Helpers/ (2)
+### Helpers/ (4)
 | 파일 | 설명 |
 |------|------|
-| `Constants.swift` | 앱 상수 + 유틸리티 |
-| `WindowAccessor.swift` | alwaysOnTop modifier |
+| `Constants.swift` | 앱 상수 + 유틸리티 (keyCode 기반 단축키) |
+| `WindowAccessor.swift` | alwaysOnTop NSViewRepresentable modifier |
+| `BookmarkManager.swift` | Security-scoped bookmark 관리 (저장 폴더 접근 권한) |
+| `ImageCacheEnvironmentKey.swift` | EnvironmentKey 기반 캐시 주입 |
 
 ### Debug/ (2) — DEBUG 전용
 | 파일 | 설명 |
 |------|------|
 | `DebugLogManager.swift` | `ObservableObject` 로그 관리자 (타임스탬프 자동 추가) |
-| `DebugLogView.swift` | SwiftUI 로그 뷰 (자동 스크롤, 복사 가능) + `debugLogOverlay` View extension |
+| `DebugLogView.swift` | SwiftUI 로그 뷰 (자동 스크롤, 복사 가능) |
+
+### Views/ (1)
+| 파일 | 설명 |
+|------|------|
+| `CachedImageViews.swift` | CachedThumbnailView + CachedAvatarView 공유 컴포넌트 |
 
 ### Build/ (1)
 | 파일 | 설명 |
 |------|------|
-| `build_and_run.sh` | 빌드 스크립트 — 단일 바이너리 → `TubeKeep.app` 번들 생성 |
+| `build_and_run.sh` | 빌드 스크립트 — debug/release + yt-dlp/ffmpeg 번들링 + 설치 + 실행 |
 
 ---
 
 ## 10. 데이터 저장 키 총정리
 
-| 키 | 타입 | 내용 | 저장소 |
-|----|------|------|--------|
-| `"appSettings"` | JSON | Settings (concurrentDownloads, outputDirectory, ...) | UserDefaults.standard |
-| `"downloadLibrary"` | JSON | `[videoId: LibraryItem]` | UserDefaults(suiteName:) |
-| `"libraryViewMode"` | String | `"grid"` or `"list"` | UserDefaults.standard |
-| `"channelOrder"` | JSON | `[String]` 채널 ID 정렬 순서 (T-117) | UserDefaults.standard |
-| `"subscribedChannels"` | JSON | `[SubscribedChannel]` | UserDefaults.standard |
-| `"channelDownloads"` | [String] | 다운로드 완료된 videoId 목록 | UserDefaults.standard |
-| `"channelFetchTimestamps"` | [String: Date] | 채널별 마지막 fetch 시간 | UserDefaults.standard |
-| `"channelVideosData"` | JSON | 채널별 비디오 목록 캐시 | UserDefaults.standard |
-| `"channelsNewVideos"` | JSON | `[channelId: [videoId]]` 채널별 미확인 새 영상 ID 목록 (T-114) | UserDefaults.standard |
-| `"channelsSeenVideoIds"` | JSON | `[channelId: [videoId]]` 채널별 확인 완료 영상 ID 목록 (T-114) | UserDefaults.standard |
-| `"downloadQueue"` | JSON | `[DownloadItem]` 큐 영속성 (T-115) | UserDefaults.standard |
+### SwiftData (v2.4.0+)
+| @Model | 테이블 | 주요 속성 |
+|--------|--------|-----------|
+| `LibraryItem` | SwiftData 자동 | `id, title, channelId, filePath, downloadDate, tags, summary, transcript, chapters, ...` |
+| `SubscribedChannel` | SwiftData 자동 | `id, name, avatarURL, videoCount, ...` |
 
-- `UserDefaults(suiteName: "com.tubekeep.shared")`는 라이브러리 데이터 공유용
+### UserDefaults
+| 키 | 타입 | 내용 |
+|----|------|------|
+| `"appSettings"` | JSON | Settings (concurrentDownloads, storageDirectory, OpenAI API 키, ...) |
+| `"libraryViewMode"` | String | `"grid"` or `"list"` |
+| `"channelOrder"` | JSON | `[String]` 채널 ID 정렬 순서 (T-117) |
+| `"channelDownloads"` | [String] | 다운로드 완료된 videoId 목록 |
+| `"channelFetchTimestamps"` | [String: Date] | 채널별 마지막 fetch 시간 |
+| `"channelVideosData"` | JSON | 채널별 비디오 목록 캐시 |
+| `"channelsNewVideos"` | JSON | `[channelId: [videoId]]` 채널별 미확인 새 영상 ID 목록 (T-114) |
+| `"channelsSeenVideoIds"` | JSON | `[channelId: [videoId]]` 채널별 확인 완료 영상 ID 목록 (T-114) |
+| `"downloadQueue"` | JSON | `[DownloadItem]` 큐 영속성 (T-115) |
+
+### SQLite (v2.5.0+) — `~/Library/Application Support/com.borasarang.tubekeep/tubekeep_ai.db`
+| 테이블 | 컬럼 | 설명 |
+|--------|------|------|
+| `video_ai_data` | `video_id (PK), transcript, transcript_language, summary, chapters (JSON), mindmap (JSON), podcast_path, tags (JSON), created_at, updated_at` | AI 콘텐츠 캐시 |
+| `qna_history` | `id (PK), video_id (FK), question, answer, timestamps (JSON), created_at` | Q&A 히스토리 |

@@ -387,7 +387,7 @@ struct BatchDownloadView: View {
 
         // Simulate processing with delays
         processingPhase = .processing
-        progressText = "Mock 처리중..."
+        progressText = "Mock 처리 중..."
 
         Task {
             for i in urlItems.indices {
@@ -420,12 +420,12 @@ struct BatchDownloadView: View {
                 store.send(.downloadQueue(.addItems(items)))
                 store.send(.home(.resetInfo))
                 processingPhase = .completed
-                progressText = "모두 다운로드 목록에 추가 되었습니다 (5초 후 자동 종료)"
+                progressText = "모두 다운로드 목록에 추가되었습니다 (5초 후 자동 종료)"
             }
             for remaining in stride(from: 4, through: 1, by: -1) {
                 try? await Task.sleep(for: .seconds(1))
                 await MainActor.run {
-                    progressText = "모두 다운로드 목록에 추가 되었습니다 (\(remaining)초 후 자동 종료)"
+                    progressText = "모두 다운로드 목록에 추가되었습니다 (\(remaining)초 후 자동 종료)"
                 }
             }
             try? await Task.sleep(for: .seconds(1))
@@ -457,7 +457,7 @@ struct BatchDownloadView: View {
         urlItems = rawURLs.map { BatchURLItem(url: $0, status: .pending, videoTitle: nil, thumbnailURL: nil) }
         processingPhase = .processing
         fetchLogs = ["진행상태: 일괄 다운로드 시작 (\(rawURLs.count)개)"]
-        progressText = "0/\(rawURLs.count) 처리중..."
+        progressText = "0/\(rawURLs.count) 처리 중..."
 
         let ytService = YouTubeDLService()
         let uploadService = UploadOrderService()
@@ -513,7 +513,7 @@ struct BatchDownloadView: View {
 
                     await MainActor.run {
                         fetchLogs.append("진행상태: [\(index + 1)/\(rawURLs.count)] 업로드 순번 조회 중...")
-                        progressText = "\(index + 1)/\(rawURLs.count) 순번 조회중..."
+                        progressText = "\(index + 1)/\(rawURLs.count) 순번 조회 중..."
                     }
                     let uploadIndex = (try? await uploadService.fetchUploadIndex(
                         channelId: info.channelId,
@@ -558,13 +558,13 @@ struct BatchDownloadView: View {
                 store.send(.downloadQueue(.addItems(allItems)))
                 store.send(.home(.resetInfo))
                 processingPhase = .completed
-                progressText = "모두 다운로드 목록에 추가 되었습니다 (5초 후 자동 종료)"
+                progressText = "모두 다운로드 목록에 추가되었습니다 (5초 후 자동 종료)"
                 fetchLogs.append("진행상태: \(count)개 추가 완료 ✓")
             }
             for remaining in stride(from: 4, through: 1, by: -1) {
                 try? await Task.sleep(for: .seconds(1))
                 await MainActor.run {
-                    progressText = "모두 다운로드 목록에 추가 되었습니다 (\(remaining)초 후 자동 종료)"
+                    progressText = "모두 다운로드 목록에 추가되었습니다 (\(remaining)초 후 자동 종료)"
                 }
             }
             try? await Task.sleep(for: .seconds(1))

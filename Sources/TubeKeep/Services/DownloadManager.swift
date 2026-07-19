@@ -134,6 +134,9 @@ final class DownloadManager: @unchecked Sendable {
                     let fileExists = actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
 
                     if process.terminationStatus == 0 || fileExists {
+                        if item.includeSubtitles, let path = actualPath {
+                            Self.saveSubtitlesToDB(videoPath: path)
+                        }
                         completionHandler(item.id, true, actualPath, nil)
                         if self.settings.playSoundOnComplete {
                             _ = await MainActor.run {
@@ -260,5 +263,40 @@ final class DownloadManager: @unchecked Sendable {
         ytdlTemplate = ytdlTemplate.trimmingCharacters(in: CharacterSet(charactersIn: ".- "))
 
         return "\(channelDir)/\(ytdlTemplate).%(id)s.%(ext)s"
+    }
+
+    private static func saveSubtitlesToDB(videoPath: String) {
+        let dir = (videoPath as NSString).deletingLastPathComponent
+        let baseName = ((videoPath as NSString).lastPathComponent as NSString).deletingPathExtension
+        let fm = FileManager.default
+
+        // Extract YouTube videoId from filename (last dot-separated component)
+        let nameParts = baseName.components(separatedBy: ".")
+        guard let videoId = nameParts.last, videoId.count >= 10 else { return }
+
+        guard let files = try? fm.contentsOfDirectory(atPath: dir) else { return }
+
+        for file in files {
+            guard file.hasPrefix(baseName),
+                  (file.hasSuffix(".vtt") || file.hasSuffix(".srt")) else { continue }
+
+            let path = (dir as NSString).appendingPathComponent(file)
+            guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { continue }
+
+            let text: String
+            let lang: String
+            if file.hasSuffix(".vtt") {
+                text = SummarizationService.parseVTT(content)
+                lang = file.contains(".ko.") ? "ko" : "en"
+            } else {
+                text = SummarizationService.parseSRT(content)
+                lang = file.contains(".ko.") ? "ko" : "en"
+            }
+
+            if !text.isEmpty {
+                DatabaseManager.shared.updateTranscript(videoId: videoId, transcript: text, language: lang)
+            }
+            try? fm.removeItem(atPath: path)
+        }
     }
 }

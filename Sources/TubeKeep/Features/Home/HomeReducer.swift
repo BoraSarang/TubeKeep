@@ -28,6 +28,7 @@ struct HomeReducer {
         var lastAutoFetchedURL: String = ""
         var clipboardMonitoring: Bool = true
         var summaryText: String?
+        var summaryProvider: String?
         var summaryLoading = false
         var showSummaryPopover = false
         var showGeminiKeyAlert = false
@@ -65,7 +66,7 @@ struct HomeReducer {
         case addToQueueResponse(DownloadItem)
         case playlistSelection(PresentationAction<PlaylistSelectionReducer.Action>)
         case requestSummary
-        case summaryLoaded(String)
+        case summaryLoaded(String, provider: String)
         case summaryFailed(String)
         case toggleSummaryPopover
         case dismissSummary
@@ -95,7 +96,7 @@ struct HomeReducer {
 
             case .fetchInfoTapped:
                 guard !state.urlString.trimmingCharacters(in: .whitespaces).isEmpty else {
-                    state.errorMessage = "URL을 입력해주세요"
+                    state.errorMessage = "URL을 입력해 주세요"
                     return .none
                 }
                 return .merge(
@@ -218,40 +219,29 @@ struct HomeReducer {
 
             case .requestSummary:
                 guard let info = state.videoInfo else { return .none }
-                let videoId = info.id
-                let title = info.title
-                let channel = info.channel
                 state.summaryLoading = true
                 state.summaryText = nil
                 state.showSummaryPopover = true
                 return .run { send in
                     let service = SummarizationService()
-                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    let ax4Key = UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey
+                    let geminiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
                     do {
-                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
-                        await send(.summaryLoaded("\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                        let result = try await service.summarizeVideo(videoId: info.id, title: info.title, channel: info.channel, openRouterAPIKey: openRouterKey, ax4APIKey: ax4Key, geminiAPIKey: geminiKey)
+                        await send(.summaryLoaded("\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n"), provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
-                        if case .quotaExceeded = error, !apiKey.isEmpty {
-                            do {
-                                let result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
-                                await send(.summaryLoaded("\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
-                            } catch {
-                                await send(.summaryFailed(error.localizedDescription))
-                            }
-                        } else {
-                            if case .quotaExceeded = error {
-                                await send(.setGeminiKeyAlert(true))
-                            }
-                            await send(.summaryFailed(error.localizedDescription))
-                        }
+                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
+                        await send(.summaryFailed(error.localizedDescription))
                     } catch {
                         await send(.summaryFailed(error.localizedDescription))
                     }
                 }
 
-            case let .summaryLoaded(text):
+            case let .summaryLoaded(text, provider):
                 state.summaryLoading = false
                 state.summaryText = text
+                state.summaryProvider = provider
                 return .none
 
                 case let .summaryFailed(error):
@@ -269,6 +259,7 @@ struct HomeReducer {
             case .dismissSummary:
                 state.showSummaryPopover = false
                 state.summaryText = nil
+                state.summaryProvider = nil
                 state.summaryLoading = false
                 return .none
 

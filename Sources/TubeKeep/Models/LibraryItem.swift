@@ -1,20 +1,27 @@
 import Foundation
+import SwiftData
 
-struct LibraryItem: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let channelId: String
-    let channelName: String
-    let thumbnailURL: String
+@Model
+final class LibraryItem: Identifiable, @unchecked Sendable {
+    @Attribute(.unique) var id: String
+    var title: String
+    var channelId: String
+    var channelName: String
+    var thumbnailURL: String
     var filePath: String
-    let downloadDate: Date
-    let uploadDate: Date?
-    let duration: Int?
-    let channelUploadIndex: Int?
+    var downloadDate: Date
+    var uploadDate: Date?
+    var duration: Int?
+    var channelUploadIndex: Int?
     var tags: [String]
     var summary: String?
 
-    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil) {
+    // v2.5.0: AI 콘텐츠 캐싱
+    var transcript: String?
+    var chapters: Data?
+    var subtitleLanguage: String?
+
+    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil, transcript: String? = nil, chapters: Data? = nil, subtitleLanguage: String? = nil) {
         self.id = id
         self.title = title
         self.channelId = channelId
@@ -27,53 +34,26 @@ struct LibraryItem: Identifiable, Equatable {
         self.channelUploadIndex = channelUploadIndex
         self.tags = tags
         self.summary = summary
+        self.transcript = transcript
+        self.chapters = chapters
+        self.subtitleLanguage = subtitleLanguage
     }
 
     func withChannelUploadIndex(_ index: Int) -> LibraryItem {
-        LibraryItem(
+        let item = LibraryItem(
             id: id, title: title, channelId: channelId, channelName: channelName,
             thumbnailURL: thumbnailURL, filePath: filePath, downloadDate: downloadDate,
             uploadDate: uploadDate, duration: duration, channelUploadIndex: index,
-            tags: tags, summary: summary
+            tags: tags, summary: summary, transcript: transcript, chapters: chapters,
+            subtitleLanguage: subtitleLanguage
         )
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, channelId, channelName, thumbnailURL, filePath, downloadDate, uploadDate, duration, channelUploadIndex, tags, summary
+        return item
     }
 }
 
-extension LibraryItem: Codable {
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        title = try c.decode(String.self, forKey: .title)
-        channelId = try c.decode(String.self, forKey: .channelId)
-        channelName = try c.decode(String.self, forKey: .channelName)
-        thumbnailURL = try c.decode(String.self, forKey: .thumbnailURL)
-        filePath = try c.decode(String.self, forKey: .filePath)
-        downloadDate = try c.decode(Date.self, forKey: .downloadDate)
-        uploadDate = try c.decodeIfPresent(Date.self, forKey: .uploadDate)
-        duration = try c.decodeIfPresent(Int.self, forKey: .duration)
-        channelUploadIndex = try c.decodeIfPresent(Int.self, forKey: .channelUploadIndex)
-        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
-        summary = try c.decodeIfPresent(String.self, forKey: .summary)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(id, forKey: .id)
-        try c.encode(title, forKey: .title)
-        try c.encode(channelId, forKey: .channelId)
-        try c.encode(channelName, forKey: .channelName)
-        try c.encode(thumbnailURL, forKey: .thumbnailURL)
-        try c.encode(filePath, forKey: .filePath)
-        try c.encode(downloadDate, forKey: .downloadDate)
-        try c.encodeIfPresent(uploadDate, forKey: .uploadDate)
-        try c.encodeIfPresent(duration, forKey: .duration)
-        try c.encodeIfPresent(channelUploadIndex, forKey: .channelUploadIndex)
-        try c.encode(tags, forKey: .tags)
-        try c.encodeIfPresent(summary, forKey: .summary)
+extension LibraryItem: Equatable {
+    static func == (lhs: LibraryItem, rhs: LibraryItem) -> Bool {
+        lhs.id == rhs.id
     }
 }
 

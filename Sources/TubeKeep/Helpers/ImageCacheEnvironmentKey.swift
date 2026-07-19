@@ -2,7 +2,7 @@ import SwiftUI
 import Foundation
 
 private struct ImageCacheKey: EnvironmentKey {
-    static let defaultValue: LibraryCacheService = .shared
+    nonisolated(unsafe) static let defaultValue: LibraryCacheService = LibraryCacheService.shared
 }
 
 extension EnvironmentValues {

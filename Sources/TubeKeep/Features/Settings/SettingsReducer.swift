@@ -22,9 +22,22 @@ struct SettingsReducer {
         var showMainWindowOnLaunch: Bool = true
         var sponsorBlock: Bool = true
         var embedMetadata: Bool = true
+        var ttsEngine: TTSEngine = .apple
+        var openRouterAPIKey: String {
+            get { UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "" }
+            set { UserDefaults.standard.set(newValue, forKey: "openRouterAPIKey") }
+        }
+        var openRouterModel: String {
+            get { UserDefaults.standard.string(forKey: "openRouterModel") ?? "openrouter/free" }
+            set { UserDefaults.standard.set(newValue, forKey: "openRouterModel") }
+        }
         var geminiAPIKey: String {
             get { UserDefaults.standard.string(forKey: "geminiAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "geminiAPIKey") }
+        }
+        var ax4APIKey: String {
+            get { UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey }
+            set { UserDefaults.standard.set(newValue, forKey: "ax4APIKey") }
         }
 
         var settings: Settings {
@@ -40,9 +53,11 @@ struct SettingsReducer {
                 launchAtLogin: launchAtLogin,
                 maxUploadCheck: maxUploadCheck,
                 skipIndexOnFailure: skipIndexOnFailure,
+                openRouterAPIKey: openRouterAPIKey,
                 showMainWindowOnLaunch: showMainWindowOnLaunch,
                 sponsorBlock: sponsorBlock,
-                embedMetadata: embedMetadata
+                embedMetadata: embedMetadata,
+                ttsEngine: ttsEngine
             )
         }
     }
@@ -65,7 +80,11 @@ struct SettingsReducer {
         case toggleShowMainWindowOnLaunch
         case toggleSponsorBlock
         case toggleEmbedMetadata
+        case setTTSEngine(TTSEngine)
+        case setOpenRouterAPIKey(String)
+        case setOpenRouterModel(String)
         case setGeminiAPIKey(String)
+        case setAX4APIKey(String)
         case saveSettings
     }
 
@@ -174,8 +193,24 @@ struct SettingsReducer {
                 state.embedMetadata.toggle()
                 return .send(.saveSettings)
 
+            case let .setTTSEngine(engine):
+                state.ttsEngine = engine
+                return .send(.saveSettings)
+
+            case let .setOpenRouterAPIKey(key):
+                state.openRouterAPIKey = key
+                return .none
+
+            case let .setOpenRouterModel(model):
+                state.openRouterModel = model
+                return .none
+
             case let .setGeminiAPIKey(key):
                 state.geminiAPIKey = key
+                return .none
+
+            case let .setAX4APIKey(key):
+                state.ax4APIKey = key
                 return .none
 
             case .saveSettings:

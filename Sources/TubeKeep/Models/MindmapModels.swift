@@ -27,6 +27,10 @@ struct MindmapNode: Codable, Equatable, Identifiable {
         try container.encode(label, forKey: .label)
         try container.encode(children, forKey: .children)
     }
+
+    static func == (lhs: MindmapNode, rhs: MindmapNode) -> Bool {
+        lhs.label == rhs.label && lhs.children == rhs.children
+    }
 }
 
 struct MindmapResult: Equatable {

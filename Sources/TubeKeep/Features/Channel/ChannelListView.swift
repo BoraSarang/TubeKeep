@@ -140,7 +140,7 @@ struct ChannelListView: View {
                         onMove: onMoveChannels
                     )
                 )
-                .onChange(of: selectedChannel?.id) { newID in
+                .onChange(of: selectedChannel?.id) { _, newID in
                     guard let id = newID else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         proxy.scrollTo(id, anchor: .center)

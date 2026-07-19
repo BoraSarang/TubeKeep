@@ -299,7 +299,7 @@ struct ChannelDownloaderView: View {
                     let idx = count - v.playlistIndex + 1
                     return idx > 0 ? (v.id, idx) : nil
                 }
-                await LibraryCacheService.shared.updateChannelUploadIndices(channelId: channel.id, updates)
+                LibraryCacheService.shared.updateChannelUploadIndices(channelId: channel.id, updates)
 
                 // Refresh library in-memory state from disk
                 store.send(.library(.loadFromDisk))
@@ -470,7 +470,7 @@ struct ChannelDownloaderView: View {
             }
             .frame(height: 60)
             .background(Color(.textBackgroundColor).opacity(0.3))
-            .onChange(of: debugLogs.count) { _ in
+            .onChange(of: debugLogs.count) {
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
         }

@@ -85,7 +85,7 @@ struct DownloadQueueView: View {
             Image(systemName: "tray")
                 .font(.system(size: 24))
                 .foregroundStyle(.tertiary)
-            Text("다운로드할 영상을 추가해주세요")
+            Text("다운로드할 영상을 추가해 주세요")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -262,7 +262,7 @@ struct DownloadQueueView: View {
             }
             .frame(height: 60)
             .background(Color(.textBackgroundColor).opacity(0.3))
-            .onChange(of: store.debugLogs.count) { _ in
+            .onChange(of: store.debugLogs.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
         }

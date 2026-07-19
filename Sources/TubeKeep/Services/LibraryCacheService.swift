@@ -1,10 +1,10 @@
 import Foundation
 import AppKit
+import SwiftData
 
-actor LibraryCacheService {
+@MainActor
+final class LibraryCacheService {
     static let shared = LibraryCacheService()
-    private let saveKey = "downloadLibrary"
-    private let sharedDefaults = UserDefaults(suiteName: Constants.appGroupSuiteName)
 
     private var thumbCache: NSCache<NSString, NSImage> = {
         let c = NSCache<NSString, NSImage>()
@@ -29,24 +29,20 @@ actor LibraryCacheService {
         return libDir
     }
 
+    private var context: ModelContext {
+        PersistenceController.shared.context
+    }
+
     // MARK: - Library Data
 
     func loadItems() -> [LibraryItem] {
-        let items: [LibraryItem]
-        if let data = sharedDefaults?.data(forKey: saveKey),
-           let decoded = try? JSONDecoder().decode([String: LibraryItem].self, from: data) {
-            items = Array(decoded.values).sorted { $0.downloadDate > $1.downloadDate }
-        } else if let data = UserDefaults.standard.data(forKey: saveKey),
-                  let decoded = try? JSONDecoder().decode([String: LibraryItem].self, from: data) {
-            sharedDefaults?.set(data, forKey: saveKey)
-            items = Array(decoded.values).sorted { $0.downloadDate > $1.downloadDate }
-        } else {
-            return []
-        }
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [SortDescriptor(\.downloadDate, order: .reverse)])
+        guard let items = try? context.fetch(descriptor) else { return [] }
 
         BookmarkManager.ensureAccess()
         let videoExts = Set(["mp4", "mkv", "webm"])
-        let fixed = items.map { item in
+        var changed = false
+        let fixed = items.map { item -> LibraryItem in
             let currentExt = (item.filePath as NSString).pathExtension
             if FileManager.default.fileExists(atPath: item.filePath) && videoExts.contains(currentExt) {
                 return item
@@ -56,78 +52,85 @@ actor LibraryCacheService {
             guard let match = files.first(where: {
                 $0.contains(item.id) && videoExts.contains(($0 as NSString).pathExtension)
             }) else { return item }
-            var updated = item
-            updated.filePath = "\(channelDir)/\(match)"
-            return updated
+            item.filePath = "\(channelDir)/\(match)"
+            changed = true
+            return item
         }
 
-        let changed = zip(items, fixed).contains { $0.filePath != $1.filePath }
         if changed {
-            saveItems(fixed)
+            try? context.save()
         }
         return fixed
     }
 
-    func saveItems(_ items: [LibraryItem]) {
-        var dict: [String: LibraryItem] = [:]
-        for item in items {
-            dict[item.id] = item
-        }
-        guard let data = try? JSONEncoder().encode(dict) else { return }
-        sharedDefaults?.set(data, forKey: saveKey)
-    }
-
     func addItem(_ item: LibraryItem) {
-        var items = loadItems()
-        items.removeAll { $0.id == item.id }
-        items.append(item)
-        saveItems(items)
+        if let existing = findItem(id: item.id) {
+            context.delete(existing)
+        }
+        context.insert(item)
+        try? context.save()
     }
 
     func updateItem(_ item: LibraryItem) {
-        var items = loadItems()
-        if let idx = items.firstIndex(where: { $0.id == item.id }) {
-            items[idx] = item
+        if let existing = findItem(id: item.id) {
+            existing.title = item.title
+            existing.channelId = item.channelId
+            existing.channelName = item.channelName
+            existing.thumbnailURL = item.thumbnailURL
+            existing.filePath = item.filePath
+            existing.downloadDate = item.downloadDate
+            existing.uploadDate = item.uploadDate
+            existing.duration = item.duration
+            existing.channelUploadIndex = item.channelUploadIndex
+            existing.tags = item.tags
+            existing.summary = item.summary
+            existing.transcript = item.transcript
+            existing.chapters = item.chapters
+            existing.subtitleLanguage = item.subtitleLanguage
         } else {
-            items.append(item)
+            context.insert(item)
         }
-        saveItems(items)
+        try? context.save()
     }
 
     func updateChannelUploadIndices(channelId: String, _ updates: [(videoId: String, uploadIndex: Int)]) {
-        let items = loadItems()
-        let updated = items.map { item -> LibraryItem in
-            guard item.channelId == channelId else { return item }
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
+        guard let items = try? context.fetch(descriptor) else { return }
+        for item in items where item.channelId == channelId {
             if let match = updates.first(where: { $0.videoId == item.id }) {
-                return item.withChannelUploadIndex(match.uploadIndex)
+                item.channelUploadIndex = match.uploadIndex
             }
-            return item
         }
-        saveItems(updated)
+        try? context.save()
     }
 
     func removeItem(id: String) {
-        let items = loadItems()
-        if let item = items.first(where: { $0.id == id }) {
+        if let item = findItem(id: id) {
             BookmarkManager.ensureAccess()
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
+            context.delete(item)
+            try? context.save()
         }
-        var updated = items
-        updated.removeAll { $0.id == id }
-        saveItems(updated)
     }
 
     func removeItems(ids: [String]) {
-        let items = loadItems()
-        for item in items where ids.contains(item.id) {
+        let idSet = Set(ids)
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
+        guard let items = try? context.fetch(descriptor) else { return }
+        for item in items where idSet.contains(item.id) {
             BookmarkManager.ensureAccess()
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
+            context.delete(item)
         }
-        var updated = items
-        updated.removeAll { ids.contains($0.id) }
-        saveItems(updated)
+        try? context.save()
+    }
+
+    private func findItem(id: String) -> LibraryItem? {
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
+        guard let items = try? context.fetch(descriptor) else { return nil }
+        return items.first { $0.id == id }
     }
 
     // MARK: - Channel Names
@@ -236,21 +239,21 @@ actor LibraryCacheService {
         let fm = FileManager.default
         var total: Int64 = 0
 
-        let dirs = [
-            Constants.channelStorageDirectory,
-            (try? fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false))
-                .flatMap { $0.appendingPathComponent("com.tubekeep").path }
-        ].compactMap { $0 }
+        let podcastDir = (NSHomeDirectory() as NSString).appendingPathComponent("Documents/TubeKeep/Podcasts")
+        let cacheDir = (try? fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false))
+            .flatMap { $0.appendingPathComponent("com.tubekeep").path }
+        var dirs: [String] = [Constants.channelStorageDirectory, podcastDir]
+        if let cacheDir { dirs.append(cacheDir) }
 
         for dir in dirs {
             guard fm.fileExists(atPath: dir) else { continue }
             guard let enumerator = fm.enumerator(
                 at: URL(fileURLWithPath: dir),
-                includingPropertiesForKeys: [.fileSizeKey],
+                includingPropertiesForKeys: [URLResourceKey.fileSizeKey],
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             ) else { continue }
             for case let fileURL as URL in enumerator {
-                guard let attrs = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
+                guard let attrs = try? fileURL.resourceValues(forKeys: [URLResourceKey.fileSizeKey]),
                       let size = attrs.fileSize
                 else { continue }
                 total += Int64(size)

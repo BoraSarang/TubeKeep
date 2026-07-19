@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TubeKeep",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v14)],
     dependencies: [
         .package(
             url: "https://github.com/pointfreeco/swift-composable-architecture",
@@ -18,6 +18,16 @@ let package = Package(
                     name: "ComposableArchitecture",
                     package: "swift-composable-architecture"
                 ),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
+        .testTarget(
+            name: "TubeKeepTests",
+            dependencies: ["TubeKeep"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
             ]
         ),
     ]

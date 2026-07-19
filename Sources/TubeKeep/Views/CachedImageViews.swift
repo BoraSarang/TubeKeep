@@ -32,7 +32,7 @@ struct CachedAvatarView: View {
         guard !url.isEmpty else { return }
         
         // Check cache first
-        if let cached = await cache.cachedAvatar(for: channelId) {
+        if let cached = cache.cachedAvatar(for: channelId) {
             await MainActor.run { image = cached }
             return
         }
@@ -43,7 +43,7 @@ struct CachedAvatarView: View {
         do {
             let (data, _) = try await URLSession.shared.data(from: urlObj)
             if let nsImage = NSImage(data: data) {
-                await cache.cacheAvatar(for: channelId, data: data)
+                cache.cacheAvatar(for: channelId, data: data)
                 await MainActor.run { image = nsImage }
             }
         } catch {
@@ -80,7 +80,7 @@ struct CachedThumbnailView: View {
         guard !url.isEmpty else { return }
         
         // Check cache first
-        if let cached = await cache.cachedThumbnail(for: videoId) {
+        if let cached = cache.cachedThumbnail(for: videoId) {
             await MainActor.run { image = cached }
             return
         }
@@ -91,7 +91,7 @@ struct CachedThumbnailView: View {
         do {
             let (data, _) = try await URLSession.shared.data(from: urlObj)
             if let nsImage = NSImage(data: data) {
-                await cache.cacheThumbnail(for: videoId, data: data)
+                cache.cacheThumbnail(for: videoId, data: data)
                 await MainActor.run { image = nsImage }
             }
         } catch {

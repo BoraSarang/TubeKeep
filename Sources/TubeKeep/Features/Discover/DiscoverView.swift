@@ -27,7 +27,7 @@ struct DiscoverView: View {
             }
             Button("취소", role: .cancel) { }
         } message: {
-            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해주세요.")
+            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해 주세요.")
         }
     }
 
@@ -104,6 +104,7 @@ struct DiscoverView: View {
                                 thumbnail: thumbnailImages[video.id],
                                 showSummary: store.library.discoverSummaryVideoId == video.id,
                                 summaryText: store.library.discoverSummaryText,
+                                summaryProvider: store.library.discoverSummaryProvider,
                                 summaryLoading: store.library.discoverSummaryLoading,
                                 isDownloaded: isDownloaded,
                                 localFilePath: localItem?.filePath,
@@ -144,7 +145,7 @@ struct DiscoverView: View {
         guard thumbnailImages[video.id] == nil else { return }
         let service = LibraryCacheService.shared
         Task {
-            if let cached = await service.cachedThumbnail(for: video.id) {
+            if let cached = service.cachedThumbnail(for: video.id) {
                 await MainActor.run { thumbnailImages[video.id] = cached }
                 return
             }
@@ -163,6 +164,7 @@ struct DiscoverCard: View {
     let thumbnail: NSImage?
     let showSummary: Bool
     let summaryText: String?
+    let summaryProvider: String?
     let summaryLoading: Bool
     let isDownloaded: Bool
     let localFilePath: String?
@@ -252,10 +254,29 @@ struct DiscoverCard: View {
                                 VStack(alignment: .leading, spacing: 16) {
                                     HStack {
                                         Label("AI 요약", systemImage: "text.bubble")
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 14, weight: .semibold))
+                                        if let provider = summaryProvider {
+                                            Text(provider)
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(.secondary)
+                                        }
                                         Spacer()
-                                        Button("닫기") {
+                                        Button {
+                                            if let text = summaryText {
+                                                NSPasteboard.general.clearContents()
+                                                NSPasteboard.general.setString(text, forType: .string)
+                                            }
+                                        } label: {
+                                            Image(systemName: "doc.on.doc")
+                                                .frame(width: 14, height: 14)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .controlSize(.small)
+                                        Button {
                                             onHideSummary()
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .frame(width: 14, height: 14)
                                         }
                                         .buttonStyle(.borderedProminent)
                                         .controlSize(.small)
@@ -281,15 +302,6 @@ struct DiscoverCard: View {
                                                     .foregroundStyle(.secondary)
                                                     .textSelection(.enabled)
                                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                                            }
-                                            HStack {
-                                                Spacer()
-                                                Button("복사") {
-                                                    NSPasteboard.general.clearContents()
-                                                    NSPasteboard.general.setString(text, forType: .string)
-                                                }
-                                                .buttonStyle(.borderedProminent)
-                                                .controlSize(.small)
                                             }
                                         }
                                     } else {

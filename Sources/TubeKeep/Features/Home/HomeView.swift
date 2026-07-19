@@ -43,7 +43,7 @@ struct HomeView: View {
             }
             Button("취소", role: .cancel) { }
         } message: {
-            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해주세요.")
+            Text("Google Gemini 모드에서는 API 키가 필요합니다.\n설정에서 API 키를 입력하거나 yTeaser 모드로 전환해 주세요.")
         }
     }
 
@@ -65,7 +65,7 @@ struct HomeView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .id(store.urlString)
-                    .onChange(of: store.urlString) { newValue in
+                    .onChange(of: store.urlString) { _, newValue in
                         guard isVideoURL(newValue),
                               newValue != store.lastAutoFetchedURL
                         else { return }
@@ -183,7 +183,7 @@ struct HomeView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .frame(height: 50)
-                            .onChange(of: store.fetchLogs.count) { _ in
+                            .onChange(of: store.fetchLogs.count) { _, _ in
                                 let lastIdx = store.fetchLogs.suffix(30).count - 1
                                 guard lastIdx >= 0 else { return }
                                 Task { @MainActor in
@@ -361,10 +361,29 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Label("AI 요약", systemImage: "text.bubble")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 14, weight: .semibold))
+                            if let provider = store.summaryProvider {
+                                Text(provider)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Button("닫기") {
+                            Button {
+                                if let text = store.summaryText {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(text, forType: .string)
+                                }
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .frame(width: 14, height: 14)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            Button {
                                 store.send(.dismissSummary)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .frame(width: 14, height: 14)
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
@@ -390,15 +409,6 @@ struct HomeView: View {
                                         .foregroundStyle(.secondary)
                                         .textSelection(.enabled)
                                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                                }
-                                HStack {
-                                    Spacer()
-                                    Button("복사") {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString(text, forType: .string)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
                                 }
                             }
                         } else {

@@ -12,7 +12,7 @@ actor YouTubeDLService {
         var errorDescription: String? {
             switch self {
             case .notInstalled:
-                return "yt-dlp가 설치되지 않았습니다.\n터미널에 'brew install yt-dlp'를 입력해주세요."
+                return "yt-dlp가 설치되지 않았습니다.\n터미널에 'brew install yt-dlp'를 입력해 주세요."
             case let .infoFetchFailed(msg):
                 return "정보 조회 실패: \(ErrorMessageMapper.map(msg))"
             case let .downloadFailed(msg):

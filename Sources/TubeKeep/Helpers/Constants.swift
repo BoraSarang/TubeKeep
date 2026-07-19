@@ -12,6 +12,8 @@ enum Constants {
     static let defaultStorageDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Documents/TubeKeep").path
     static let defaultFilenameTemplate = "{index} - {title}.{id}"
+    static let defaultAX4APIKey = "sktax-XyeKFrq67ZjS4EpsDlrHHXV8it"
+    static let defaultOpenRouterModel = "openrouter/free"
 
     static var youtubeExtractorArgs: String {
         let lang = Locale.preferredLanguages.first?.prefix(2) ?? "en"
@@ -38,6 +40,7 @@ enum Constants {
     static let openChannelWithIdNotification = Notification.Name("com.tubekeep.openChannelWithId")
     static let selectChannelNotification = Notification.Name("com.tubekeep.selectChannel")
     static let openSettingsWindowNotification = Notification.Name("com.tubekeep.openSettingsWindow")
+    static let openAIWindowNotification = Notification.Name("com.tubekeep.openAIWindow")
 
     static let librarySaveKey = "downloadLibrary"
     static let libraryViewModeKey = "libraryViewMode"

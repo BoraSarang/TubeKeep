@@ -7,30 +7,80 @@ actor TaggingService {
         "요리/음식", "여행/일상", "과학",
     ]
 
-    func classify(title: String, channel: String, apiKey: String) async -> String {
-        guard !apiKey.isEmpty else {
-            return autoClassify(title: title, channel: channel)
-        }
-        let prompt = """
-        Classify the following YouTube video into exactly ONE category.
-        Choose only from: \(predefinedTags.joined(separator: ", "))
-
-        Title: \(title)
-        Channel: \(channel)
-
-        Return ONLY the category name, nothing else.
-        """
-
-        guard let tag = try? await queryGemini(prompt: prompt, apiKey: apiKey) else {
-            return autoClassify(title: title, channel: channel)
-        }
-
-        let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-        if predefinedTags.contains(cleaned) {
-            return cleaned
+    func classify(title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String) async -> String {
+        // 1순위: OpenRouter (무료)
+        if !openRouterAPIKey.isEmpty {
+            do {
+                let service = OpenRouterService()
+                let tag = try await service.classifyTag(title: title, channel: channel, apiKey: openRouterAPIKey)
+                if predefinedTags.contains(tag) {
+                    log("[AI Fallback] OpenRouter 태깅 성공: \(tag) — \(title)")
+                    return tag
+                }
+                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → A.X 4.0 시도 — \(title)")
+            } catch {
+                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → A.X 4.0 시도 — \(title)")
+            }
+        } else {
+            log("[AI Fallback] OpenRouter 키 없음 → A.X 4.0 시도 — \(title)")
         }
 
-        return autoClassify(title: title, channel: channel)
+        // 2순위: A.X 4.0
+        if !ax4APIKey.isEmpty {
+            do {
+                let tag = try await classifyWithAX4(title: title, channel: channel, apiKey: ax4APIKey)
+                if predefinedTags.contains(tag) {
+                    log("[AI Fallback] A.X 4.0 태깅 성공: \(tag) — \(title)")
+                    return tag
+                }
+                log("[AI Fallback] A.X 4.0 태깅 결과 미매칭(\(tag)) → Gemini 시도 — \(title)")
+            } catch AX4Error.serviceUnavailable {
+                log("[AI Fallback] A.X 4.0 게스트 API 종료 → Gemini 시도 — \(title)")
+            } catch {
+                log("[AI Fallback] A.X 4.0 태깅 실패 → Gemini 시도 — \(title)")
+            }
+        } else {
+            log("[AI Fallback] A.X 4.0 키 없음 → Gemini 시도 — \(title)")
+        }
+
+        // 3순위: Gemini (유료)
+        if !geminiAPIKey.isEmpty {
+            let prompt = """
+            Classify the following YouTube video into exactly ONE category.
+            Choose only from: \(predefinedTags.joined(separator: ", "))
+
+            Title: \(title)
+            Channel: \(channel)
+
+            Return ONLY the category name, nothing else.
+            """
+            if let tag = try? await queryGemini(prompt: prompt, apiKey: geminiAPIKey),
+               predefinedTags.contains(tag) {
+                log("[AI Fallback] Gemini 태깅 성공: \(tag) — \(title)")
+                return tag
+            }
+            log("[AI Fallback] Gemini 태깅 실패 → 규칙 기반 분류 — \(title)")
+        } else {
+            log("[AI Fallback] Gemini 키 없음 → 규칙 기반 분류 — \(title)")
+        }
+
+        // 4순위: 규칙 기반
+        let fallback = autoClassify(title: title, channel: channel)
+        log("[AI Fallback] 규칙 기반 태깅: \(fallback) — \(title)")
+        return fallback
+    }
+
+    private func log(_ message: String) {
+        #if DEBUG
+        Task { @MainActor in
+            DebugLogManager.shared?.append(message)
+        }
+        #endif
+    }
+
+    private func classifyWithAX4(title: String, channel: String, apiKey: String) async throws -> String {
+        let ax4 = AX4Service()
+        return try await ax4.classifyTag(title: title, channel: channel, apiKey: apiKey)
     }
 
     private func autoClassify(title: String, channel: String) -> String {
@@ -75,26 +125,38 @@ actor TaggingService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 15
+        request.timeoutInterval = 30
 
         let body: [String: Any] = [
             "contents": [["parts": [["text": prompt]]]]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200
-        else { throw SummarizationService.SummaryError.apiUnavailable("Gemini API 오류") }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let first = candidates.first,
-              let content = first["content"] as? [String: Any],
-              let parts = content["parts"] as? [[String: Any]],
-              let firstPart = parts.first,
-              let result = firstPart["text"] as? String
-        else { throw SummarizationService.SummaryError.summaryFailed("Gemini API 응답 파싱 실패") }
-        return result
+        var lastDetail: String?
+        for attempt in 0..<4 {
+            if attempt > 0 {
+                let delay = Double(min(attempt, 4)) * 2.0
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { continue }
+            if httpResponse.statusCode == 200 {
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let candidates = json["candidates"] as? [[String: Any]],
+                      let first = candidates.first,
+                      let content = first["content"] as? [String: Any],
+                      let parts = content["parts"] as? [[String: Any]],
+                      let firstPart = parts.first,
+                      let result = firstPart["text"] as? String
+                else { throw SummarizationService.SummaryError.summaryFailed("Gemini API 응답 파싱 실패") }
+                return result
+            }
+            if httpResponse.statusCode == 429 {
+                lastDetail = "요청 한도 초과"
+                continue
+            }
+            throw SummarizationService.SummaryError.apiUnavailable("Gemini API 오류 (HTTP \(httpResponse.statusCode))")
+        }
+        throw SummarizationService.SummaryError.apiUnavailable(lastDetail ?? "Gemini API 요청 실패")
     }
 }

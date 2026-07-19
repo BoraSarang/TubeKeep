@@ -41,13 +41,6 @@ struct VideoDownloadView: View {
                     Image(systemName: "xmark.circle")
                 }
                 .help("창 닫기")
-
-                Button {
-                    NSApp.terminate(nil)
-                } label: {
-                    Image(systemName: "power")
-                }
-                .help("프로그램 종료")
             }
         }
     }

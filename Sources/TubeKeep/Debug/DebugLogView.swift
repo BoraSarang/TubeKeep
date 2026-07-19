@@ -9,20 +9,21 @@ struct DebugLogView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 1) {
-                        ForEach(Array(manager.logs.enumerated()), id: \.offset) { _, entry in
+                        ForEach(Array(manager.logs.enumerated()), id: \.offset) { index, entry in
                             Text(entry)
                                 .font(.system(size: 9, design: .monospaced))
                                 .textSelection(.enabled)
                                 .foregroundColor(.secondary)
-                                .id(entry)
+                                .id(index)
                         }
                     }
                     .padding(6)
                     .frame(maxWidth: .infinity)
-                    .onChange(of: manager.logs.count) { _ in
-                        withAnimation {
-                            proxy.scrollTo(manager.logs.last ?? "", anchor: .bottom)
-                        }
+                    .onChange(of: manager.logs.count) { _, _ in
+                        scrollToBottom(proxy: proxy)
+                    }
+                    .onChange(of: manager.logs.last) { _, _ in
+                        scrollToBottom(proxy: proxy)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: 50)
@@ -47,6 +48,14 @@ struct DebugLogView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
+        }
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        let lastIndex = manager.logs.count - 1
+        guard lastIndex >= 0 else { return }
+        withAnimation(.easeOut(duration: 0.1)) {
+            proxy.scrollTo(lastIndex, anchor: .bottom)
         }
     }
 }

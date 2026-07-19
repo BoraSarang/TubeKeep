@@ -187,3 +187,152 @@
 | T-212 | Cmd+Click 선택 수정 (NSEvent.modifierFlags) | medium | completed | ✅ |
 | T-213 | StatusBar 다운로드 동기화 (start/pause/resume) | medium | completed | ✅ |
 | T-214 | 메뉴바 Timer RunLoop.common 등록 + itemChanged | medium | completed | ✅ |
+
+## v2.4.0 — 기술부채 해소 + SwiftData 전환 + A.X 4.0 통합 (2026-07-16) 🏁
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-300 | SwiftData 마이그레이션 (LibraryItem, SubscribedChannel → @Model) | high | completed | 빌드+55테스트 ✅ |
+| T-301 | AppDelegate 분리 (StatusBarManager, ClipboardMonitor, ChannelUpdateService) | high | completed | 빌드 ✅ |
+| T-302 | Gemini API 백오프 통합 (summarizeVideo unified, 4회 재시도) | high | completed | 빌드 ✅ |
+| T-303 | 자동 테스트 (ErrorMessageMapper 23 + DownloadItem 17 + Constants 15) | medium | completed | 55개 ✅ |
+| T-304 | macOS 14+ 플랫폼 타겟 상향 (SwiftData 필요) | high | completed | ✅ |
+| T-306 | SKT A.X 4.0 API 클라이언트 추가 (OpenAI 호환) | high | completed | 빌드+55테스트 ✅ |
+| T-307 | 설정 UI - A.X 4.0 API 키 관리 (공개 키 기본값) | high | completed | 빌드 ✅ |
+| T-308 | 요약 폴백 체인 변경: A.X 4.0 → yTeaser → Gemini | high | completed | 빌드+55테스트 ✅ |
+| T-309 | 태깅 폴백 체인 변경: A.X 4.0 → Gemini → autoClassify | high | completed | 빌드+55테스트 ✅ |
+| T-310 | 한글 맞춤법 수정 (소스+문서) | medium | completed | 55개 ✅ |
+| T-311 | OpenRouter Free Tier 서비스 추가 (OpenAI 호환) | high | completed | 빌드+55테스트 ✅ |
+| T-312 | 요약 폴백 체인 변경: OpenRouter → yTeaser → A.X 4.0 → Gemini | high | completed | 빌드+55테스트 ✅ |
+| T-313 | 태깅 폴백 체인 변경: OpenRouter → A.X 4.0 → Gemini → autoClassify | high | completed | 빌드+55테스트 ✅ |
+| T-314 | 설정 UI — OpenRouter API 키 입력 + "무료 가입" 링크 | high | completed | 빌드+55테스트 ✅ |
+| T-305 | 모듈 분리 (TubeKeepCore + TubeKeep) | medium | pending | v2.5.0으로 미룸 |
+
+## v2.5.0—v2.5.6 — AI 콘텐츠 캐싱 + 챕터/팟캐스트/Q&A/마인드맵 + UI 통합 + 최종 테스트 (2026-07-17~19) 🏁
+
+**버전 체계**: v2.5.0 → v2.5.1 → ... → v2.5.6 (+0.0.1씩 증가)
+
+### 챕터 1: SQLite DB 구축 + 자막 캐싱 (v2.5.0)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-500 | **DatabaseManager.swift 생성** — SQLite3 오픈/생성, 테이블 생성 | high | completed | ✅ |
+| T-501 | **video_ai_data 테이블 생성** — CREATE TABLE IF NOT EXISTS | high | completed | ✅ |
+| T-502 | **CRUD 메서드 구현** — save/load/update/delete | high | completed | ✅ |
+| T-503 | **SummarizationService 자막 DB 저장** — fetch 후 DB 저장 | high | completed | ✅ |
+| T-504 | **SummarizationService 자막 DB 로드** — DB에서 로드 (재사용) | high | completed | ✅ |
+| T-505 | **LibraryCacheService DB 동기화** — 요약 저장 시 DB도 저장 | high | completed | ✅ |
+| T-506 | **LibraryItem 새 속성 추가** — transcript, chapters | high | completed | ✅ |
+| T-507 | **Info.plist 버전 2.5.0 + Bundle ID 수정** | medium | completed | ✅ |
+| T-508 | **자막 파일 → DB 저장 전환** — 다운로드 시 임시 저장 후 DB 저장 + 파일 삭제 | high | completed | ✅ |
+| T-509 | **DownloadManager 자막 DB 저장** — 비디오 다운로드 시 자막도 DB 저장 | high | completed | ✅ |
+| T-510 | **기존 자막 파일 마이그레이션** — 17개 .vtt 파일 DB 저장 후 디스크 삭제 | high | completed | ✅ |
+| T-511 | **키보드 단축키 keyCode 수정** — 한글 레이아웃 호환 (event.keyCode 사용) | high | completed | ✅ |
+| T-512 | **DebugLogManager 초기화 시점 수정** — applicationDidFinishLaunching 즉시 초기화 | medium | completed | ✅ |
+| T-513 | **AI 요약 DB 캐싱 — 확인** — summarizeVideo() API 호출 전 DB에서 기존 요약 확인 | high | completed | ✅ |
+| T-514 | **AI 요약 DB 캐싱 — 저장** — summaryResult 시 DatabaseManager.updateSummary() 호출 | high | completed | ✅ |
+| T-515 | **AI 요약 DB 캐싱 — 표시** — showSummary 시 item.summary 먼저 확인 | high | completed | ✅ |
+| T-516 | **자막 가용성 DB 체크** — hasSubtitles()를 파일시스템 → DB 체크로 변경 | high | completed | ✅ |
+
+### 챕터 2: AI 요약 + 챕터 생성 (v2.5.1)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-510 | **ChapterInfo 모델 생성** — Codable, Identifiable | high | completed | ✅ |
+| T-511 | **SummaryResult에 chapters 필드 추가** | high | completed | ✅ |
+| T-512 | **SummarizationService 프롬프트 변경** — 챕터 형식 추가 | high | completed | ✅ |
+| T-513 | **OpenRouterService 프롬프트 변경** | high | completed | ✅ |
+| T-514 | **AX4Service 프롬프트 변경** | high | completed | ✅ |
+| T-515 | **챕터 응답 파싱 로직** | high | completed | ✅ |
+| T-516 | **DB에 챕터 저장** | high | completed | ✅ |
+| T-517 | **LibraryGridView 챕터 표시 UI** | medium | completed | ✅ |
+| T-518 | **LibraryListView 챕터 표시 UI** | medium | completed | ✅ |
+| T-519 | **Info.plist 버전 2.5.1** | medium | completed | ✅ |
+
+### 챕터 3: AI 팟캐스트 생성 (v2.5.2) — macOS 내장 TTS (무료)
+
+**TTS 엔진**: AVSpeechSynthesizer (macOS 내장, 완전 무료, 오프라인)
+**대화 스크립트**: 기존 LLM 폴백 체인 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+
+#### 3-1. 데이터 모델 + 서비스
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-520 | **PodcastService.swift 생성** — 팟캐스트 생성 서비스 (actor) | high | completed | ✅ |
+| T-520a | **PodcastScript 모델** — PodcastSegment, PodcastResult 모델 정의 | high | completed | ✅ |
+| T-521 | **AI 대화 스크립트 생성 프롬프트** — 2인 대화 (진행자A/B), 15~25 세그먼트 | high | completed | ✅ |
+| T-522 | **TTSService 생성** — AVSpeechSynthesizer 래퍼, 한국어 음성 선택 | high | completed | ✅ |
+
+#### 3-2. 오디오 생성 + 저장
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-523 | **오디오 파일 저장 로직** — `~/Documents/TubeKeep/Podcasts/{videoId}/` | high | completed | ✅ |
+| T-524 | **DB에 podcast_path 저장** — DatabaseManager.updatePodcastPath() | high | completed | ✅ |
+
+#### 3-3. UI 통합
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-525 | **요약 팝업에 팟캐스트 컨트롤 추가** — 재생/일시정지/정지 버튼 + 진행 바 | medium | completed | ✅ |
+| T-526 | **컨텍스트 메뉴 팟캐스트 항목** — 팟캐스트 만들기/듣기/삭제 | medium | completed | ✅ |
+| T-527 | **LibraryReducer 팟캐스트 액션** — generatePodcast/playPodcast/deletePodcast | high | completed | ✅ |
+
+#### 3-4. 마무리
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-528 | **팟캐스트 파일 정리** — 삭제 시 DB + 디렉토리 삭제 | medium | completed | ✅ |
+| T-529 | **Info.plist 버전 2.5.2** | medium | completed | ✅ |
+
+### 챕터 4: 트랜스크립트 Q&A (v2.5.3)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-530 | **QAService.swift 생성** — Q&A 서비스 | high | completed | ✅ |
+| T-531 | **qna_history 테이블 생성** | high | completed | ✅ |
+| T-532 | **Q&A 프롬프트 설계** | high | completed | ✅ |
+| T-533 | **QAView UI** | high | completed | ✅ |
+| T-534 | **LibraryReducer Q&A 액션** | medium | completed | ✅ |
+| T-535 | **Q&A 히스토리 저장/로드** | medium | completed | ✅ |
+| T-536 | **타임스탬프 클릭 → 재생 위치 이동** | medium | completed | ✅ |
+| T-537 | **Info.plist 버전 2.5.3** | medium | completed | ✅ |
+
+### 챕터 5: 마인드맵 생성 (v2.5.4)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-540 | **MindmapNode 모델 생성** | high | completed | ✅ |
+| T-541 | **MindmapService.swift 생성** | high | completed | ✅ |
+| T-542 | **마인드맵 생성 프롬프트** | high | completed | ✅ |
+| T-543 | **DB에 마인드맵 저장** | high | completed | ✅ |
+| T-544 | **MindmapView UI** | medium | completed | ✅ |
+| T-545 | **마인드맵 노드 확장/축소** | low | completed | ✅ |
+| T-546 | **마인드맵 이미지 내보내기** | low | cancelled | 패스 |
+| T-547 | **Info.plist 버전 2.5.4** | medium | completed | ✅ |
+
+### 챕터 6: UI 통합 + 챕터 표시 (v2.5.5)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-550 | **LibraryGridView 챕터 표시** | high | completed | ✅ (v2.5.1에서 완료) |
+| T-551 | **LibraryListView 챕터 표시** | high | completed | ✅ (v2.5.1에서 완료) |
+| T-552 | **액션 메뉴 통합 (3→1 "AI 기능")** | high | completed | ✅ |
+| T-553 | **AIWindowView 좌우 split 레이아웃** | medium | completed | ✅ |
+| T-554 | **팟캐스트 시간 왼쪽 표시** | medium | completed | ✅ |
+| T-555 | **다크모드 오버레이 + 자동 포커스 방지** | medium | completed | ✅ |
+| T-556 | **Info.plist 버전 2.5.5** | medium | completed | ✅ |
+
+### 챕터 7: 마이그레이션 + 테스트 (v2.5.6)
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-560 | **DatabaseManager 마이그레이션 로직** | high | completed | 배포 전 검증 |
+| T-561 | **기존 데이터 동기화 (summary→DB)** | high | completed | 배포 전 검증 |
+| T-562 | **SwiftData 새 속성 마이그레이션** | high | completed | 배포 전 검증 |
+| T-563 | **전체 기능 테스트** | high | completed | TC-5-63 자동화 완료, 수동 패스 |
+| T-564 | **빌드 검증 (0 warnings)** | high | completed | 76 tests ✅ |
+| T-565 | **테스트 명세서 작성** | medium | completed | docs/tests/v2.5.6.md |
+| T-566 | **PLAN.md 업데이트** | medium | completed | |
+| T-567 | **TODO.md 업데이트** | medium | completed | |
+| T-568 | **Info.plist 버전 2.5.6** | medium | completed | |

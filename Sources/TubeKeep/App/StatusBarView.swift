@@ -5,7 +5,7 @@ import ComposableArchitecture
 struct StatusBarReducer {
     @ObservableState
     struct State: Equatable {
-        var statusText: String = "대기중"
+        var statusText: String = "대기 중"
         var statusDetail: String = ""
         var downloadSpeed: String = ""
         var badgeCount: Int = 0
@@ -26,13 +26,13 @@ struct StatusBarReducer {
             if hasActiveDownloads, !downloadSpeed.isEmpty {
                 return downloadSpeed
             }
-            if !statusText.isEmpty, statusText != "대기중" {
+            if !statusText.isEmpty, statusText != "대기 중" {
                 return statusText
             }
             if badgeCount > 0 {
-                return "대기중 \(badgeCount)"
+                return "대기 중 \(badgeCount)"
             }
-            return "대기중"
+            return "대기 중"
         }
 
         var hasBadge: Bool { badgeCount > 0 }

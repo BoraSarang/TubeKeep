@@ -154,7 +154,7 @@ struct ChannelDownloadCache {
             guard file.hasPrefix("000 - ") else { continue }
             let withoutExt = (file as NSString).deletingPathExtension
             guard let lastDot = withoutExt.lastIndex(of: "."),
-                  let ext = file.components(separatedBy: ".").last
+                  file.components(separatedBy: ".").last != nil
             else { continue }
             let videoId = String(withoutExt[withoutExt.index(after: lastDot)...])
 

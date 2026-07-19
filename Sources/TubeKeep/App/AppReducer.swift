@@ -94,6 +94,7 @@ struct AppReducer {
                             if !settings.embedMetadata {
                                 await send(.settings(.toggleEmbedMetadata))
                             }
+                            await send(.settings(.setTTSEngine(settings.ttsEngine)))
                         }
                     }
                 )
@@ -337,6 +338,9 @@ struct AppReducer {
                 return .none
 
             case .library(.showSummary):
+                return .none
+
+            case .library(.resummarize):
                 return .none
 
             case .library(.summaryResult):

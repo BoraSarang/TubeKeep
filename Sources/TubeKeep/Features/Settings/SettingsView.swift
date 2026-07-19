@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ComposableArchitecture
 
 struct SettingsView: View {
@@ -322,69 +323,273 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - AI Tab
+
     private var aiContent: some View {
         VStack(spacing: 0) {
-            SettingsRow(title: "yTeaser", description: "yTeaser.com — 무료 · API 키 불필요 · 50회/일 (IP 기반)") {
-                Text("항상 사용")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-            }
+            ttsSection
 
-            divider
+            sectionSubHeader
 
-            SettingsRow(title: "Google Gemini", description: "API Key — 키 생성 후 Billing 등록 필수 · yTeaser 소진 시 자동 사용") {
-                SecureField("", text: Binding(
-                    get: { store.geminiAPIKey },
-                    set: { store.send(.setGeminiAPIKey($0)) }
-                ))
-                .textFieldStyle(.plain)
-                .font(.callout)
-                .frame(width: 200)
-                .padding(6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                )
-            }
-
-            divider
-
-            HStack(spacing: 4) {
-                Spacer()
-                Image(systemName: "link")
-                    .font(.system(size: 11))
-                Button("API 키 발급 + Billing 등록") {
-                    NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
-                }
-                .buttonStyle(.plain)
-                .font(.callout)
-                .foregroundStyle(.tint)
-            }
-            .padding(.vertical, 8)
-
-            HStack {
-                Spacer()
-                Text("무료 티어: 분당 60회, 1일 1,500회 요청")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-
-            divider
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("yTeaser 50회가 소진되면 자동으로 Gemini로 전환됩니다.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text("단, Gemini API 키가 없으면 동작하지 않으므로 설정을 권장합니다.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, 10)
+            llmSection
         }
+    }
+
+    // MARK: - TTS Section
+
+    private var ttsSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader(
+                title: "음성 합성 (TTS)",
+                subtitle: "팟캐스트 음성 합성 엔진 선택"
+            )
+
+            VStack(spacing: 0) {
+                divider
+
+                SettingsRow(title: "엔진 선택", description: "팟캐스트 생성 시 사용할 TTS 엔진") {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { store.ttsEngine },
+                            set: { store.send(.setTTSEngine($0)) }
+                        )
+                    ) {
+                        ForEach(TTSEngine.allCases, id: \.self) { engine in
+                            Text(engine.displayName).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.callout)
+                    .fixedSize()
+                }
+
+                divider
+
+                SettingsRow(title: "엔진 정보") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(store.ttsEngine.description)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.leading, 20)
+        }
+    }
+
+    // MARK: - LLM Section
+
+    private var llmSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader(
+                title: "언어 모델 (LLM)",
+                subtitle: "요약/태깅에 사용할 AI 엔진 설정"
+            )
+
+            // OpenRouter
+            VStack(spacing: 0) {
+                divider
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("OpenRouter")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("무료 · API 키 필요 (openrouter.ai 가입)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+
+                VStack(spacing: 0) {
+                    divider
+
+                    SettingsRow(title: "API 키", description: "openrouter.ai 가입 후 발급") {
+                        HStack(spacing: 8) {
+                            SecureField("sk-or-...", text: Binding(
+                                get: { store.openRouterAPIKey },
+                                set: { store.send(.setOpenRouterAPIKey($0)) }
+                            ))
+                            .textFieldStyle(.plain)
+                            .font(.system(.callout, design: .monospaced))
+                            .frame(width: 160)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(nsColor: .controlBackgroundColor))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            )
+
+                            Button("무료 가입") {
+                                NSWorkspace.shared.open(URL(string: "https://openrouter.ai/settings/keys")!)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.blue)
+                        }
+                        .fixedSize()
+                    }
+
+                    divider
+
+                    SettingsRow(title: "모델", description: "기본: openrouter/free (무료 모델 자동 선택)") {
+                        TextField("openrouter/free", text: Binding(
+                            get: { store.openRouterModel },
+                            set: { store.send(.setOpenRouterModel($0)) }
+                        ))
+                        .textFieldStyle(.plain)
+                        .font(.system(.callout, design: .monospaced))
+                        .frame(width: 200)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        )
+                        .fixedSize()
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            .padding(.leading, 20)
+
+            // yTeaser
+            sectionSubHeader
+
+            VStack(spacing: 0) {
+                divider
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("yTeaser")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("무료 · API 키 불필요 · 50회/일 (IP 기반)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+
+                VStack(spacing: 0) {
+                    divider
+
+                    SettingsRow(title: "상태") {
+                        Text("사용 중")
+                            .font(.callout)
+                            .foregroundStyle(.green)
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            .padding(.leading, 20)
+
+            // Google Gemini
+            sectionSubHeader
+
+            VStack(spacing: 0) {
+                divider
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Google Gemini")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("유료 · API 키 필요")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+
+                VStack(spacing: 0) {
+                    divider
+
+                    SettingsRow(title: "API 키") {
+                        HStack(spacing: 8) {
+                            SecureField("API 키 입력", text: Binding(
+                                get: { store.geminiAPIKey },
+                                set: { store.send(.setGeminiAPIKey($0)) }
+                            ))
+                            .textFieldStyle(.plain)
+                            .font(.system(.callout, design: .monospaced))
+                            .frame(width: 160)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(nsColor: .controlBackgroundColor))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            )
+
+                            Button("발급 받기") {
+                                NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.blue)
+                        }
+                        .fixedSize()
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            .padding(.leading, 20)
+
+            // 폴백 순서
+            sectionSubHeader
+
+            VStack(spacing: 0) {
+                divider
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("폴백 순서")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("요약: OpenRouter → yTeaser → A.X 4.0 → Gemini")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text("태깅: OpenRouter → A.X 4.0 → Gemini → 규칙 기반")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 10)
+            }
+            .padding(.leading, 20)
+        }
+    }
+
+    // MARK: - Section Helpers
+
+    private func sectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.primary)
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+    }
+
+    private var sectionSubHeader: some View {
+        HStack {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(height: 0.5)
+                .padding(.leading, 8)
+                .padding(.trailing, 8)
+        }
+        .padding(.vertical, 6)
     }
 
     // MARK: - Components
@@ -392,6 +597,18 @@ struct SettingsView: View {
     private var divider: some View {
         Divider()
             .padding(.leading, 8)
+    }
+
+    private var sectionDivider: some View {
+        VStack(spacing: 0) {
+            Color(nsColor: .separatorColor)
+                .frame(height: 1)
+            Color(nsColor: .controlBackgroundColor)
+                .frame(height: 8)
+            Color(nsColor: .separatorColor)
+                .frame(height: 1)
+        }
+        .padding(.vertical, 6)
     }
 }
 

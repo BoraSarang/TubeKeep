@@ -277,7 +277,7 @@ struct DownloadQueueReducer {
                                 channelName: channelName,
                                 videoId: videoId
                             )
-                            let channels = SubscribedChannel.loadAll()
+                            let channels = await MainActor.run { SubscribedChannel.loadAll() }
                             if let channel = channels.first(where: { $0.name == channelName }) {
                                 ChannelDownloadCache.removeSeenVideoIds(
                                     channelId: channel.id,
