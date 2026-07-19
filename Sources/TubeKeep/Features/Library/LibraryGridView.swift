@@ -33,20 +33,27 @@ struct LibraryGridView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         let displayItems = Array(store.library.filteredItems.prefix(displayedCount))
                         ForEach(displayItems) { item in
-                             LibraryGridCell(
-                                 item: item,
-                                 thumbnail: thumbnailImages[item.id],
-                                 isSelected: store.library.selectedIds.contains(item.id),
-                                 isDownloadingSubtitle: store.library.subtitleDownloadingIds.contains(item.id),
-                                 hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
-                                onOpen: { store.send(.library(.openFile(item.id))) },
-                                onReveal: { store.send(.library(.revealInFinder(item.id))) },
-                                onDelete: { store.send(.library(.removeItem(item.id))) },
-                                onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
-                                 onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                                 onShowSummary: { store.send(.library(.showSummary(item.id))) },
-                                onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
-                            )
+                         LibraryGridCell(
+                             item: item,
+                             thumbnail: thumbnailImages[item.id],
+                             isSelected: store.library.selectedIds.contains(item.id),
+                             isDownloadingSubtitle: store.library.subtitleDownloadingIds.contains(item.id),
+                             hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
+                             hasSummary: store.library.summaryAvailableIds.contains(item.id),
+                             hasPodcast: store.library.podcastAvailableIds.contains(item.id),
+                             chapterCount: {
+                                 guard let data = item.chapters else { return 0 }
+                                 return (try? JSONDecoder().decode([ChapterInfo].self, from: data))?.count ?? 0
+                             }(),
+                             showThumbnailPreview: store.library.showThumbnailPreview,
+                             onOpen: { store.send(.library(.openFile(item.id))) },
+                            onReveal: { store.send(.library(.revealInFinder(item.id))) },
+                            onDelete: { store.send(.library(.removeItem(item.id))) },
+                            onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
+                             onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                             onOpenAI: { store.send(.library(.showSummary(item.id))) },
+                            onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
+                        )
                             .onAppear {
                                 loadThumbnail(for: item)
                                 if item.id == displayItems.last?.id {
@@ -64,7 +71,7 @@ struct LibraryGridView: View {
             }
         }
         .overlay(EmptyView())
-        .onChange(of: store.library.filteredItems) { _ in
+        .onChange(of: store.library.filteredItems) { _, _ in
             displayedCount = pageSize
             let newIds = Set(store.library.filteredItems.prefix(displayedCount).map(\.id))
             let oldIds = Set(thumbnailImages.keys)
@@ -83,6 +90,20 @@ struct LibraryGridView: View {
                 .foregroundStyle(.secondary)
 
             Spacer()
+
+            Button {
+                store.send(.library(.toggleThumbnailPreview))
+            } label: {
+                Image(systemName: "photo")
+                    .font(.system(size: 11))
+                    .foregroundStyle(store.library.showThumbnailPreview ? .white : .secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(store.library.showThumbnailPreview ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .buttonStyle(.plain)
+            .help(store.library.showThumbnailPreview ? "썸네일 미리보기 끄기" : "썸네일 미리보기 켜기")
 
             Picker("정렬", selection: Binding(
                 get: { store.library.sortOrder },
@@ -211,7 +232,7 @@ struct LibraryGridView: View {
         let service = LibraryCacheService.shared
 
         Task {
-            if let cached = await service.cachedThumbnail(for: item.id) {
+            if let cached = service.cachedThumbnail(for: item.id) {
                 await MainActor.run {
                     thumbnailImages[item.id] = cached
                 }
@@ -241,12 +262,16 @@ struct LibraryGridCell: View {
     let isSelected: Bool
     let isDownloadingSubtitle: Bool
     let hasSubtitles: Bool
+    let hasSummary: Bool
+    let hasPodcast: Bool
+    let chapterCount: Int
+    let showThumbnailPreview: Bool
     let onOpen: () -> Void
     let onReveal: () -> Void
     let onDelete: () -> Void
     let onDownloadSubtitles: () -> Void
     let onChannelDownload: () -> Void
-    let onShowSummary: () -> Void
+    let onOpenAI: () -> Void
     let onToggleSelection: () -> Void
     @State private var bounceUp = false
     @State private var isHovering = false
@@ -304,6 +329,60 @@ struct LibraryGridCell: View {
                     .background(Capsule().fill(Color.blue))
                     .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                 }
+
+                if chapterCount > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Text("\(chapterCount)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.orange))
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .offset(y: (hasSubtitles || isDownloadingSubtitle) ? 28 : 0)
+                }
+
+                if hasSummary {
+                    HStack(spacing: 2) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.green))
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .offset(y: {
+                        var offset: CGFloat = 0
+                        if hasSubtitles || isDownloadingSubtitle { offset += 28 }
+                        if chapterCount > 0 { offset += 28 }
+                        return offset
+                    }())
+                }
+
+                if hasPodcast {
+                    HStack(spacing: 2) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.purple))
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .offset(y: {
+                        var offset: CGFloat = 0
+                        if hasSubtitles || isDownloadingSubtitle { offset += 28 }
+                        if chapterCount > 0 { offset += 28 }
+                        if hasSummary { offset += 28 }
+                        return offset
+                    }())
+                }
             }
 
             Text(item.title)
@@ -335,20 +414,23 @@ struct LibraryGridCell: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .leftClickMenu(entries: [
-            .action(title: "열기", action: onOpen),
+            .action(title: "열기", icon: "play.fill", action: onOpen),
             .separator,
-            .action(title: "AI 요약", action: onShowSummary),
-            .action(title: "자막 다운로드", action: onDownloadSubtitles, enabled: !hasSubtitles && !isDownloadingSubtitle),
-            .action(title: "채널 다운로더 실행", action: onChannelDownload),
+            .action(title: "AI 기능", icon: "sparkles", action: onOpenAI),
             .separator,
-            .action(title: "Finder에서 보기", action: onReveal),
+            .action(title: "자막 다운로드", icon: "captions.bubble", action: onDownloadSubtitles, enabled: !hasSubtitles && !isDownloadingSubtitle),
+            .action(title: "채널 다운로더 실행", icon: "tv", action: onChannelDownload),
             .separator,
-            .action(title: "라이브러리에서 삭제", action: onDelete, destructive: true)
+            .action(title: "Finder에서 보기", icon: "folder", action: onReveal),
+            .separator,
+            .action(title: "라이브러리에서 삭제", icon: "trash", action: onDelete, destructive: true)
         ], onToggleSelection: onToggleSelection)
         .onHover { hovering in
-            isHovering = hovering
+            if showThumbnailPreview {
+                isHovering = hovering
+            }
         }
-        .background(HoverPreviewPanel(thumbnail: thumbnail, isVisible: $isHovering))
+        .background(showThumbnailPreview ? AnyView(HoverPreviewPanel(thumbnail: thumbnail, isVisible: $isHovering)) : AnyView(EmptyView()))
     }
 
     private var thumbnailView: some View {
@@ -441,7 +523,7 @@ struct EmptyLibraryCell: View {
 // MARK: - Left-Click NSMenu
 
 enum LeftClickMenuEntry {
-    case action(title: String, action: () -> Void, destructive: Bool = false, enabled: Bool = true)
+    case action(title: String, icon: String? = nil, action: () -> Void, destructive: Bool = false, enabled: Bool = true)
     case separator
 }
 
@@ -492,11 +574,14 @@ struct LeftClickMenu: NSViewRepresentable {
             menu.autoenablesItems = false
             for (i, entry) in entries.enumerated() {
                 switch entry {
-                case .action(let title, _, let destructive, let enabled):
+                case .action(let title, let icon, _, let destructive, let enabled):
                     let item = NSMenuItem(title: title, action: enabled ? #selector(performAction(_:)) : nil, keyEquivalent: "")
                     item.tag = i
                     item.target = self
                     item.isEnabled = enabled
+                    if let iconName = icon {
+                        item.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+                    }
                     if destructive {
                         item.attributedTitle = NSAttributedString(
                             string: title,
@@ -515,7 +600,7 @@ struct LeftClickMenu: NSViewRepresentable {
         @objc func performAction(_ sender: NSMenuItem) {
             let idx = sender.tag
             guard idx >= 0, idx < entries.count else { return }
-            if case .action(_, let action, _, _) = entries[idx] {
+            if case .action(_, _, let action, _, _) = entries[idx] {
                 action()
             }
         }
@@ -605,45 +690,49 @@ struct HoverPreviewPanel: NSViewRepresentable {
                 globalMonitor = nil
             }
             globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
-                self?.hidePanel()
+                Task { @MainActor in
+                    self?.hidePanel()
+                }
             }
 
             // Timer: track cell position, hide only when mouse leaves cell AND panel
             checkTimer?.invalidate()
             checkTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-                guard let self = self,
-                      let positioningView = self.positioningView,
-                      let window = positioningView.window,
-                      let panel = self.panel else {
-                    self?.hidePanel()
-                    timer.invalidate()
-                    self?.checkTimer = nil
-                    return
-                }
+                Task { @MainActor [weak self] in
+                    guard let self = self,
+                          let positioningView = self.positioningView,
+                          let window = positioningView.window,
+                          let panel = self.panel else {
+                        self?.hidePanel()
+                        timer.invalidate()
+                        self?.checkTimer = nil
+                        return
+                    }
 
-                if HoverPreviewPanel.isSuppressed {
-                    self.hidePanel()
-                    timer.invalidate()
-                    self.checkTimer = nil
-                    return
-                }
+                    if HoverPreviewPanel.isSuppressed {
+                        self.hidePanel()
+                        timer.invalidate()
+                        self.checkTimer = nil
+                        return
+                    }
 
-                let mouseLoc = NSEvent.mouseLocation
-                let windowRect = positioningView.convert(positioningView.bounds, to: nil)
-                let currentCellFrame = window.convertToScreen(windowRect)
+                    let mouseLoc = NSEvent.mouseLocation
+                    let windowRect = positioningView.convert(positioningView.bounds, to: nil)
+                    let currentCellFrame = window.convertToScreen(windowRect)
 
-                let thumbnailCenterX = currentCellFrame.midX
-                let thumbnailCenterY = currentCellFrame.maxY - (currentCellFrame.width * 9 / 32)
-                let newX = thumbnailCenterX - 360
-                let newY = thumbnailCenterY
-                panel.setFrameOrigin(NSPoint(x: newX, y: newY))
+                    let thumbnailCenterX = currentCellFrame.midX
+                    let thumbnailCenterY = currentCellFrame.maxY - (currentCellFrame.width * 9 / 32)
+                    let newX = thumbnailCenterX - 360
+                    let newY = thumbnailCenterY
+                    panel.setFrameOrigin(NSPoint(x: newX, y: newY))
 
-                let panelFrame = panel.frame
-                // Keep visible if mouse is in cell OR in the preview panel
-                if !currentCellFrame.contains(mouseLoc) && !panelFrame.contains(mouseLoc) {
-                    self.hidePanel()
-                    timer.invalidate()
-                    self.checkTimer = nil
+                    let panelFrame = panel.frame
+                    // Keep visible if mouse is in cell OR in the preview panel
+                    if !currentCellFrame.contains(mouseLoc) && !panelFrame.contains(mouseLoc) {
+                        self.hidePanel()
+                        timer.invalidate()
+                        self.checkTimer = nil
+                    }
                 }
             }
             if let t = checkTimer { RunLoop.main.add(t, forMode: .common) }

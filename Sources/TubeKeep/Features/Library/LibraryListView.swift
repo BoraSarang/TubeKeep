@@ -35,6 +35,20 @@ struct LibraryListView: View {
 
             Spacer()
 
+            Button {
+                store.send(.library(.toggleThumbnailPreview))
+            } label: {
+                Image(systemName: "photo")
+                    .font(.system(size: 11))
+                    .foregroundStyle(store.library.showThumbnailPreview ? .white : .secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(store.library.showThumbnailPreview ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .buttonStyle(.plain)
+            .help(store.library.showThumbnailPreview ? "썸네일 미리보기 끄기" : "썸네일 미리보기 켜기")
+
             Picker("정렬", selection: Binding(
                 get: { store.library.sortOrder },
                 set: { store.send(.library(.setSortOrder($0))) }
@@ -160,12 +174,13 @@ struct LibraryListView: View {
                         thumbnail: thumbnailImages[item.id],
                         isSelected: store.library.selectedIds.contains(item.id),
                         hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
+                        hasPodcast: store.library.podcastAvailableIds.contains(item.id),
                         onOpen: { store.send(.library(.openFile(item.id))) },
                         onReveal: { store.send(.library(.revealInFinder(item.id))) },
                         onDelete: { store.send(.library(.removeItem(item.id))) },
                         onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                         onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                        onShowSummary: { store.send(.library(.showSummary(item.id))) },
+                        onOpenAI: { store.send(.library(.showSummary(item.id))) },
                         onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
                     )
                     .onAppear {
@@ -183,7 +198,7 @@ struct LibraryListView: View {
         let service = LibraryCacheService.shared
 
         Task {
-            if let cached = await service.cachedThumbnail(for: item.id) {
+            if let cached = service.cachedThumbnail(for: item.id) {
                 await MainActor.run { thumbnailImages[item.id] = cached }
                 return
             }
@@ -202,12 +217,13 @@ private struct LibraryListRow: View {
     let thumbnail: NSImage?
     let isSelected: Bool
     let hasSubtitles: Bool
+    let hasPodcast: Bool
     let onOpen: () -> Void
     let onReveal: () -> Void
     let onDelete: () -> Void
     let onDownloadSubtitles: () -> Void
     let onChannelDownload: () -> Void
-    let onShowSummary: () -> Void
+    let onOpenAI: () -> Void
     let onToggleSelection: () -> Void
 
     var body: some View {
@@ -235,6 +251,24 @@ private struct LibraryListRow: View {
                         Image(systemName: "captions.bubble.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.blue)
+                    }
+
+                    if let data = item.chapters,
+                       let chapters = try? JSONDecoder().decode([ChapterInfo].self, from: data),
+                       !chapters.isEmpty {
+                        HStack(spacing: 1) {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 9))
+                            Text("\(chapters.count)")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundStyle(.orange)
+                    }
+
+                    if item.summary != nil && !(item.summary?.isEmpty ?? true) {
+                        Image(systemName: "doc.text.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.green)
                     }
                 }
             }
@@ -266,15 +300,16 @@ private struct LibraryListRow: View {
         .padding(.vertical, 6)
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
         .leftClickMenu(entries: [
-            .action(title: "열기", action: onOpen),
+            .action(title: "열기", icon: "play.fill", action: onOpen),
             .separator,
-            .action(title: "AI 요약", action: onShowSummary),
-            .action(title: "자막 다운로드", action: onDownloadSubtitles, enabled: !hasSubtitles),
-            .action(title: "채널 다운로더 실행", action: onChannelDownload),
+            .action(title: "AI 기능", icon: "sparkles", action: onOpenAI),
             .separator,
-            .action(title: "Finder에서 보기", action: onReveal),
+            .action(title: "자막 다운로드", icon: "captions.bubble", action: onDownloadSubtitles, enabled: !hasSubtitles),
+            .action(title: "채널 다운로더 실행", icon: "tv", action: onChannelDownload),
             .separator,
-            .action(title: "라이브러리에서 삭제", action: onDelete, destructive: true)
+            .action(title: "Finder에서 보기", icon: "folder", action: onReveal),
+            .separator,
+            .action(title: "라이브러리에서 삭제", icon: "trash", action: onDelete, destructive: true)
         ], onToggleSelection: onToggleSelection)
     }
 

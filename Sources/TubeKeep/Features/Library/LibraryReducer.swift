@@ -17,10 +17,12 @@ struct LibraryReducer {
         var sortOrder: LibrarySortOrder = .dateDesc
         var filterMode: LibraryFilterMode = .all
         var viewMode: LibraryViewMode = .grid
+        var showThumbnailPreview: Bool = true
         var isLoading = false
         var selectedIds: Set<String> = []
         var subtitleDownloadingIds: Set<String> = []
         var subtitleAvailableIds: Set<String> = []
+        var summaryAvailableIds: Set<String> = []
         var subtitleToast: ToastMessage?
         var subtitleToastVideoId: String?
         var diskUsageBytes: Int64 = 0
@@ -40,12 +42,34 @@ struct LibraryReducer {
         // Discover Summary
         var discoverSummaryVideoId: String?
         var discoverSummaryText: String?
+        var discoverSummaryProvider: String?
         var discoverSummaryLoading = false
 
         // Library Summary
         var librarySummaryVideoId: String?
         var librarySummaryText: String?
+        var librarySummaryProvider: String?
         var librarySummaryLoading = false
+
+        // Podcast (v2.5.2)
+        var podcastGeneratingIds: Set<String> = []
+        var podcastPlayingId: String?
+        var podcastError: String?
+        var podcastAvailableIds: Set<String> = []
+        var podcastLastEngine: String?
+
+        // Q&A (v2.5.3)
+        var qnaHistoryItems: [QAHistoryItem] = []
+        var qnaLoading = false
+        var qnaError: String?
+        var qnaSelectedVideoId: String?
+        var qnaShowSheet = false
+
+        // Mindmap (v2.5.4)
+        var mindmapNode: MindmapNode?
+        var mindmapLoading = false
+        var mindmapError: String?
+        var mindmapShow = false
 
         // Gemini API Key Alert
         var showGeminiKeyAlert = false
@@ -53,6 +77,7 @@ struct LibraryReducer {
         init() {
             let saved = UserDefaults.standard.string(forKey: Constants.libraryViewModeKey) ?? "grid"
             viewMode = LibraryViewMode(rawValue: saved) ?? .grid
+            showThumbnailPreview = UserDefaults.standard.object(forKey: "showThumbnailPreview") as? Bool ?? true
         }
 
         var filteredItems: [LibraryItem] {
@@ -128,6 +153,7 @@ struct LibraryReducer {
         case setSortOrder(LibrarySortOrder)
         case setFilterMode(LibraryFilterMode)
         case setViewMode(LibraryViewMode)
+        case toggleThumbnailPreview
         case openFile(String)
         case revealInFinder(String)
         case downloadSubtitles(String)
@@ -156,13 +182,14 @@ struct LibraryReducer {
         case discoverSearchLoaded([TrendingVideo])
         case discoverSearchFailed(String)
         case discoverRequestSummary(videoId: String, title: String, channel: String)
-        case discoverSummaryLoaded(text: String)
+        case discoverSummaryLoaded(text: String, provider: String)
         case discoverSummaryFailed(String)
         case discoverDismissSummary
 
         // Summary
         case showSummary(String)
-        case summaryResult(videoId: String, overview: String, keyPoints: [String])
+        case resummarize(String)
+        case summaryResult(videoId: String, overview: String, keyPoints: [String], chapters: [ChapterInfo], provider: String)
         case summaryFailed(videoId: String, error: String)
         case dismissLibrarySummary
         case setGeminiKeyAlert(Bool)
@@ -171,18 +198,43 @@ struct LibraryReducer {
         // Tagging
         case tagItem(videoId: String, title: String, channel: String)
         case itemTagged(videoId: String, tag: String)
+
+        // Podcast (v2.5.2)
+        case generatePodcast(String)
+        case podcastGenerated(String, PodcastResult)
+        case podcastGenerationFailed(String, String)
+        case playPodcast(String)
+        case pausePodcast
+        case stopPodcast
+        case deletePodcast(String)
+
+        // Q&A (v2.5.3)
+        case openQnA(String)
+        case closeQnA
+        case askQuestion(videoId: String, question: String)
+        case qnaResponseReceived(QAResponse)
+        case qnaFailed(String)
+        case loadQnAHistory(String)
+        case qnaHistoryLoaded([QAHistoryItem])
+        case deleteQnAHistoryItem(Int64)
+        case deleteAllQnAHistory(String)
+        case seekToTimestamp(Double)
+
+        // Mindmap (v2.5.4)
+        case generateMindmap(String)
+        case mindmapResult(MindmapNode)
+        case mindmapFailed(String)
+        case toggleMindmap
     }
 
-    static func hasSubtitles(for filePath: String) -> Bool {
-        let dir = (filePath as NSString).deletingLastPathComponent
-        let basename = ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
-        let comps = basename.components(separatedBy: ".")
-        guard let videoId = comps.last, !videoId.isEmpty,
-              let files = try? FileManager.default.contentsOfDirectory(atPath: dir) else { return false }
-        let subPatterns = [".en.srt", ".ko.srt", ".en.vtt", ".ko.vtt"]
-        return subPatterns.contains { pattern in
-            files.contains { $0.hasSuffix("\(videoId)\(pattern)") }
-        }
+    static func hasSubtitles(for videoId: String) -> Bool {
+        let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId)
+        let hasTranscript = data?.transcript != nil && !(data?.transcript?.isEmpty ?? true)
+        return hasTranscript
+    }
+
+    static func hasPodcast(for videoId: String) -> Bool {
+        return PodcastService.shared.getPodcastPath(videoId: videoId) != nil
     }
 
     var body: some ReducerOf<Self> {
@@ -196,7 +248,9 @@ struct LibraryReducer {
 
             case .itemsLoaded(let items):
                 state.items = items
-                state.subtitleAvailableIds = Set(items.filter { Self.hasSubtitles(for: $0.filePath) }.map(\.id))
+                state.subtitleAvailableIds = Set(items.filter { Self.hasSubtitles(for: $0.id) }.map(\.id))
+                state.summaryAvailableIds = Set(items.filter { $0.summary != nil && !($0.summary?.isEmpty ?? true) }.map(\.id))
+                state.podcastAvailableIds = Set(items.filter { Self.hasPodcast(for: $0.id) }.map(\.id))
                 return .none
 
             case .addItem(let item):
@@ -246,6 +300,13 @@ struct LibraryReducer {
                 state.viewMode = mode
                 return .run { _ in
                     UserDefaults.standard.set(mode.rawValue, forKey: Constants.libraryViewModeKey)
+                }
+
+            case .toggleThumbnailPreview:
+                state.showThumbnailPreview.toggle()
+                let newValue = state.showThumbnailPreview
+                return .run { _ in
+                    UserDefaults.standard.set(newValue, forKey: "showThumbnailPreview")
                 }
 
             case .setFilterMode(let mode):
@@ -314,17 +375,21 @@ struct LibraryReducer {
             case .downloadSubtitles(let id):
                 guard let item = state.items.first(where: { $0.id == id }) else { return .none }
                 let videoURL = "https://www.youtube.com/watch?v=\(item.id)"
-                let basePath = (item.filePath as NSString).deletingPathExtension
                 state.subtitleDownloadingIds.insert(id)
                 return .run { send in
                     do {
+                        let fm = FileManager.default
+                        let tmpDir = fm.temporaryDirectory.appendingPathComponent("tubekeep_subs_\(UUID().uuidString.prefix(8))")
+                        try fm.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+
                         let process = Process()
+                        let outputTemplate = tmpDir.appendingPathComponent("%(id)s.%(ext)s").path
                         let args = [
                             "--write-subs", "--write-auto-subs",
                             "--sub-langs", "en,ko",
                             "--skip-download",
                             "--no-warnings",
-                            "-o", "\(basePath).%(ext)s",
+                            "-o", outputTemplate,
                             videoURL,
                         ]
                         if Constants.ytDlpPath.hasPrefix("/") {
@@ -339,9 +404,35 @@ struct LibraryReducer {
                         process.standardError = stderrPipe
                         try process.run()
                         process.waitUntilExit()
-                        let success = process.terminationStatus == 0
+
+                        let files = (try? fm.contentsOfDirectory(atPath: tmpDir.path)) ?? []
+                        var saved = false
+                        for file in files {
+                            let path = tmpDir.appendingPathComponent(file)
+                            let content = try String(contentsOf: path, encoding: .utf8)
+                            let text: String
+                            let lang: String
+                            if file.hasSuffix(".vtt") {
+                                text = SummarizationService.parseVTT(content)
+                                lang = file.contains(".ko.") ? "ko" : "en"
+                            } else if file.hasSuffix(".srt") {
+                                text = SummarizationService.parseSRT(content)
+                                lang = file.contains(".ko.") ? "ko" : "en"
+                            } else {
+                                continue
+                            }
+                            if !text.isEmpty {
+                                DatabaseManager.shared.updateTranscript(videoId: id, transcript: text, language: lang)
+                                saved = true
+                            }
+                        }
+                        try? fm.removeItem(at: tmpDir)
+
+                        let success = process.terminationStatus == 0 && saved
                         let errMsg: String
-                        if !success {
+                        if !success && files.isEmpty {
+                            errMsg = "자막 파일 없음"
+                        } else if !success {
                             let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                             errMsg = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "알 수 없는 오류"
                         } else {
@@ -386,7 +477,7 @@ struct LibraryReducer {
 
             case .openChannelDownload(let channelId, let channelName):
                 return .run { _ in
-                    let channels = SubscribedChannel.loadAll()
+                    let channels = await MainActor.run { SubscribedChannel.loadAll() }
                     var targetChannel: SubscribedChannel?
 
                     if let existing = channels.first(where: { $0.id == channelId || $0.name == channelName }) {
@@ -402,10 +493,12 @@ struct LibraryReducer {
                             url = "https://www.youtube.com/@\(channelName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channelName)/videos"
                         }
                         if let channel = try? await service.fetchChannelInfo(from: url) {
-                            var updated = SubscribedChannel.loadAll()
-                            updated.removeAll { $0.name == channel.name }
-                            updated.insert(channel, at: 0)
-                            SubscribedChannel.saveAll(updated)
+                            await MainActor.run {
+                                var updated = SubscribedChannel.loadAll()
+                                updated.removeAll { $0.name == channel.name }
+                                updated.insert(channel, at: 0)
+                                SubscribedChannel.saveAll(updated)
+                            }
                             targetChannel = channel
                         }
                     }
@@ -526,32 +619,24 @@ struct LibraryReducer {
                 state.discoverSummaryText = nil
                 return .run { send in
                     let service = SummarizationService()
-                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    let ax4Key = UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey
+                    let geminiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
                     do {
-                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
-                        await send(.discoverSummaryLoaded(text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
+                        let result = try await service.summarizeVideo(videoId: videoId, title: title, channel: channel, openRouterAPIKey: openRouterKey, ax4APIKey: ax4Key, geminiAPIKey: geminiKey)
+                        await send(.discoverSummaryLoaded(text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n"), provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
-                        if case .quotaExceeded = error, !apiKey.isEmpty {
-                            do {
-                                let result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
-                                await send(.discoverSummaryLoaded(text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")))
-                            } catch {
-                                await send(.discoverSummaryFailed(error.localizedDescription))
-                            }
-                        } else {
-                            if case .quotaExceeded = error {
-                                await send(.setGeminiKeyAlert(true))
-                            }
-                            await send(.discoverSummaryFailed(error.localizedDescription))
-                        }
+                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
+                        await send(.discoverSummaryFailed(error.localizedDescription))
                     } catch {
                         await send(.discoverSummaryFailed(error.localizedDescription))
                     }
                 }
 
-            case let .discoverSummaryLoaded(text):
+            case let .discoverSummaryLoaded(text, provider):
                 state.discoverSummaryLoading = false
                 state.discoverSummaryText = text
+                state.discoverSummaryProvider = provider
                 return .none
 
             case let .discoverSummaryFailed(error):
@@ -562,57 +647,100 @@ struct LibraryReducer {
             case .discoverDismissSummary:
                 state.discoverSummaryVideoId = nil
                 state.discoverSummaryText = nil
+                state.discoverSummaryProvider = nil
                 state.discoverSummaryLoading = false
                 return .none
 
             // Summary
             case let .showSummary(videoId):
                 guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+                if state.librarySummaryVideoId != videoId {
+                    state.qnaHistoryItems = []
+                }
                 state.librarySummaryVideoId = videoId
+                state.qnaSelectedVideoId = videoId
+                state.mindmapNode = nil
+                state.mindmapError = nil
+                state.mindmapLoading = false
+                state.mindmapShow = false
+                // 기존 마인드맵이 있으면 로드
+                if let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
+                   let mindmapData = data.mindmap,
+                   let existing = try? JSONDecoder().decode(MindmapNode.self, from: mindmapData) {
+                    state.mindmapNode = existing
+                    state.mindmapShow = true
+                }
+                // 기존 요약이 있으면 API 호출 없이 표시
+                if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
+                    state.librarySummaryText = existing
+                    state.librarySummaryLoading = false
+                    return .run { _ in
+                        await MainActor.run {
+                            NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                        }
+                    }
+                }
                 state.librarySummaryLoading = true
                 state.librarySummaryText = nil
-                let title = item.title
-                let channel = item.channelName
-                let filePath = item.filePath
                 return .run { send in
+                    await MainActor.run {
+                        NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                    }
                     let service = SummarizationService()
-                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    let ax4Key = UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey
+                    let geminiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
                     do {
-                        let result = try await service.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
-                        await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints))
+                        let result = try await service.summarizeVideo(videoId: videoId, title: item.title, channel: item.channelName, openRouterAPIKey: openRouterKey, ax4APIKey: ax4Key, geminiAPIKey: geminiKey, localFilePath: item.filePath)
+                        await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
-                        if case .quotaExceeded = error, !apiKey.isEmpty {
-                            do {
-                                let result: SummarizationService.SummaryResult
-                                if FileManager.default.fileExists(atPath: filePath) {
-                                    result = try await service.summarizeFromLocalFile(videoPath: filePath, title: title, channel: channel, apiKey: apiKey)
-                                } else {
-                                    result = try await service.summarize(videoId: videoId, title: title, channel: channel, apiKey: apiKey)
-                                }
-                                await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints))
-                            } catch {
-                                await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                            }
-                        } else {
-                            if case .quotaExceeded = error {
-                                await send(.setGeminiKeyAlert(true))
-                            }
-                            await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                        }
+                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
+                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
                     } catch {
                         await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
                     }
                 }
 
-            case let .summaryResult(videoId, overview, keyPoints):
+            case let .resummarize(videoId):
+                guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+                state.librarySummaryVideoId = videoId
+                state.librarySummaryLoading = true
+                state.librarySummaryText = nil
+                if let idx = state.items.firstIndex(where: { $0.id == videoId }) {
+                    state.items[idx].summary = nil
+                }
+                return .run { send in
+                    DatabaseManager.shared.updateSummary(videoId: videoId, summary: nil)
+                    let service = SummarizationService()
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    let ax4Key = UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey
+                    let geminiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    do {
+                        let result = try await service.summarizeVideo(videoId: videoId, title: item.title, channel: item.channelName, openRouterAPIKey: openRouterKey, ax4APIKey: ax4Key, geminiAPIKey: geminiKey, localFilePath: item.filePath)
+                        await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
+                    } catch let error as SummarizationService.SummaryError {
+                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
+                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                    } catch {
+                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                    }
+                }
+
+            case let .summaryResult(videoId, overview, keyPoints, chapters, provider):
                 state.librarySummaryLoading = false
-                let joined = "\(overview)\n\n" + keyPoints.map { "• \($0)" }.joined(separator: "\n")
+                state.librarySummaryProvider = provider
+                var joined = "\(overview)\n\n" + keyPoints.map { "• \($0)" }.joined(separator: "\n")
                 state.librarySummaryText = joined
+                state.summaryAvailableIds.insert(videoId)
                 if let idx = state.items.firstIndex(where: { $0.id == videoId }) {
                     state.items[idx].summary = joined
+                    let chaptersData = try? JSONEncoder().encode(chapters)
+                    state.items[idx].chapters = chaptersData
                     let updated = state.items[idx]
                     return .run { _ in
                         await LibraryCacheService.shared.updateItem(updated)
+                        DatabaseManager.shared.updateSummary(videoId: videoId, summary: joined)
+                        DatabaseManager.shared.updateChapters(videoId: videoId, chapters: chaptersData ?? Data())
                     }
                 }
                 return .none
@@ -628,6 +756,7 @@ struct LibraryReducer {
             case .dismissLibrarySummary:
                 state.librarySummaryVideoId = nil
                 state.librarySummaryText = nil
+                state.librarySummaryProvider = nil
                 state.librarySummaryLoading = false
                 return .none
 
@@ -645,8 +774,10 @@ struct LibraryReducer {
             case let .tagItem(videoId, title, channel):
                 return .run { send in
                     let service = TaggingService()
-                    let apiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
-                    let tag = await service.classify(title: title, channel: channel, apiKey: apiKey)
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    let ax4Key = UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey
+                    let geminiKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+                    let tag = await service.classify(title: title, channel: channel, openRouterAPIKey: openRouterKey, ax4APIKey: ax4Key, geminiAPIKey: geminiKey)
                     await send(.itemTagged(videoId: videoId, tag: tag))
                 }
 
@@ -657,6 +788,224 @@ struct LibraryReducer {
                     return .run { _ in
                         await LibraryCacheService.shared.updateItem(updated)
                     }
+                }
+                return .none
+
+            // Podcast
+            case let .generatePodcast(videoId):
+                guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+                state.podcastGeneratingIds.insert(videoId)
+                state.podcastError = nil
+                // 요약 팝업 열기
+                state.librarySummaryVideoId = videoId
+                state.librarySummaryLoading = false
+                if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
+                    state.librarySummaryText = existing
+                } else {
+                    state.librarySummaryText = nil
+                }
+                return .run { send in
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    do {
+                        let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId)
+                        guard let transcript = data?.transcript, !transcript.isEmpty else {
+                            await send(.podcastGenerationFailed(videoId, "자막이 없어 팟캐스트를 생성할 수 없습니다."))
+                            return
+                        }
+                        let result = try await PodcastService.shared.generatePodcast(
+                            videoId: videoId,
+                            title: item.title,
+                            channel: item.channelName,
+                            transcript: transcript,
+                            openRouterAPIKey: openRouterKey
+                        )
+                        await send(.podcastGenerated(videoId, result))
+                    } catch {
+                        await send(.podcastGenerationFailed(videoId, error.localizedDescription))
+                    }
+                }
+
+            case let .podcastGenerated(videoId, result):
+                state.podcastGeneratingIds.remove(videoId)
+                state.podcastAvailableIds.insert(videoId)
+                state.podcastLastEngine = result.engineName
+                return .none
+
+            case let .podcastGenerationFailed(videoId, error):
+                state.podcastGeneratingIds.remove(videoId)
+                state.podcastError = error
+                return .none
+
+            case let .playPodcast(videoId):
+                state.podcastPlayingId = videoId
+                return .merge(
+                    .run { _ in
+                        do {
+                            try await PodcastService.shared.playPodcast(videoId: videoId)
+                        } catch {
+                            #if DEBUG
+                            Task { @MainActor in
+                                DebugLogManager.shared?.append("[Podcast] 재생 실패: \(error.localizedDescription)")
+                            }
+                            #endif
+                        }
+                    },
+                    .run { send in
+                        for await _ in NotificationCenter.default.notifications(named: .podcastPlaybackFinished) {
+                            await send(.stopPodcast)
+                        }
+                    }
+                )
+
+            case .pausePodcast:
+                return .run { _ in
+                    await PodcastService.shared.pausePodcast()
+                }
+
+            case .stopPodcast:
+                state.podcastPlayingId = nil
+                return .run { _ in
+                    await PodcastService.shared.stopPodcast()
+                }
+
+            case let .deletePodcast(videoId):
+                // 재생 중이면 중지
+                if state.podcastPlayingId == videoId {
+                    state.podcastPlayingId = nil
+                }
+                state.podcastAvailableIds.remove(videoId)
+                return .run { _ in
+                    try? await PodcastService.shared.deletePodcast(videoId: videoId)
+                }
+
+            // Q&A (v2.5.3)
+            case let .openQnA(videoId):
+                state.qnaSelectedVideoId = videoId
+                state.qnaHistoryItems = []
+                state.qnaShowSheet = true
+                return .send(.showSummary(videoId))
+
+            case .closeQnA:
+                state.qnaShowSheet = false
+                state.qnaSelectedVideoId = nil
+                state.qnaHistoryItems = []
+                return .none
+
+            case let .askQuestion(videoId, question):
+                state.qnaLoading = true
+                state.qnaError = nil
+                return .run { send in
+                    guard let item = await LibraryCacheService.shared.loadItems().first(where: { $0.id == videoId }),
+                          let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
+                          let transcript = data.transcript, !transcript.isEmpty else {
+                        await send(.qnaFailed("자막이 없습니다"))
+                        return
+                    }
+                    let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                    do {
+                        let response = try await QAService.shared.ask(
+                            videoId: videoId,
+                            question: question,
+                            transcript: transcript,
+                            title: item.title,
+                            openRouterAPIKey: openRouterKey
+                        )
+                        await send(.qnaResponseReceived(response))
+                    } catch {
+                        await send(.qnaFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .qnaResponseReceived(response):
+                state.qnaLoading = false
+                if let videoId = state.qnaSelectedVideoId {
+                    return .send(.loadQnAHistory(videoId))
+                }
+                return .none
+
+            case let .qnaFailed(error):
+                state.qnaLoading = false
+                state.qnaError = error
+                return .none
+
+            case let .loadQnAHistory(videoId):
+                return .run { send in
+                    let items = await QAService.shared.loadHistory(videoId: videoId)
+                    await send(.qnaHistoryLoaded(items))
+                }
+
+            case let .qnaHistoryLoaded(items):
+                state.qnaHistoryItems = items
+                return .none
+
+            case let .deleteQnAHistoryItem(id):
+                let selectedVideoId = state.qnaSelectedVideoId
+                return .run { send in
+                    await QAService.shared.deleteHistory(id: id)
+                    if let videoId = selectedVideoId {
+                        await send(.loadQnAHistory(videoId))
+                    }
+                }
+
+            case let .deleteAllQnAHistory(videoId):
+                return .run { send in
+                    await QAService.shared.deleteAllHistory(videoId: videoId)
+                    await send(.qnaHistoryLoaded([]))
+                }
+
+            case let .seekToTimestamp(time):
+                NotificationCenter.default.post(name: .seekToTime, object: time)
+                return .none
+
+            // Mindmap (v2.5.4)
+            case let .generateMindmap(videoId):
+                guard let item = state.items.first(where: { $0.id == videoId }),
+                      let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
+                      let transcript = data.transcript, !transcript.isEmpty else {
+                    state.mindmapError = "자막이 없습니다"
+                    return .none
+                }
+                if let mindmapData = data.mindmap,
+                   let existing = try? JSONDecoder().decode(MindmapNode.self, from: mindmapData) {
+                    state.mindmapNode = existing
+                    state.mindmapShow = true
+                    return .none
+                }
+                state.mindmapLoading = true
+                state.mindmapError = nil
+                state.mindmapShow = true
+                let openRouterKey = UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? ""
+                return .run { send in
+                    do {
+                        let node = try await MindmapService.shared.generate(
+                            videoId: videoId,
+                            transcript: transcript,
+                            title: item.title,
+                            channel: item.channelName,
+                            openRouterAPIKey: openRouterKey
+                        )
+                        await send(.mindmapResult(node))
+                    } catch {
+                        await send(.mindmapFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .mindmapResult(node):
+                state.mindmapLoading = false
+                state.mindmapNode = node
+                return .none
+
+            case let .mindmapFailed(error):
+                state.mindmapLoading = false
+                state.mindmapError = error
+                print("[MindmapRedux] ❌ mindmapFailed — \(error)")
+                return .none
+
+            case .toggleMindmap:
+                state.mindmapShow.toggle()
+                if !state.mindmapShow {
+                    state.mindmapNode = nil
+                    state.mindmapError = nil
                 }
                 return .none
             }
