@@ -141,9 +141,6 @@ v2.5.4의 마인드맵 기능은 v2.5.5에서 AI 창 UI 통합과 함께 구현�
   - HomeReducer, LibraryReducer 중복 폴백 로직 3곳 제거
 - **자동 테스트 55개 추가**: ErrorMessageMapperTests(23), DownloadItemTests(17), ConstantsTests(15)
 
-### v2.5.0 예정
-- 모듈 분리 (TubeKeepCore + TubeKeep)
-
 ---
 
 ## v2.3.0 (2026-07-16) — SponsorBlock + 기능 다듬기

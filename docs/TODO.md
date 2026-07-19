@@ -206,7 +206,7 @@
 | T-312 | 요약 폴백 체인 변경: OpenRouter → yTeaser → A.X 4.0 → Gemini | high | completed | 빌드+55테스트 ✅ |
 | T-313 | 태깅 폴백 체인 변경: OpenRouter → A.X 4.0 → Gemini → autoClassify | high | completed | 빌드+55테스트 ✅ |
 | T-314 | 설정 UI — OpenRouter API 키 입력 + "무료 가입" 링크 | high | completed | 빌드+55테스트 ✅ |
-| T-305 | 모듈 분리 (TubeKeepCore + TubeKeep) | medium | pending | v2.5.0으로 미룸 |
+| T-305 | 모듈 분리 (TubeKeepCore + TubeKeep) | medium | cancelled | 단일 모듈로 충분, 분리할 실질적 이점 없음 |
 
 ## v2.5.0—v2.5.6 — AI 콘텐츠 캐싱 + 챕터/팟캐스트/Q&A/마인드맵 + UI 통합 + 최종 테스트 (2026-07-17~19) 🏁
 
