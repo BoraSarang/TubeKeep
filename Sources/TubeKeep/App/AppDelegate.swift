@@ -43,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         Task { await BundledLibraryManager.shared.warmUp() }
 
+        checkForUpdate()
+
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
@@ -570,6 +572,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DebugLogManager.shared?.append("[Channel] 업데이트 체크 시작")
     }
     #endif
+
+    // MARK: - Update Check
+
+    private func checkForUpdate() {
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let update = await UpdateChecker.checkForUpdate() else { return }
+
+            let alert = NSAlert()
+            alert.messageText = "업데이트 가능"
+            alert.informativeText = "TubeKeep \(update.latestVersion) 사용 가능합니다.\n현재 버전: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")"
+            if let notes = update.releaseNotes {
+                alert.informativeText += "\n\n변경 사항:\n\(notes)"
+            }
+            alert.addButton(withTitle: "다운로드")
+            alert.addButton(withTitle: "나중에")
+            alert.addButton(withTitle: "이 버전 건너뛰기")
+
+            let response = alert.runModal()
+            switch response {
+            case .alertFirstButtonReturn:
+                if let url = URL(string: update.downloadURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            case .alertThirdButtonReturn:
+                UpdateChecker.skipVersion(update.latestVersion)
+            default:
+                break
+            }
+        }
+    }
 
     // MARK: - NSWindowDelegate
 

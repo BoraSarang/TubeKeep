@@ -53,6 +53,8 @@ enum Constants {
     static let sponsorBlockKey = "sponsorBlock"
     static let embedMetadataKey = "embedMetadata"
 
+    static let appcastURL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/appcast.json"
+
     static func isChannelURL(_ url: String) -> Bool {
         let patterns = [
             #"^(https?://)?(www\.)?youtube\.com/@[a-zA-Z0-9_-]+(/videos)?(/shorts)?(/streams)?$"#,

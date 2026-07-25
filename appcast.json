@@ -1,0 +1,7 @@
+{
+  "latestVersion": "2.7.5",
+  "minimumVersion": "2.7.0",
+  "downloadURL": "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v2.7.5/TubeKeep-2.7.5.dmg",
+  "releaseNotes": "• DMG 배포 기반 구축\n• 코드 서명 + Notarization 준비\n• 자체 업데이트 기능 추가",
+  "pubDate": "2026-07-25T21:00:00Z"
+}
