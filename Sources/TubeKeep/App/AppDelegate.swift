@@ -430,7 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func openBuyMeACoffee() {
-        guard let url = URL(string: "https://buymeacoffee.com/YOUR_USERNAME") else { return }
+        guard let url = URL(string: "https://buymeacoffee.com/borasarang") else { return }
         NSWorkspace.shared.open(url)
     }
 
