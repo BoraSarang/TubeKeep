@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 
-#if DEBUG
 final class DebugLogManager: ObservableObject {
     nonisolated(unsafe) static var shared: DebugLogManager?
 
@@ -13,12 +12,15 @@ final class DebugLogManager: ObservableObject {
     }()
 
     func append(_ message: String) {
+        #if DEBUG
         let timestamp = dateFormatter.string(from: Date())
         logs.append("[\(timestamp)] \(message)")
+        #endif
     }
 
     func clear() {
+        #if DEBUG
         logs.removeAll()
+        #endif
     }
 }
-#endif

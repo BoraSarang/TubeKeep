@@ -6,10 +6,12 @@ pkill -f "TubeKeep" 2>/dev/null || true
 
 BUILD_MODE="${1:-release}"
 CLEAN=false
+NO_LAUNCH=false
 
 for arg in "$@"; do
     case "$arg" in
         --clean) CLEAN=true ;;
+        --no-launch) NO_LAUNCH=true ;;
     esac
 done
 
@@ -227,6 +229,12 @@ echo "✅ Installed: $INSTALL_DIR/TubeKeep.app"
 # Ad-hoc sign to suppress Gatekeeper "Intel 미지원" warning (ARM64-only build)
 codesign --force --deep --sign - "$INSTALL_DIR/TubeKeep.app" 2>/dev/null || true
 
-echo ""
-echo "🚀 Launching TubeKeep..."
-open "$INSTALL_DIR/TubeKeep.app"
+if [ "$NO_LAUNCH" = false ]; then
+    echo ""
+    echo "🚀 Launching TubeKeep..."
+    open "$INSTALL_DIR/TubeKeep.app"
+else
+    echo ""
+    echo "📦 App bundle: $INSTALL_DIR/TubeKeep.app"
+    echo "📦 Build ready at: /tmp/TubeKeep-build/TubeKeep.app"
+fi
