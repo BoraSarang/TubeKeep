@@ -24,12 +24,14 @@ struct LibraryGridView: View {
 
             Divider()
 
-            ScrollView {
-                if store.library.items.isEmpty && store.library.filteredItems.isEmpty {
-                    emptyState
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.top, 60)
-                } else {
+            if store.library.items.isEmpty && store.library.filteredItems.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !store.library.items.isEmpty && store.library.filteredItems.isEmpty {
+                searchEmptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         let displayItems = Array(store.library.filteredItems.prefix(displayedCount))
                         ForEach(displayItems) { item in
@@ -211,6 +213,17 @@ struct LibraryGridView: View {
                 downloaderButton("일괄 다운로더", notification: Constants.openBatchWindowNotification)
                 downloaderButton("채널 다운로더", notification: Constants.openChannelWindowNotification)
             }
+        }
+    }
+
+    private var searchEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 36))
+                .foregroundStyle(.tertiary)
+            Text("검색 결과가 없습니다")
+                .font(.headline)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -643,7 +656,7 @@ struct HoverPreviewPanel: NSViewRepresentable {
         Coordinator()
     }
 
-    class Coordinator: NSObject, NSWindowDelegate {
+    class Coordinator: NSObject, NSWindowDelegate, @unchecked Sendable {
         weak var positioningView: NSView?
         var thumbnail: NSImage?
         var panel: NSPanel?

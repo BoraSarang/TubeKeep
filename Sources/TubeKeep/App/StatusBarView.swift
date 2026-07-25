@@ -14,14 +14,6 @@ struct StatusBarReducer {
         var totalCount: Int = 0
         var completedCount: Int = 0
         var downloadETA: String = ""
-        var speedTestState: SpeedTestState = .idle
-
-        enum SpeedTestState: Equatable {
-            case idle
-            case measuring
-            case completed(kbps: Double)
-        }
-
         var displayText: String {
             if hasActiveDownloads, !downloadSpeed.isEmpty {
                 return downloadSpeed
@@ -44,9 +36,6 @@ struct StatusBarReducer {
         case badgeIncrement
         case setBadgeCount(Int)
         case badgeReset
-        case startSpeedTest
-        case speedTestUpdate(Double)
-        case speedTestComplete
         case updateStatusText(String)
         case updateStatusDetail(String)
         #if DEBUG
@@ -86,19 +75,6 @@ struct StatusBarReducer {
             case let .updateStatusDetail(detail):
                 state.statusDetail = detail
                 return .none
-            case .startSpeedTest:
-                state.speedTestState = .measuring
-                return .none
-            case let .speedTestUpdate(kbps):
-                state.speedTestState = .completed(kbps: kbps)
-                return .run { send in
-                    try await Task.sleep(for: .seconds(5))
-                    await send(.speedTestComplete)
-                }
-            case .speedTestComplete:
-                state.speedTestState = .idle
-                return .none
-
             #if DEBUG
             case .startStatusBarTest:
                 state.hasActiveDownloads = true

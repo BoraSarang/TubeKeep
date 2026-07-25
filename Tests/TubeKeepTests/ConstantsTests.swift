@@ -88,7 +88,7 @@ final class ConstantsTests: XCTestCase {
 
     func testDefaultValues() {
         XCTAssertEqual(Constants.appName, "TubeKeep")
-        XCTAssertEqual(Constants.defaultResolution, 480)
+        XCTAssertEqual(Constants.defaultResolution, 360)
         XCTAssertEqual(Constants.defaultConcurrentDownloads, 2)
         XCTAssertEqual(Constants.minConcurrentDownloads, 1)
         XCTAssertEqual(Constants.maxConcurrentDownloads, 5)

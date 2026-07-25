@@ -1,4 +1,5 @@
 import Cocoa
+import Combine
 import ComposableArchitecture
 import UserNotifications
 
@@ -6,6 +7,7 @@ import UserNotifications
 final class ChannelUpdateService {
     private let store: StoreOf<AppReducer>
     private var timer: Timer?
+    private var cancellables = Set<AnyCancellable>()
     private let fetchService = ChannelFetchService()
     #if DEBUG
     private var logManager: DebugLogManager?
@@ -13,9 +15,38 @@ final class ChannelUpdateService {
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
+        observeSettingChanges()
     }
 
     func start() {
+        guard store.state.settings.showChannelBadge else { return }
+        startTimer()
+    }
+
+    func stop() {
+        stopTimer()
+    }
+
+    private func observeSettingChanges() {
+        store.publisher
+            .map(\.settings.showChannelBadge)
+            .removeDuplicates()
+            .sink { [weak self] show in
+                guard let self else { return }
+                if show {
+                    self.restartTimer()
+                    Task { await self.checkForUpdates() }
+                } else {
+                    self.stopTimer()
+                    self.store.send(.statusBar(.setBadgeCount(0)))
+                    self.store.send(.statusBar(.updateStatusText("")))
+                    self.store.send(.statusBar(.updateStatusDetail("")))
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { await self.checkForUpdates() }
@@ -26,9 +57,14 @@ final class ChannelUpdateService {
         }
     }
 
-    func stop() {
+    private func stopTimer() {
         timer?.invalidate()
         timer = nil
+    }
+
+    private func restartTimer() {
+        stopTimer()
+        startTimer()
     }
 
     #if DEBUG
@@ -50,7 +86,7 @@ final class ChannelUpdateService {
         logManager?.append("🔄 채널 업데이트 체크 시작 (\(channels.count)개)")
         #endif
         _ = await MainActor.run { [channels] in
-            self.store.send(.statusBar(.updateStatusText("업데이트 확인 중")))
+            self.store.send(.statusBar(.updateStatusText("신규영상 확인중")))
             self.store.send(.statusBar(.updateStatusDetail("[0/\(channels.count)]")))
         }
 
@@ -110,7 +146,7 @@ final class ChannelUpdateService {
         let notifyTotal = newVideosByChannel.reduce(0) { $0 + $1.count }
         let notifyDetails = newVideosByChannel.map { ($0.channelName, $0.count) }
         _ = await MainActor.run {
-            if notifyHasChanges {
+            if notifyHasChanges, self.store.state.settings.showChannelBadge {
                 self.store.send(.statusBar(.updateStatusText("업데이트 완료")))
                 self.store.send(.statusBar(.updateStatusDetail("새 영상 \(notifyTotal)개")))
                 self.showNotification(total: notifyTotal, details: notifyDetails)

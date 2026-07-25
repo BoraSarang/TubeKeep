@@ -44,7 +44,7 @@ final class EdgeTTSClient: NSObject, URLSessionWebSocketDelegate {
 
     // MARK: - 공개 API
 
-    func synthesize(text: String, voice: String = "ko-KR-InJoonNeural", rate: String = "+10%") async throws -> Data {
+    func synthesize(text: String, voice: String? = nil, rate: String = "+10%") async throws -> Data {
         audioData = Data()
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -102,7 +102,9 @@ final class EdgeTTSClient: NSObject, URLSessionWebSocketDelegate {
                     .replacingOccurrences(of: "\"", with: "&quot;")
 
                 let timestamp = Self.formatTimestamp(Date())
-                let ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='ko-KR'><voice name='\(voice)'><prosody rate='\(rate)'>\(escapedText)</prosody></voice></speak>"
+                let resolvedVoice = voice ?? LanguageService.ttsVoice(for: .edgeTTS, gender: .male)
+                let lang = resolvedVoice.count >= 5 ? String(resolvedVoice.prefix(5)) : LanguageService.systemLanguageCode
+                let ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='\(lang)'><voice name='\(resolvedVoice)'><prosody rate='\(rate)'>\(escapedText)</prosody></voice></speak>"
                 let synthMsg = "X-RequestId:\(connectionId)\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:\(timestamp)\r\nPath:ssml\r\n\r\n\(ssml)"
 
                 self.webSocket?.send(.string(synthMsg)) { error in

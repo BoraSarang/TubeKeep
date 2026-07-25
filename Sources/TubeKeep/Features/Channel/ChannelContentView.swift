@@ -14,7 +14,19 @@ struct ChannelContentView: View {
     @State private var sortOrder: ChannelSortOrder = .dateDesc
     @State private var selectedIDs: Set<String> = Set()
     @State private var displayCount = 50
-    @State private var presetResolution: Int = Constants.defaultResolution
+    @State private var presetResolution: Int
+
+    init(store: StoreOf<AppReducer>, channel: SubscribedChannel?, videos: [ChannelVideoItem], isLoading: Bool,
+         onRefresh: (() -> Void)? = nil, onDropURL: ((String) -> Void)? = nil, onAddChannel: (() -> Void)? = nil) {
+        self.store = store
+        self.channel = channel
+        self.videos = videos
+        self.isLoading = isLoading
+        self.onRefresh = onRefresh
+        self.onDropURL = onDropURL
+        self.onAddChannel = onAddChannel
+        _presetResolution = State(initialValue: store.settings.defaultResolution)
+    }
     @State private var presetSubtitles = false
     @State private var presetAudioOnly = false
     @State private var isAddingDownloads = false
@@ -96,6 +108,9 @@ struct ChannelContentView: View {
                 }
                 Spacer()
             }
+        }
+        .onChange(of: channel?.id) { _, _ in
+            selectedIDs = []
         }
     }
 
@@ -405,11 +420,12 @@ struct ChannelContentView: View {
         let selected = videos.filter { selectedIDs.contains($0.id) && !downloaded.contains($0.id) }
         guard !selected.isEmpty else { return }
 
+        selectedIDs = []
         isAddingDownloads = true
 
         let items = selected.map { item in
             let format = Format(
-                id: "best[height<=\(presetResolution)]",
+                id: "best[height<=\(presetResolution)]/best",
                 label: "\(presetResolution)p",
                 height: presetResolution,
                 ext: "mp4",

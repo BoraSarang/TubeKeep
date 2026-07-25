@@ -46,7 +46,12 @@ struct BatchDownloadView: View {
         ("360p", 360), ("240p", 240), ("144p", 144),
     ]
 
-    @State private var selectedResolution: Int = Constants.defaultResolution
+    @State private var selectedResolution: Int
+
+    init(store: StoreOf<AppReducer>) {
+        self.store = store
+        _selectedResolution = State(initialValue: store.settings.defaultResolution)
+    }
     @State private var includeSubtitles = false
     @State private var audioOnly = false
 

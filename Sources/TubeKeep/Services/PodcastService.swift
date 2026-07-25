@@ -1,5 +1,5 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 extension Notification.Name {
     static let podcastPlaybackFinished = Notification.Name("podcastPlaybackFinished")
@@ -15,9 +15,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
     private var currentVideoId: String?
     private var playCompletion: ((Bool) -> Void)?
 
-    // 한국어 음성 식별자
-    private static let maleVoiceId = "com.apple.eloquence.ko-KR.Reed"
-    private static let femaleVoiceId = "com.apple.voice.super-compact.ko-KR.Yuna"
+    // TTS 음성 식별자 (LanguageService.ttsVoice로 동적 결정)
 
     enum PodcastError: LocalizedError {
         case noTranscript
@@ -46,11 +44,13 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         title: String,
         channel: String,
         transcript: String,
-        openRouterAPIKey: String
+        openRouterAPIKey: String,
+        progress: (@MainActor @Sendable (String) -> Void)?
     ) async throws -> PodcastResult {
         log("[Podcast] 팟캐스트 생성 시작 — videoId: \(videoId)")
 
         // 1. 대화 스크립트 생성
+        progress?("대화 스크립트 생성 중...")
         let script = try await generateScript(
             transcript: transcript,
             title: title,
@@ -72,18 +72,20 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
             guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
                   let data = json.data(using: .utf8),
                   let settings = try? JSONDecoder().decode(Settings.self, from: data) else {
-                return .apple
+                return .edgeTTS
             }
             return settings.ttsEngine
         }()
 
+        progress?("음성 변환 중... (\(script.segments.count)개 세그먼트)")
         log("[Podcast] 병렬 TTS 시작 — 세그먼트: \(script.segments.count)개, 엔진: \(ttsEngine.displayName)")
 
         let segmentURLs: [URL] = await withTaskGroup(of: (Int, URL?).self, returning: [URL].self) { group in
             for (index, segment) in script.segments.enumerated() {
                 group.addTask {
                     let segURL = URL(fileURLWithPath: (tempDir as NSString).appendingPathComponent("seg_\(index).aiff"))
-                    let voiceId = segment.speaker.contains("A") ? ttsEngine.maleVoice : ttsEngine.femaleVoice
+                    let gender: TTSEngine.Gender = segment.speaker.contains("A") ? .male : .female
+                    let voiceId = LanguageService.ttsVoice(for: ttsEngine, gender: gender)
                     let cleanText = segment.text
                         .replacingOccurrences(of: #"^진행자[AB]\s*:\s*"#, with: "", options: .regularExpression)
                         .replacingOccurrences(of: #"^\[진행자[AB]\]\s*"#, with: "", options: .regularExpression)
@@ -116,6 +118,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         log("[Podcast] 세그먼트 TTS 완료 — 개수: \(segmentURLs.count)")
 
         // 4. 세그먼트 오디오를 하나로 합치기 (AVAudioFile append)
+        progress?("오디오 합치는 중...")
         let audioPath = (outputDir as NSString).appendingPathComponent("\(videoId)_full.aiff")
         let audioURL = URL(fileURLWithPath: audioPath)
         try concatenateAudioFiles(urls: segmentURLs, outputURL: audioURL)
@@ -270,6 +273,9 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
 
         출력 형식 (JSON 배열만 출력하세요):
         [{"speaker": "진행자A", "text": "안녕하세요, 오늘은..."}, {"speaker": "진행자B", "text": "네, 정말 흥미로운 내용이네요."}]
+        
+        **⚠️ 중요: 반드시 위 JSON 배열 형식만 출력하세요. 절대 설명, 부연, 사족을 추가하지 마세요.
+        JSON 이외의 텍스트는 단 한 글자도 출력하지 마세요.**
 
         자막 내용:
         \(transcript.prefix(12000))
@@ -303,11 +309,11 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
             }
         }
 
-        // 2. 직접 JSON 배열 검색 (텍스트에서 [로 시작하여 ]로 끝나는 부분)
+        // 2. 직접 JSON 배열 검색 ([{...}] 패턴 — 자연어 대괄호와 구분)
         if jsonString.isEmpty {
-            if let start = response.firstIndex(of: "["),
+            if let range = response.range(of: #"\[\s*\{"#, options: .regularExpression),
                let end = response.lastIndex(of: "]") {
-                jsonString = String(response[start...end])
+                jsonString = String(response[range.lowerBound...end])
                 log("[Podcast] 직접 JSON 배열 추출 — 길이: \(jsonString.count)")
             }
         }
@@ -510,11 +516,12 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
 
                 var inputProvided = false
                 var conversionError: NSError?
+                nonisolated(unsafe) let unsafeInputBuffer = inputBuffer
                 let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
                     if !inputProvided {
                         inputProvided = true
                         outStatus.pointee = .haveData
-                        return inputBuffer
+                        return unsafeInputBuffer
                     } else {
                         outStatus.pointee = .endOfStream
                         return nil

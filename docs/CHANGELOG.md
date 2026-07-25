@@ -1,5 +1,150 @@
 # CHANGELOG
 
+## v2.7.2 (2026-07-22) — Settings 재구성 + 재생 속도 개선 ✅
+
+### Features
+- **설정 4탭 → 5탭** (`SettingsView.swift`): 다운로드·저장·알림 신규·시스템·AI 설정으로 재구성; "채널 업데이트 알림"을 "알림 신규" 탭으로 이동, 시스템 탭의 11개 혼합 항목을 적절한 탭에 재배치
+- **"채널 업데이트 알림" → "채널 업데이트 확인"** (`ChannelUpdateService.swift`): OFF 시 타이머/API/알림 완전 중단 (Combine observer 패턴)
+- **도구 모음 드롭다운 통합** (`MainView.swift`): 3개 툴바 버튼 → `Menu("영상 다운로드")` 드롭다운으로 통합
+
+### Bug Fixes
+- **상태바 큐 항목 비활성화** (`StatusBarManager.swift`): `action: nil`로 생성한 메뉴 아이템이 시스템에 의해 비활성화/흐리게(faded) 표시되던 문제 — `#selector(queueItemNoop)` + `target: self`로 수정, 다운로드 상태와 무관하게 항상 표시
+- **채널 체크박스 선택 미초기화** (`ChannelContentView.swift`): `addSelectedToQueue()`에서 다운로드 후 `selectedIDs`를 비우지 않아 다운로드 완료 후에도 체크 표시가 유지되던 문제; 채널 전환 시 이전 채널의 `selectedIDs`가 유지되던 문제를 `.onChange(of: channel?.id)`로 수정
+
+### Performance
+- **첫 재생 지연 단축** (`PlayerView.swift`): `needsTranscoding()`에서 ffprobe `Process`+`waitUntilExit()` 호출(프로세스 생성/파이썬 init/파일 I/O 5~10초 소요)을 `AVURLAsset.loadTracks`+`load(.formatDescriptions)`로 대체; `codecCache`를 `UserDefaults`에 저장하여 앱 재시작에도 코덱 캐시 유지
+
+### Infrastructure
+- **Info.plist**: v2.7.2 (build 13)
+
+## v2.7.1 (2026-07-21) — Critical Bug Fixes + 성능 개선 ✅
+
+### Bug Fixes (Critical)
+- **Playlist URL 초기화** (`HomeReducer.swift`): `infoResponse`에서 `state.urlString` 클리어 시점을 playlist 체크 이후로 이동 — 재생목록 URL이 항상 빈 문자열로 전달되던 버그 수정
+- **False 설정 복원** (`AppReducer.swift`): `playSoundOnComplete=false`, `clipboardMonitoring=false`가 앱 재시작 시 무시되던 버그 수정 — `if` 조건을 `!settings.playSoundOnComplete`으로 변경
+- **Actor 차단 해소** (`SummarizationService.swift`): `process.waitUntilExit()`가 actor 협력 스레드를 블로킹하던 문제 — `terminationHandler` 기반 정적 메서드 `runProcess()`로 교체
+- **Data race** (`BookmarkManager.swift`): `nonisolated(unsafe) var activeURLs`에 lock 없이 동시 접근 — `OSAllocatedUnfairLock`으로 동기화
+- **API 키 노출** (`MindmapService.swift`): `print("[Mindmap] ❌ API 키: ...")`이 릴리스 빌드에서 콘솔에 출력 — `log()`로 교체, `print()` 제거
+- **하드코딩 API 키** (`Constants.swift`): `defaultAX4APIKey`가 소스 코드에 포함 — 빈 문자열로 변경
+- **SRT 숫자 텍스트 누락** (`PlayerReducer.swift`, `WhisperService.swift`, `SummarizationService.swift`): `Int($0) == nil` 필터가 숫자로만 된 자막 텍스트를 잘못 제거 — `seenTiming` 플래그로 SRT 인덱스 번호만 필터
+
+### Bug Fixes (High)
+- **이중 컨트롤** (`NSPlayerView.swift`): `controlsStyle = .default`로 AVPlayer 기본 컨트롤 + SwiftUI 커스텀 컨트롤바가 동시에 표시 — `.none`으로 변경
+- **영상 재생 지연** (`PlayerView.swift`): `setupPlayer()`에서 `needsTranscoding()` 호출이 `process.waitUntilExit()`로 메인 스레드 1~5초 차단 — `Task { }`로 비동기 분리하여 즉시 재생
+- **죽은 코드** (`NSPlayerView.swift`): 미사용 `playerLayer` 변수 제거
+
+### Infrastructure
+- **Info.plist**: v2.7.1 (build 12)
+
+## v2.7.0 (2026-07-20) — 시스템 언어 + 쿠키 인증 + Whisper AI 자막 + 프리셋 + 히스토리 ✅
+
+### New Features
+- **시스템 언어 기반 동적 전환**: 하드코딩된 한국어(`"en,ko"`, `"ko-KR"`) → `Locale.current` 기반 자동 전환
+  - 자막 다운로드 언어 (`--sub-langs`), TTS 음성, AI 프롬프트 언어가 시스템 언어를 따라감
+  - `LanguageService.swift` 신규 — 언어별 Edge TTS 음성 맵핑 테이블 포함
+  - Settings에 자막 언어 override 옵션 제공 (자동/한국어/영어/일본어)
+- **브라우저 쿠키 인증**: `--cookies-from-browser` 플래그로 비공개/연령 제한/멤버십 영상 접근
+  - Safari / Chrome / Brave / Edge / Firefox 선택 가능
+  - 모든 yt-dlp 호출(info fetch, subtitle, streaming URL, download)에 쿠키 전파
+- **AI 자막 생성 (Whisper CoreML)**: yt-dlp 자막이 없는 영상도 음성 인식으로 자동 자막 생성
+  - WhisperKit SPM 기반, Apple Silicon CoreML 최적화
+  - 모델(~500MB)은 백그라운드 다운로드 — 다운로드 중에도 앱 사용 가능
+  - Settings UI: 토글 + 모델 다운로드 버튼 + 진행률(속도/ETA/남은시간) + 상태 표시
+  - 플레이어와 요약 서비스 모두 Whisper fallback 연결
+- **다운로드 프리셋 / Smart Mode**: 자주 쓰는 설정을 프리셋으로 저장 → 1클릭 다운로드
+  - 기본 프리셋 3개: "고품질 (4K)", "기본 (1080p)", "오디오만"
+  - Smart Mode ON: URL 입력 → 정보 조회 → 프리셋 자동 적용 → 큐 바로 추가
+  - Settings 저장 탭에서 프리셋 추가/편집/삭제
+- **다운로드 히스토리 (DB)**: 모든 다운로드 완료 내역을 SQLite에 영구 기록
+  - download_history 테이블: video_id, title, channel, url, format, resolution, file_size, file_path, downloaded_at, status
+  - HistoryView: 테이블 뷰 + 검색 + 날짜별 필터 + 우클릭 메뉴
+
+### UI Changes
+- SettingsView 시스템 탭 — "브라우저 쿠키" Picker 추가
+- SettingsView AI 탭 — "AI 자막 생성 (Whisper)" 섹션 추가 (설명 + 토글 + 모델 다운로드 UI)
+- SettingsView 저장 탭 — "다운로드 프리셋" 섹션 추가 (목록 + 추가/편집/삭제)
+- VideoDownloadView — Smart Mode 토글 + 프리셋 Picker
+- LibrarySidebarView — "다운로드 히스토리" 항목 추가
+- 앱 전체 토스트 알림 — Whisper 모델 다운로드 진행률/완료/실패 표시
+
+### Infrastructure
+- **신규 파일 7개**: `Helpers/LanguageService.swift`, `Services/WhisperService.swift`, `Models/DownloadPreset.swift`, `Features/Library/HistoryView.swift`, `Components/ToastView.swift`, `Components/WhisperDownloadView.swift`
+- **설정 6개 추가**: `subtitleLanguageOverride`, `cookiesFromBrowser`, `enableAISubtitles`, `whisperModelDownloaded`, `presets`, `smartMode`, `activePresetId`
+- **DB 테이블 1개 추가**: `download_history`
+- **Info.plist**: v2.7.0 (build 11)
+
+## v2.6.2 (2026-07-20) — 스레드 안정성 + 메뉴바 드롭메뉴 개선 ✅
+
+### Bug Fixes
+- **다운로드 데이터 레이스 크래시 수정**: `DownloadManager`의 `settings`/`storageDirectory`/`filenameTemplate`이 Lock 없이 여러 스레드에서 접근되던 문제 수정
+  - `OSAllocatedUnfairLock`으로 `ManagerState` 전체 보호
+  - `startDownload()` 진입 시 Lock에서 값 복사 후 사용 → 이후 Lock 불필요
+  - `buildDownloadArgs()`/`constructOutputTemplate()`에 파라미터 전달 방식으로 변경
+- **`DateFormatter` 스레드 안전성 수정**: `#if DEBUG` `timestamp()` 함수가 매 호출마다 새 `DateFormatter`를 생성하여 ICU 내부 상태가 손상되는 힙 코럽션 크래시 수정
+  - 정적 `timestampFormatter` + `OSAllocatedUnfairLock`으로 변경
+- **`pausedItems` Lock 누락 수정**: `Set<UUID>`에 대한 모든 접근을 `stateLock`으로 보호
+- **Mock 테스트 서브메뉴 비활성화 수정**: `NSMenuItem`에 `target = self` 누락으로 DEBUG 메뉴 항목이 회색 처리되어 클릭 불가능했던 문제 수정 (`StatusBarManager.swift`)
+- **TTS 엔진 기본값 변경**: `macOS 내장` → `Edge TTS` (Settings.swift, SettingsReducer.swift, PodcastService.swift 3군데)
+
+### UI Changes
+- **메뉴바 드롭메뉴 `NSView` 기반으로 전면 재작성**: `attributedTitle` + `NSTextTab` 방식의 오른쪽 정렬이 NSMenu right inset(~14pt)을 제어할 수 없어 빈 공간이 발생하던 문제를 `NSMenuItem.view`(커스텀 NSView + 두 개 NSTextField) 방식으로 교체
+  - `menuTabStopLocation`/`attributedMenuTitle()` 제거 → `makeQueueMenuItemView()` + `updateLabel()` 추가
+  - `menuLeftPadding: CGFloat = 19`, `menuRightPadding: CGFloat = 14` — 일반 메뉴 항목과 동일한 좌우 여백
+  - `menuItemViewWidth: CGFloat = 187` — 기존 280pt에서 1/3 축소
+- **드롭메뉴 텍스트 변경**: "다운로드 중" → "다운로드 속도", "진행 상태" value = "완료/전체", "남은 시간" 유지
+- **메뉴바 상태 텍스트 변경**: "완1/4" → "진행 1/4"
+
+### Infrastructure
+- **Info.plist**: v2.6.2 (build 10)
+- **AGENTS.md**: `코드 수정 후 반드시 build_and_run.sh 실행` 규칙 추가
+
+## v2.6.1 (2026-07-20) — H.264 다운로드 + 플레이어 개선 ✅
+
+### New Features
+- **H.264 우선 다운로드**: yt-dlp `-f`에 `[ext=mp4][vcodec^=avc1]` 필터 추가 → 새로 받는 영상은 변환 불필요
+- **트랜스코딩 캐시**: SHA256 해시 기반 캐싱 (`~/Library/Caches/com.tubekeep/transcoded/`) → 같은 파일 재변환 방지
+- **변환 진행률 + ETA**: ffmpeg `-progress pipe:1` 파싱 → determinate ProgressBar + "% 변환 중... (남은 시간: XX:XX)"
+- **플레이어 컨트롤 오버레이**: 호버 시에만 나타나는 하단 컨트롤바 (재생/정지, 시크 슬라이더, 시간 표시, 3초 후 자동 숨김)
+- **자막 언어 우선순위**: 한국어(`.ko.`) → 영어(`.en.`) 순서로 정렬
+
+### UI Changes
+- **자막 오버레이 기본값 OFF**: 영상만 먼저 보여주고, 싱글클릭 시 오버레이 표시
+- **자막 패널 자동 스크롤**: 현재 재생 위치의 자막으로 자동 포커스
+- **기본 해상도**: 480p → 360p (Constants.defaultResolution)
+
+### Bug Fixes
+- **전체화면 미동작**: `WindowAccessor` `[self]` 캡처로 window 참조 유실 문제 수정
+- **영문 자막 우선 표시**: 파일 정렬 없이 `contentsOfDirectory` 순회로 영어가 먼저 나오는 문제 수정
+- **다운로드 실패 오진**: `--embed-thumbnail`로 생성된 .webp/.png 섬네일 경로가 `after_move:filepath`를 오염시켜 .mp4가 정상 생성됐음에도 실패로 표시되는 문제 수정
+  - after_move 경로가 .mp4인지 검증 후, 아니면 출력 디렉토리에서 `{videoId}.mp4` 직접 스캔 fallback
+- **H.264 필터 누락**: `DownloadManager.buildDownloadArgs()`에 `[ext=mp4][vcodec^=avc1]` 포맷 필터가 없어 360p 다운로드도 AV1/VP9로 받아 변환 발생하던 문제 수정
+
+### Infrastructure
+- **Info.plist**: v2.6.1 (build 9)
+
+## v2.6.0 (2026-07-20) — 자체 비디오 플레이어 + 플레이어 모드 설정 ✅
+
+### New Features
+- **자체 비디오 플레이어**: AVKit 기반 별도 창 플레이어 (960×640 고정)
+  - `AVPlayerView` 래퍼 — 재생/일시정지/볼륨/타임라인 기본 컨트롤
+  - 우측 자막 패널 (320pt, toggle) — 전체 자막 리스트 + 현재 위치 하이라이트
+  - 비디오 위 자막 오버레이 (toggle) — 시간 동기화 자막 표시
+  - 툴바: 자막 오버레이 토글 / 자막 패널 토글 / Pin(최상위 고정) / Close
+  - `.seekToTime` notification 구독 — Q&A 타임스탬프 클릭 시 seek
+- **플레이어 모드 설정**: 시스템 탭 "비디오 플레이어" picker
+  - `자체 플레이어` (기본값) — "열기" 버튼이 TubeKeep 내장 플레이어 실행
+  - `기본 연결 프로그램` — "열기" 버튼이 `NSWorkspace.shared.open` (기존 동작)
+- **Discover 미리보기**: 미다운로드 영상 hover 시 "미리보기" 버튼
+  - `yt-dlp -f best --get-url` → 스트리밍 URL → 자체 플레이어로 재생
+- **자막 시간 동기화**: yt-dlp VTT/SRT 다운로드 → 타임스탬프 보존 파싱 → 오버레이/패널
+
+### Infrastructure
+- **신규 6개 파일**: Features/Player/ 아래 PlayerItem, PlayerReducer, NSPlayerView, SubtitleOverlay, SubtitlePanel, PlayerView
+- **YouTubeDLService.fetchStreamingURL()** — `--get-url` 스트리밍 URL 조회
+- **YouTubeDLService.fetchSubtitles()** — 시간 동기화 자막 다운로드/파싱
+- **PlayerMode enum**: Settings에 `builtIn` / `systemDefault` 케이스
+- **Info.plist**: v2.6.0 (build 8)
+
 ## v2.5.6 (2026-07-19) — 마이그레이션 + 최종 테스트 ✅ 완료
 
 ### Testing

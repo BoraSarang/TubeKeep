@@ -45,20 +45,17 @@ actor SummarizationService {
         }
     }
 
-    func summarize(videoId: String, title: String, channel: String, apiKey: String) async throws -> SummaryResult {
-        let text = try await fetchTranscript(videoId: videoId)
+    func summarize(videoId: String, title: String, channel: String, apiKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
+        let text = try await fetchTranscript(videoId: videoId, progress: progress)
+        progress?("요약 생성 중...")
         return try await generateSummary(text: text, title: title, channel: channel, apiKey: apiKey)
     }
 
-    func summarizeFromLocalFile(videoPath: String, title: String, channel: String, apiKey: String) async throws -> SummaryResult {
-        let text = try await extractTranscriptFromLocalFile(videoPath: videoPath)
-        return try await generateSummary(text: text, title: title, channel: channel, apiKey: apiKey)
-    }
-
-    func summarizeVideo(videoId: String, title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String, localFilePath: String? = nil) async throws -> SummaryResult {
+    func summarizeVideo(videoId: String, title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
         log("[AI Fallback] 요약 시작 — videoId: \(videoId), title: \(title)")
 
         // DB 캐시 확인 — 기존 요약이 있으면 바로 반환
+        progress?("캐시 확인 중...")
         if let cached = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
            let summary = cached.summary, !summary.isEmpty {
             log("[AI Fallback] ✅ DB 캐시 히트 — videoId: \(videoId)")
@@ -75,15 +72,9 @@ actor SummarizationService {
         if !openRouterAPIKey.isEmpty {
             log("[AI Fallback] 1순위: OpenRouter 시도 — videoId: \(videoId)")
             do {
-                let text: String
-                if let path = localFilePath, FileManager.default.fileExists(atPath: path) {
-                    log("[AI Fallback] 로컬 파일에서 자막 추출 시도 — path: \(path)")
-                    text = try await extractTranscriptFromLocalFile(videoPath: path)
-                } else {
-                    log("[AI Fallback] YouTube에서 자막 다운로드 시도 — videoId: \(videoId)")
-                    text = try await fetchTranscript(videoId: videoId)
-                }
+                let text = try await fetchTranscript(videoId: videoId, progress: progress)
                 log("[AI Fallback] 자막 추출 완료 — 길이: \(text.count)자")
+                progress?("요약 생성 중...")
                 let service = OpenRouterService()
                 let result = try await service.generateSummary(transcript: text, title: title, channel: channel, apiKey: openRouterAPIKey)
                 log("[AI Fallback] ✅ OpenRouter 성공 — videoId: \(videoId)")
@@ -111,7 +102,7 @@ actor SummarizationService {
         if !ax4APIKey.isEmpty {
             log("[AI Fallback] 3순위: A.X 4.0 시도 — videoId: \(videoId)")
             do {
-                let result = try await summarizeWithAX4(videoId: videoId, title: title, channel: channel, apiKey: ax4APIKey, localFilePath: localFilePath)
+                let result = try await summarizeWithAX4(videoId: videoId, title: title, channel: channel, apiKey: ax4APIKey, progress: progress)
                 log("[AI Fallback] ✅ A.X 4.0 성공 — videoId: \(videoId)")
                 return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "A.X 4.0")
             } catch AX4Error.serviceUnavailable {
@@ -129,12 +120,7 @@ actor SummarizationService {
             throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
         }
         log("[AI Fallback] 4순위: Gemini 시도 — videoId: \(videoId)")
-        if let path = localFilePath, FileManager.default.fileExists(atPath: path) {
-            let result = try await summarizeFromLocalFile(videoPath: path, title: title, channel: channel, apiKey: geminiAPIKey)
-            log("[AI Fallback] ✅ Gemini 성공 (로컬 파일) — videoId: \(videoId)")
-            return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
-        }
-        let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey)
+        let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
         log("[AI Fallback] ✅ Gemini 성공 — videoId: \(videoId)")
         return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
     }
@@ -158,13 +144,9 @@ actor SummarizationService {
 
     // MARK: - A.X 4.0 API
 
-    func summarizeWithAX4(videoId: String, title: String, channel: String, apiKey: String, localFilePath: String? = nil) async throws -> SummaryResult {
-        let text: String
-        if let path = localFilePath, FileManager.default.fileExists(atPath: path) {
-            text = try await extractTranscriptFromLocalFile(videoPath: path)
-        } else {
-            text = try await fetchTranscript(videoId: videoId)
-        }
+    func summarizeWithAX4(videoId: String, title: String, channel: String, apiKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
+        let text = try await fetchTranscript(videoId: videoId, progress: progress)
+        progress?("요약 생성 중...")
         let ax4 = AX4Service()
         let result = try await ax4.generateSummary(transcript: text, title: title, channel: channel, apiKey: apiKey)
         return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "A.X 4.0")
@@ -211,7 +193,23 @@ actor SummarizationService {
 
     // MARK: - Subtitle Fetching
 
-    private func fetchTranscript(videoId: String) async throws -> String {
+    private static func runProcess(arguments: [String]) async throws -> Int32 {
+        try await withCheckedThrowingContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = arguments
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    private func fetchTranscript(videoId: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> String {
         log("[Subtitle] 자막 가져오기 시작 — videoId: \(videoId)")
         
         // DB에서 캐시된 자막 확인
@@ -223,6 +221,7 @@ actor SummarizationService {
         }
         log("[Subtitle] ❌ DB에 캐시된 자막 없음 — videoId: \(videoId)")
 
+        progress?("자막 다운로드 중...")
         let videoURL = "https://www.youtube.com/watch?v=\(videoId)"
         let fm = FileManager.default
         let tmpDir = fm.temporaryDirectory.appendingPathComponent("tubekeep_subs_\(UUID().uuidString.prefix(8))")
@@ -231,32 +230,30 @@ actor SummarizationService {
 
         log("[Subtitle] YouTube 자막 다운로드 시작 — videoId: \(videoId)")
         log("[Subtitle] 임시 디렉토리: \(tmpDir.path)")
+        let subLangs = LanguageService.subtitleLanguages
+        #if DEBUG
+        Task { @MainActor in DebugLogManager.shared?.append("[Subtitle] --sub-langs: \(subLangs)") }
+        #endif
         let outputTemplate = tmpDir.appendingPathComponent("%(id)s.%(ext)s").path
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [
-            Constants.ytDlpPath,
-            "--write-subs", "--write-auto-subs",
-            "--sub-langs", "en,ko",
-            "--skip-download",
-            "--no-warnings",
-            "-o", outputTemplate,
-            videoURL,
-        ]
-        log("[Subtitle] yt-dlp 명령어: \(process.arguments?.joined(separator: " ") ?? "")")
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        try process.run()
-        process.waitUntilExit()
-        
-        let exitCode = process.terminationStatus
+        let exitCode = try await Self.runProcess(
+            arguments: [
+                Constants.ytDlpPath,
+                "--write-subs", "--write-auto-subs",
+                "--sub-langs", subLangs,
+                "--skip-download",
+                "--no-warnings",
+                "-o", outputTemplate,
+            ] + LanguageService.cookiesArgs + [videoURL]
+        )
+        #if DEBUG
+        if !LanguageService.cookiesArgs.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[Subtitle] 쿠키 적용: \(LanguageService.cookiesArgs.joined(separator: " "))") } }
+        #endif
         log("[Subtitle] yt-dlp 종료 코드: \(exitCode)")
 
         let files = (try? fm.contentsOfDirectory(atPath: tmpDir.path)) ?? []
         log("[Subtitle] 다운로드된 파일 수: \(files.count)")
         if files.isEmpty {
-            log("[Subtitle] ⚠️ 자막 파일 없음 — videoId: \(videoId)")
+            log("[Subtitle] ⚠️ YouTube 자막 없음 — videoId: \(videoId)")
         } else {
             for file in files {
                 log("[Subtitle] 발견된 파일: \(file)")
@@ -289,60 +286,70 @@ actor SummarizationService {
                 log("[Subtitle] ⚠️ SRT에서 유효한 텍스트 없음")
             }
         }
-        log("[Subtitle] ❌ 사용 가능한 자막 파일 없음 — videoId: \(videoId)")
+        log("[Subtitle] ❌ 유효한 자막 없음 — videoId: \(videoId)")
+
+        // Whisper fallback: yt-dlp 자막 실패 시 음성 인식
+        let settings = Self.loadSettings()
+        if settings.enableWhisperTranscription {
+            log("[Subtitle] Whisper fallback 시도 — videoId: \(videoId)")
+            progress?("Whisper 자막 생성 중...")
+            let whisperService = WhisperService.shared
+            let modelSize = settings.whisperModelSize
+            if whisperService.isModelDownloaded(modelSize) {
+                do {
+                    let audioURL = try await downloadAudio(videoId: videoId)
+                    log("[Subtitle] Whisper 오디오 다운로드 완료 — \(audioURL.path)")
+
+                    var transcriptText = ""
+                    let cues = try await whisperService.transcribe(
+                        audioPath: audioURL.path,
+                        modelSize: modelSize,
+                        progressHandler: { msg in Task { await self.log("[Subtitle] Whisper 진행: \(msg)") } }
+                    )
+                    transcriptText = cues.map(\.text).joined(separator: " ")
+                    try? FileManager.default.removeItem(at: audioURL)
+
+                    if !transcriptText.isEmpty {
+                        log("[Subtitle] ✅ Whisper 자막 생성 성공 — videoId: \(videoId), 길이: \(transcriptText.count)자")
+                        saveTranscriptToDB(videoId: videoId, transcript: transcriptText, language: LanguageService.systemLanguageCode)
+                        return transcriptText
+                    }
+                    log("[Subtitle] ⚠️ Whisper 자막이 비어 있음 — videoId: \(videoId)")
+                } catch {
+                    log("[Subtitle] ❌ Whisper fallback 실패 — videoId: \(videoId), error: \(error.localizedDescription)")
+                }
+            } else {
+                log("[Subtitle] ⚠️ Whisper 모델 미설치 — modelSize: \(modelSize)")
+            }
+        }
+
         throw SummaryError.noSubtitle
     }
 
-    private func extractTranscriptFromLocalFile(videoPath: String) async throws -> String {
-        log("[Subtitle] 로컬 파일에서 자막 추출 시작 — 경로: \(videoPath)")
-        let subsDir = (videoPath as NSString).deletingLastPathComponent
-        let basename = ((videoPath as NSString).lastPathComponent as NSString).deletingPathExtension
-        let comps = basename.components(separatedBy: ".")
-        guard let videoId = comps.last else {
-            log("[Subtitle] ❌ videoId 추출 실패 — basename: \(basename)")
-            throw SummaryError.noSubtitle
-        }
-        log("[Subtitle] videoId: \(videoId), 자막 검색 디렉토리: \(subsDir)")
+    private static func loadSettings() -> Settings {
+        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
+              let data = json.data(using: .utf8),
+              let settings = try? JSONDecoder().decode(Settings.self, from: data)
+        else { return Settings() }
+        return settings
+    }
 
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: subsDir)) ?? []
-        log("[Subtitle] 디렉토리 내 파일 수: \(files.count)")
-        
-        var foundFiles: [String] = []
-        for file in files {
-            if file.contains(videoId) {
-                foundFiles.append(file)
-            }
-        }
-        log("[Subtitle] videoId와 일치하는 파일: \(foundFiles.joined(separator: ", "))")
+    private func downloadAudio(videoId: String) async throws -> URL {
+        let videoURL = "https://www.youtube.com/watch?v=\(videoId)"
+        let tmpDir = FileManager.default.temporaryDirectory
+        let outputURL = tmpDir.appendingPathComponent("tubekeep_whisper_\(videoId).wav")
 
-        for file in files {
-            let fullPath = (subsDir as NSString).appendingPathComponent(file)
-            guard file.contains(videoId) else { continue }
-            if file.hasSuffix(".vtt") {
-                log("[Subtitle] 로컬 VTT 파일 발견: \(file)")
-                let content = try String(contentsOfFile: fullPath, encoding: .utf8)
-                let text = Self.parseVTT(content)
-                log("[Subtitle] VTT 파싱 완료 — 추출된 텍스트 길이: \(text.count)자")
-                if !text.isEmpty {
-                    log("[Subtitle] ✅ 로컬 자막 추출 성공 (VTT) — 파일: \(file)")
-                    return text
-                }
-                log("[Subtitle] ⚠️ 로컬 VTT에서 유효한 텍스트 없음")
-            } else if file.hasSuffix(".srt") {
-                log("[Subtitle] 로컬 SRT 파일 발견: \(file)")
-                let content = try String(contentsOfFile: fullPath, encoding: .utf8)
-                let text = Self.parseSRT(content)
-                log("[Subtitle] SRT 파싱 완료 — 추출된 텍스트 길이: \(text.count)자")
-                if !text.isEmpty {
-                    log("[Subtitle] ✅ 로컬 자막 추출 성공 (SRT) — 파일: \(file)")
-                    return text
-                }
-                log("[Subtitle] ⚠️ 로컬 SRT에서 유효한 텍스트 없음")
-            }
-        }
+        let exitCode = try await Self.runProcess(arguments: [
+            Constants.ytDlpPath,
+            "-x", "--audio-format", "wav",
+            "--no-warnings",
+            "-o", outputURL.path,
+        ] + LanguageService.cookiesArgs + [videoURL])
 
-        log("[Subtitle] ❌ 로컬 자막 없음 → YouTube 다운로드 시도 — videoId: \(videoId)")
-        return try await fetchTranscript(videoId: videoId)
+        guard exitCode == 0, FileManager.default.fileExists(atPath: outputURL.path) else {
+            throw SummaryError.transcriptionFailed("오디오 다운로드 실패 (exit: \(exitCode))")
+        }
+        return outputURL
     }
 
     // MARK: - Subtitle Parsing
@@ -367,11 +374,12 @@ actor SummarizationService {
         var textLines: [String] = []
         for block in blocks {
             let lines = block.components(separatedBy: .newlines)
+            var seenTiming = false
             for line in lines {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 if trimmed.isEmpty { continue }
-                if trimmed.contains("-->") { continue }
-                if Int(trimmed) != nil { continue }
+                if trimmed.contains("-->") { seenTiming = true; continue }
+                if !seenTiming, Int(trimmed) != nil { continue }
                 textLines.append(trimmed)
             }
         }

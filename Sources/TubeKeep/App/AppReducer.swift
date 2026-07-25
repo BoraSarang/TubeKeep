@@ -11,6 +11,7 @@ struct AppReducer {
         var settings = SettingsReducer.State()
         var statusBar = StatusBarReducer.State()
         var library = LibraryReducer.State()
+        var toastNotifications: [ToastNotification] = []
     }
 
     enum Action: Equatable {
@@ -22,6 +23,9 @@ struct AppReducer {
         case clipboardDetected(String)
         case appDidFinishLaunching
         case discoverAddToQueue(DownloadItem)
+        case addMockHistoryItems
+        case addToastNotification(ToastMessage)
+        case dismissToastNotification(UUID)
     }
 
     var body: some ReducerOf<Self> {
@@ -70,11 +74,11 @@ struct AppReducer {
                             await send(.settings(.storageDirectorySelected(settings.storageDirectory)))
                             await send(.settings(.setFilenameTemplate(settings.filenameTemplate)))
                             await send(.settings(.setLimitRate(settings.limitRate)))
-                            if settings.playSoundOnComplete {
+                            if !settings.playSoundOnComplete {
                                 await send(.settings(.togglePlaySound))
                             }
-                            if settings.clipboardMonitoring {
-                                // already true by default
+                            if !settings.clipboardMonitoring {
+                                await send(.settings(.toggleClipboardMonitoring))
                             }
                             await send(.settings(.setDefaultResolution(settings.defaultResolution)))
                             await send(.settings(.setMaxRetries(settings.maxRetries)))
@@ -95,6 +99,37 @@ struct AppReducer {
                                 await send(.settings(.toggleEmbedMetadata))
                             }
                             await send(.settings(.setTTSEngine(settings.ttsEngine)))
+                            if settings.playerMode != .builtIn {
+                                await send(.settings(.setPlayerMode(settings.playerMode)))
+                            }
+                            if !settings.showChannelBadge {
+                                await send(.settings(.toggleShowChannelBadge))
+                            }
+                            if !settings.subtitleLanguageOverride.isEmpty {
+                                await send(.settings(.setSubtitleLanguageOverride(settings.subtitleLanguageOverride)))
+                            }
+                            if !settings.cookiesFromBrowser.isEmpty {
+                                await send(.settings(.setCookiesFromBrowser(settings.cookiesFromBrowser)))
+                            }
+                            if settings.enableWhisperTranscription {
+                                await send(.settings(.toggleWhisperTranscription))
+                            }
+                            if settings.whisperModelSize != "base" {
+                                await send(.settings(.setWhisperModelSize(settings.whisperModelSize)))
+                            }
+                            if !settings.showMenuBarNotifications {
+                                await send(.settings(.toggleShowMenuBarNotifications))
+                            }
+                            if settings.menuBarNotificationDuration != 60 {
+                                await send(.settings(.setMenuBarNotificationDuration(settings.menuBarNotificationDuration)))
+                            }
+                            if settings.smartMode {
+                                await send(.settings(.toggleSmartMode))
+                            }
+                            await send(.settings(.setPresets(settings.presets)))
+                            if let activeId = settings.activePresetId {
+                                await send(.settings(.setActivePreset(activeId)))
+                            }
                         }
                     }
                 )
@@ -103,6 +138,35 @@ struct AppReducer {
                 let defaultRes = state.settings.defaultResolution
                 let defaultFormat = Format.best(forHeight: defaultRes, from: formats)
                 state.home.selectedFormatId = defaultFormat?.id
+
+                if state.settings.smartMode,
+                   let presetId = state.settings.activePresetId,
+                   let preset = state.settings.presets.first(where: { $0.id == presetId }),
+                   let info = state.home.videoInfo,
+                   let format = defaultFormat {
+                    let audioOnly = preset.formatType == .audio
+                    let useFormat: Format
+                    if audioOnly {
+                        useFormat = formats.first(where: { $0.isAudioOnly && $0.isCombined })
+                            ?? formats.first(where: { $0.isAudioOnly })
+                            ?? format
+                    } else {
+                        let atOrBelow = formats.filter { !$0.isAudioOnly && $0.height <= preset.resolution }
+                        let combined = atOrBelow.filter { $0.isCombined }
+                        useFormat = combined.sorted(by: { $0.height > $1.height }).first
+                            ?? atOrBelow.sorted(by: { $0.height > $1.height }).first
+                            ?? format
+                    }
+                    let item = DownloadItem(
+                        videoInfo: info,
+                        selectedFormat: useFormat,
+                        includeSubtitles: preset.includeSubtitles,
+                        audioOnly: audioOnly,
+                        channelUploadIndex: 0
+                    )
+                    return .send(.home(.addToQueueResponse(item)))
+                }
+
                 return .none
 
             case .home(.addToQueueResponse(let item)):
@@ -133,7 +197,26 @@ struct AppReducer {
                 state.home.lastAutoFetchedURL = ""
 
                 if mutableItem.status == .completed {
-                    return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info))))
+                    return .concatenate(
+                        .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info)))),
+                        .run { _ in
+                            let hi = DownloadHistoryItem(
+                                id: 0,
+                                videoId: item.videoInfo.id,
+                                title: item.videoInfo.title,
+                                channelName: item.videoInfo.channel,
+                                url: item.videoInfo.webpageURL,
+                                formatLabel: item.selectedFormat.label,
+                                resolution: item.selectedFormat.height,
+                                fileSize: (item.outputPath.map { try? FileManager.default.attributesOfItem(atPath: $0)[.size] as? Int64 } ?? nil) ?? nil,
+                                filePath: item.outputPath,
+                                downloadedAt: Date(),
+                                status: "completed"
+                            )
+                            DatabaseManager.shared.saveDownloadHistory(hi)
+                            NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                        }
+                    )
                 }
 
                 // index=0이면 먼저 fetch 후 startDownload (race condition 방지)
@@ -222,6 +305,21 @@ struct AppReducer {
                 state.statusBar.completedCount = state.downloadQueue.completedCount
                 state.statusBar.totalCount = state.downloadQueue.items.count
                 state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                let historyItem = state.downloadQueue.items[id: id].map { item in
+                    DownloadHistoryItem(
+                        id: 0,
+                        videoId: item.videoInfo.id,
+                        title: item.videoInfo.title,
+                        channelName: item.videoInfo.channel,
+                        url: item.videoInfo.webpageURL,
+                        formatLabel: item.selectedFormat.label,
+                        resolution: item.selectedFormat.height,
+                        fileSize: (outputPath.map { try? FileManager.default.attributesOfItem(atPath: $0)[.size] as? Int64 } ?? nil) ?? nil,
+                        filePath: outputPath,
+                        downloadedAt: Date(),
+                        status: success ? "completed" : "failed"
+                    )
+                }
                 if success {
                     let libraryItem = state.downloadQueue.items[id: id].map { item in
                         LibraryItem(
@@ -238,15 +336,27 @@ struct AppReducer {
                         )
                     }
                     return .run { send in
+                        if let hi = historyItem {
+                            DatabaseManager.shared.saveDownloadHistory(hi)
+                            NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                        }
                         if let li = libraryItem {
+                            let liId = li.id
+                            let liTitle = li.title
+                            let liChannel = li.channelName
                             await LibraryCacheService.shared.addItem(li)
-                            await send(.library(.tagItem(videoId: li.id, title: li.title, channel: li.channelName)))
+                            await send(.library(.tagItem(videoId: liId, title: liTitle, channel: liChannel)))
                         }
                         await send(.library(.loadFromDisk))
                         await send(.library(.calculateDiskUsage))
                     }
                 }
-                return .none
+                return .run { _ in
+                    if let hi = historyItem {
+                        DatabaseManager.shared.saveDownloadHistory(hi)
+                        NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                    }
+                }
 
                 case .downloadQueue(.removeItem), .downloadQueue(.retryAllFailed):
                 state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
@@ -329,7 +439,26 @@ struct AppReducer {
                 let itemId = mutableItem.id
 
                 if mutableItem.status == .completed {
-                    return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info))))
+                    return .merge(
+                        .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info)))),
+                        .run { _ in
+                            let hi = DownloadHistoryItem(
+                                id: 0,
+                                videoId: item.videoInfo.id,
+                                title: item.videoInfo.title,
+                                channelName: item.videoInfo.channel,
+                                url: item.videoInfo.webpageURL,
+                                formatLabel: item.selectedFormat.label,
+                                resolution: item.selectedFormat.height,
+                                fileSize: (item.outputPath.map { try? FileManager.default.attributesOfItem(atPath: $0)[.size] as? Int64 } ?? nil) ?? nil,
+                                filePath: item.outputPath,
+                                downloadedAt: Date(),
+                                status: "completed"
+                            )
+                            DatabaseManager.shared.saveDownloadHistory(hi)
+                            NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                        }
+                    )
                 }
 
                 if shouldStart {
@@ -354,6 +483,75 @@ struct AppReducer {
 
             case .library(.itemTagged):
                 return .none
+
+            case .addMockHistoryItems:
+                #if DEBUG
+                let channels = ["starshipTV", "NewJeans", "aespa", "IVE", "LE SSERAFIM", "BTS", "BLACKPINK", "TWICE"]
+                let titles = [
+                    "HEYA - 아이브", "How Sweet - NewJeans", "Supernova - aespa",
+                    "EASY - LE SSERAFIM", "Dynamite - BTS", "How You Like That - BLACKPINK",
+                    "Talk that Talk - TWICE", "Love Dive - IVE", "Attention - NewJeans",
+                    "Spicy - aespa", "UNFORGIVEN - LE SSERAFIM", "Butter - BTS",
+                    "Ice Cream - BLACKPINK", "FANCY - TWICE", "After LIKE - IVE",
+                    "Hype Boy - NewJeans", "Next Level - aespa", "ANTIFRAGILE - LE SSERAFIM",
+                    "Permission to Dance - BTS", "Kill This Love - BLACKPINK",
+                ]
+                let formats = ["mp4", "mp3", "mkv", "webm"]
+                let resolutions = [2160, 1440, 1080, 720, 480, 360, 0]
+                for _ in 0..<50 {
+                    let channel = channels.randomElement()!
+                    let title = titles.randomElement()!
+                    let format = formats.randomElement()!
+                    let resolution = resolutions.randomElement()!
+                    let size = Int64.random(in: 10_000_000...2_000_000_000)
+                    let daysAgo = Int.random(in: 0...90)
+                    let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                    let isAudio = resolution == 0
+                    let formatLabel = isAudio ? "audio \(format)" : "\(resolution)p \(format)"
+                    let item = DownloadHistoryItem(
+                        id: 0,
+                        videoId: "mock_\(UUID().uuidString.prefix(8))",
+                        title: "\(title) #\(Int.random(in: 1...999))",
+                        channelName: channel,
+                        url: "https://youtube.com/watch?v=mock_\(UUID().uuidString.prefix(8))",
+                        formatLabel: formatLabel,
+                        resolution: isAudio ? nil : resolution,
+                        fileSize: size,
+                        filePath: nil,
+                        downloadedAt: date,
+                        status: Int.random(in: 1...10) > 1 ? "completed" : "failed"
+                    )
+                    DatabaseManager.shared.saveDownloadHistory(item)
+                }
+                NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                let completedCount = DatabaseManager.shared.loadDownloadHistory().filter { $0.status == "completed" }.count
+                let failedCount = DatabaseManager.shared.loadDownloadHistory().filter { $0.status == "failed" }.count
+                DebugLogManager.shared?.append("[History] Mock 50개 추가 완료 (완료:\(completedCount) 실패:\(failedCount))")
+                #endif
+                return .none
+
+            case .addToastNotification(let toast):
+                let notif = ToastNotification(
+                    id: toast.id,
+                    message: toast.message,
+                    type: toast.type,
+                    timestamp: Date()
+                )
+                state.toastNotifications.append(notif)
+                if state.toastNotifications.count > 5 {
+                    state.toastNotifications.removeFirst()
+                }
+                return .none
+
+            case .dismissToastNotification(let id):
+                state.toastNotifications.removeAll { $0.id == id }
+                return .none
+
+            case .downloadQueue(.showToast(let toast)):
+                return .send(.addToastNotification(toast))
+
+            case .library(.showSubtitleToastToast(let toast)):
+                return .send(.addToastNotification(toast))
 
             default:
                 return .none

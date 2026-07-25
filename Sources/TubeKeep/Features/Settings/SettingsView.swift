@@ -4,6 +4,7 @@ import ComposableArchitecture
 
 struct SettingsView: View {
     @ObservedObject var store: StoreOf<SettingsReducer>
+    @State private var editingPreset: DownloadPreset?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -16,13 +17,30 @@ struct SettingsView: View {
                     switch store.selectedTab {
                     case .downloads: downloadsContent
                     case .storage: storageContent
-                    case .other: otherContent
+                    case .notifications: notificationsContent
+                    case .system: systemContent
                     case .ai: aiContent
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+        }
+        .sheet(item: $editingPreset) { preset in
+            PresetEditorSheet(
+                preset: preset,
+                onSave: { saved in
+                    if preset.name.isEmpty {
+                        store.send(.addPreset(saved))
+                    } else {
+                        store.send(.updatePreset(saved))
+                    }
+                    editingPreset = nil
+                },
+                onCancel: {
+                    editingPreset = nil
+                }
+            )
         }
     }
 
@@ -203,6 +221,77 @@ struct SettingsView: View {
                 .font(.callout)
                 .fixedSize()
             }
+
+            divider
+
+            SettingsRow(title: "SponsorBlock", description: "다운로드 시 스폰서/인트로/아웃트로 자동 제거") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.sponsorBlock },
+                        set: { _ in store.send(.toggleSponsorBlock) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            divider
+
+            SettingsRow(title: "메타데이터 임베딩", description: "파일에 제목/채널/섬네일 정보를 자동으로 포함") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.embedMetadata },
+                        set: { _ in store.send(.toggleEmbedMetadata) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            divider
+
+            SettingsRow(title: "자막 언어", description: "자막 다운로드 언어 (override)") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.subtitleLanguageOverride },
+                        set: { store.send(.setSubtitleLanguageOverride($0)) }
+                    )
+                ) {
+                    Text("자동 (시스템 언어)").tag("")
+                    Text("한국어").tag("ko")
+                    Text("영어").tag("en")
+                    Text("일본어").tag("ja")
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+            }
+
+            divider
+
+            SettingsRow(title: "브라우저 쿠키", description: "비공개/연령 제한 영상 접근 (yt-dlp)") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.cookiesFromBrowser },
+                        set: { store.send(.setCookiesFromBrowser($0)) }
+                    )
+                ) {
+                    Text("사용 안 함").tag("")
+                    Text("Safari").tag("safari")
+                    Text("Chrome").tag("chrome")
+                    Text("Brave").tag("brave")
+                    Text("Edge").tag("edge")
+                    Text("Firefox").tag("firefox")
+                    Text("Whale").tag("whale")
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+            }
         }
     }
 
@@ -245,23 +334,106 @@ struct SettingsView: View {
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
             }
-        }
-    }
 
-    // MARK: - Other Tab
+            divider
 
-    private var otherContent: some View {
-        VStack(spacing: 0) {
-            SettingsRow(title: "알림음", description: "완료 시 알림음 재생") {
+            SettingsRow(title: "Smart Mode", description: "URL 입력 시 활성 프리셋으로 바로 다운로드 큐에 추가") {
                 Toggle(
                     "",
                     isOn: Binding(
-                        get: { store.playSoundOnComplete },
-                        set: { _ in store.send(.togglePlaySound) }
+                        get: { store.smartMode },
+                        set: { _ in store.send(.toggleSmartMode) }
                     )
                 )
                 .toggleStyle(.switch)
                 .controlSize(.small)
+            }
+
+            divider
+
+            SettingsRow(title: "활성 프리셋", description: "Smart Mode에서 사용할 다운로드 프리셋") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.activePresetId },
+                        set: { store.send(.setActivePreset($0)) }
+                    )
+                ) {
+                    Text("사용 안 함").tag(nil as UUID?)
+                    ForEach(store.presets) { preset in
+                        Text(preset.name).tag(preset.id as UUID?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+                .disabled(!store.smartMode)
+                .opacity(store.smartMode ? 1 : 0.4)
+            }
+
+            if !store.presets.isEmpty {
+                divider
+
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(store.presets.enumerated()), id: \.offset) { _, preset in
+                        HStack {
+                            Text(preset.name)
+                                .font(.callout)
+                            Spacer()
+                            Text("\(preset.formatType.rawValue) · \(preset.resolution > 0 ? "\(preset.resolution)p" : "오디오")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("편집") {
+                                editingPreset = preset
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                            Button("삭제") {
+                                store.send(.deletePreset(preset.id))
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .padding(.leading, 20)
+            }
+
+            divider
+
+            Button("프리셋 추가") {
+                editingPreset = DownloadPreset(id: UUID(), name: "", formatType: .video, resolution: 1080, includeSubtitles: false, sponsorBlock: false, embedMetadata: true)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color.accentColor)
+            .padding(.top, 6)
+            .padding(.leading, 20)
+        }
+    }
+
+    // MARK: - System Tab
+
+    private var systemContent: some View {
+        VStack(spacing: 0) {
+            SettingsRow(title: "비디오 플레이어", description: "영상 재생 방식을 선택합니다") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.playerMode },
+                        set: { store.send(.setPlayerMode($0)) }
+                    )
+                ) {
+                    ForEach(PlayerMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
             }
 
             divider
@@ -291,15 +463,19 @@ struct SettingsView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
             }
+        }
+    }
 
-            divider
+    // MARK: - Notifications Tab
 
-            SettingsRow(title: "SponsorBlock", description: "다운로드 시 스폰서/인트로/아웃트로 자동 제거") {
+    private var notificationsContent: some View {
+        VStack(spacing: 0) {
+            SettingsRow(title: "알림음", description: "완료 시 알림음 재생") {
                 Toggle(
                     "",
                     isOn: Binding(
-                        get: { store.sponsorBlock },
-                        set: { _ in store.send(.toggleSponsorBlock) }
+                        get: { store.playSoundOnComplete },
+                        set: { _ in store.send(.togglePlaySound) }
                     )
                 )
                 .toggleStyle(.switch)
@@ -308,18 +484,46 @@ struct SettingsView: View {
 
             divider
 
-            SettingsRow(title: "메타데이터 임베딩", description: "파일에 제목/채널/섬네일 정보를 자동으로 포함") {
+            SettingsRow(title: "메뉴바 알림", description: "다운로드 완료/실패 등 메뉴바에 알림 표시") {
                 Toggle(
                     "",
                     isOn: Binding(
-                        get: { store.embedMetadata },
-                        set: { _ in store.send(.toggleEmbedMetadata) }
+                        get: { store.showMenuBarNotifications },
+                        set: { _ in store.send(.toggleShowMenuBarNotifications) }
                     )
                 )
                 .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
+            if store.showMenuBarNotifications {
+                SettingsRow(title: "알림 지속 시간", description: "메뉴바 알림이 사라질 때까지 시간 (초)") {
+                    Stepper(
+                        "\(store.menuBarNotificationDuration)초",
+                        value: Binding(
+                            get: { store.menuBarNotificationDuration },
+                            set: { store.send(.setMenuBarNotificationDuration($0)) }
+                        ),
+                        in: 10...600,
+                        step: 10
+                    )
+                    .controlSize(.small)
+                }
+            }
+
+            divider
+
+            SettingsRow(title: "채널 업데이트 확인", description: "30분마다 채널의 새 영상 확인") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.showChannelBadge },
+                        set: { _ in store.send(.toggleShowChannelBadge) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
         }
     }
 
@@ -329,9 +533,133 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             ttsSection
 
+            whisperSection
+
             sectionSubHeader
 
             llmSection
+        }
+    }
+
+    // MARK: - Whisper Section
+
+    private var whisperSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader(
+                title: "로컬 자막 생성 (Whisper)",
+                subtitle: "로컬 동영상 파일의 음성을 인식하여 자동 자막 생성"
+            )
+
+            VStack(spacing: 0) {
+                divider
+
+                SettingsRow(title: "Whisper 사용", description: "자막이 없는 동영상에서 Whisper로 자막 생성") {
+                    Toggle("", isOn: Binding(
+                        get: { store.enableWhisperTranscription },
+                        set: { _ in
+                            store.send(.toggleWhisperTranscription)
+                            store.send(.checkWhisperModelStatus)
+                        }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+
+                divider
+
+                SettingsRow(title: "모델 크기", description: "큰 모델일수록 정확도↑ 속도↓") {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { store.whisperModelSize },
+                            set: { store.send(.setWhisperModelSize($0)) }
+                        )
+                    ) {
+                        Text("Tiny (~75 MB)").tag("tiny")
+                        Text("Base (~142 MB)").tag("base")
+                        Text("Small (~466 MB)").tag("small")
+                        Text("Medium (~1.5 GB)").tag("medium")
+                        Text("Large (~2.9 GB)").tag("large")
+                    }
+                    .pickerStyle(.menu)
+                    .font(.callout)
+                    .fixedSize()
+                }
+                .opacity(store.enableWhisperTranscription ? 1 : 0.4)
+                .disabled(!store.enableWhisperTranscription)
+
+                if store.enableWhisperTranscription {
+                    divider
+
+                    modelStatusRow
+                }
+            }
+            .padding(.leading, 20)
+        }
+        .onAppear { store.send(.checkWhisperModelStatus) }
+    }
+
+    private var modelStatusRow: some View {
+        SettingsRow(title: "모델 상태", description: statusDescription) {
+            HStack(spacing: 8) {
+                switch store.whisperModelStatus {
+                case .unknown, .notInstalled:
+                    Button("모델 다운로드") {
+                        store.send(.downloadWhisperModel)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                case .downloading:
+                    HStack(spacing: 8) {
+                        ProgressView(value: store.whisperModelProgress)
+                            .progressViewStyle(.linear)
+                            .frame(width: 100)
+                        Text("\(Int(store.whisperModelProgress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("취소") {
+                            store.send(.cancelWhisperModelDownload)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.red)
+                        .controlSize(.small)
+                    }
+
+                case .installed:
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.system(size: 14))
+                        Text("설치됨")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Button("재설치") {
+                            store.send(.downloadWhisperModel)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                        .controlSize(.small)
+                    }
+
+                case .error:
+                    Button("다시 시도") {
+                        store.send(.downloadWhisperModel)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private var statusDescription: String {
+        switch store.whisperModelStatus {
+        case .unknown: return "확인 중..."
+        case .notInstalled: return "모델이 설치되지 않았습니다"
+        case .downloading: return "다운로드 중..."
+        case .installed: return "모델이 설치되었습니다"
+        case .error: return "다운로드 실패: \(store.whisperModelError ?? "알 수 없는 오류")"
         }
     }
 
@@ -643,6 +971,148 @@ struct SettingsRow<Control: View>: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
+        }
+        .padding(.vertical, 10)
+    }
+}
+
+// MARK: - Preset Editor Sheet
+
+struct PresetEditorSheet: View {
+    let preset: DownloadPreset
+    let onSave: (DownloadPreset) -> Void
+    let onCancel: () -> Void
+
+    @State private var name: String
+    @State private var formatType: DownloadPreset.PresetFormatType
+    @State private var resolution: Int
+    @State private var includeSubtitles: Bool
+
+    init(preset: DownloadPreset, onSave: @escaping (DownloadPreset) -> Void, onCancel: @escaping () -> Void) {
+        self.preset = preset
+        self.onSave = onSave
+        self.onCancel = onCancel
+        _name = State(initialValue: preset.name)
+        _formatType = State(initialValue: preset.formatType)
+        _resolution = State(initialValue: preset.resolution)
+        _includeSubtitles = State(initialValue: preset.includeSubtitles)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(preset.name.isEmpty ? "새 프리셋" : "프리셋 편집")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Button("취소") { onCancel() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            VStack(spacing: 0) {
+                formRow(title: "이름") {
+                    TextField("프리셋 이름", text: $name)
+                        .textFieldStyle(.plain)
+                        .font(.callout)
+                        .frame(width: 180)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        )
+                }
+
+                Divider().padding(.leading, 8)
+
+                formRow(title: "포맷") {
+                    Picker("", selection: $formatType) {
+                        ForEach(DownloadPreset.PresetFormatType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .font(.callout)
+                }
+
+                Divider().padding(.leading, 8)
+
+                formRow(title: "해상도") {
+                    Picker("", selection: $resolution) {
+                        Text("4K (2160p)").tag(2160)
+                        Text("2K (1440p)").tag(1440)
+                        Text("1080p").tag(1080)
+                        Text("720p").tag(720)
+                        Text("480p").tag(480)
+                        Text("360p").tag(360)
+                    }
+                    .pickerStyle(.menu)
+                    .font(.callout)
+                    .frame(width: 120)
+                    .disabled(formatType == .audio)
+                    .opacity(formatType == .audio ? 0.4 : 1)
+                }
+
+                Divider().padding(.leading, 8)
+
+                formRow(title: "자막 포함") {
+                    Toggle("", isOn: $includeSubtitles)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("취소") { onCancel() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .keyboardShortcut(.cancelAction)
+
+                Button("저장") {
+                    let preset = DownloadPreset(
+                        id: preset.id,
+                        name: name.trimmingCharacters(in: .whitespaces),
+                        formatType: formatType,
+                        resolution: formatType == .audio ? 0 : resolution,
+                        includeSubtitles: includeSubtitles,
+                        sponsorBlock: preset.sponsorBlock,
+                        embedMetadata: preset.embedMetadata
+                    )
+                    onSave(preset)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+        }
+        .frame(width: 360)
+    }
+
+    private func formRow<Control: View>(title: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 16) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 60, alignment: .leading)
+            Spacer()
+            control()
         }
         .padding(.vertical, 10)
     }

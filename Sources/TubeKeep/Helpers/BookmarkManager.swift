@@ -1,7 +1,9 @@
 import Foundation
+import os
 
 enum BookmarkManager {
-    private nonisolated(unsafe) static var activeURLs: [String: URL] = [:]
+    private static let lock = OSAllocatedUnfairLock()
+    private static var activeURLs: [String: URL] = [:]
     private static let storageDirKey = "storageDirectoryBookmark"
 
     static func saveBookmark(for url: URL) {
@@ -11,12 +13,17 @@ enum BookmarkManager {
             relativeTo: nil
         ) else { return }
         UserDefaults.standard.set(data, forKey: storageDirKey)
+        lock.lock()
         activeURLs[storageDirKey] = url
+        lock.unlock()
     }
 
     @discardableResult
     static func ensureAccess() -> Bool {
-        if activeURLs[storageDirKey] != nil { return true }
+        lock.lock()
+        let existing = activeURLs[storageDirKey]
+        lock.unlock()
+        if existing != nil { return true }
 
         guard let data = UserDefaults.standard.data(forKey: storageDirKey) else { return false }
 
@@ -33,7 +40,9 @@ enum BookmarkManager {
         }
 
         guard url.startAccessingSecurityScopedResource() else { return false }
+        lock.lock()
         activeURLs[storageDirKey] = url
+        lock.unlock()
         return true
     }
 
@@ -41,12 +50,15 @@ enum BookmarkManager {
         stopAccessing()
         saveBookmark(for: url)
         _ = url.startAccessingSecurityScopedResource()
+        lock.lock()
         activeURLs[storageDirKey] = url
+        lock.unlock()
     }
 
     static func stopAccessing() {
-        if let url = activeURLs.removeValue(forKey: storageDirKey) {
-            url.stopAccessingSecurityScopedResource()
-        }
+        lock.lock()
+        let url = activeURLs.removeValue(forKey: storageDirKey)
+        lock.unlock()
+        url?.stopAccessingSecurityScopedResource()
     }
 }

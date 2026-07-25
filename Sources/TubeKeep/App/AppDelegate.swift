@@ -3,9 +3,10 @@ import SwiftUI
 import ComposableArchitecture
 import UserNotifications
 import SwiftData
+import AVKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let store = Store(initialState: AppReducer.State()) {
         AppReducer()
     }
@@ -16,16 +17,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var libraryWindowController: FixedWidthWindowController?
     private var settingsWindow: NSWindow?
     private var aiWindow: NSWindow?
-    private var speedTestToastWindow: NSWindow?
+    private var playerWindow: NSWindow?
     private var pendingChannelId: String?
     private var pendingChannelData: [String: Any]?
     private var keyMonitor: Any?
 
     #if DEBUG
-    private var libraryLogManager: DebugLogManager?
-    private var downloaderLogManager: DebugLogManager?
-    private var batchLogManager: DebugLogManager?
-    private var channelLogManager: DebugLogManager?
+    private var debugLogWindow: NSWindow?
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -43,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupManagers()
 
+        Task { await BundledLibraryManager.shared.warmUp() }
+
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(openVideoDownloaderWindow),
+            selector: #selector(handleDownloaderNotification(_:)),
             name: Constants.openDownloaderWindowNotification,
             object: nil
         )
@@ -86,11 +86,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: Constants.openAIWindowNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openPlayerWindow(_:)),
+            name: Constants.openPlayerWindowNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openWhisperSettings),
+            name: Constants.openWhisperSettingsNotification,
+            object: nil
+        )
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.modifierFlags.contains(.command) {
                 switch event.keyCode {
-                case 49: // , (settings)
+                case 43: // , (settings)
                     self.openSettingsWindow()
                     return nil
                 case 12: // q (quit)
@@ -108,6 +120,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case 0: // a (selectAll)
                     NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
                     return nil
+                case 2: // d (debug log)
+                    #if DEBUG
+                    self.openDebugLogWindow()
+                    return nil
+                    #else
+                    return event
+                    #endif
                 default:
                     return event
                 }
@@ -141,7 +160,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar.onOpenChannelDownloader = { [weak self] in self?.openChannelDownloaderWindow() }
         statusBar.onOpenSettings = { [weak self] in self?.openSettingsWindow() }
         statusBar.onOpenAbout = { [weak self] in self?.openAboutWindow() }
-        statusBar.onStartSpeedTest = { [weak self] in self?.startSpeedTest() }
         #if DEBUG
         statusBar.onStartMockTest = { [weak self] in
             self?.store.send(.statusBar(.startStatusBarTest))
@@ -149,6 +167,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar.onTriggerChannelUpdate = { [weak self] in
             guard let self else { return }
             Task { await self.channelUpdateService?.checkForUpdates() }
+        }
+        statusBar.onOpenDebugLogWindow = { [weak self] in
+            self?.openDebugLogWindow()
         }
         #endif
         statusManager = statusBar
@@ -161,11 +182,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardMonitor = clipboard
 
         let channelUpdate = ChannelUpdateService(store: store)
-        #if DEBUG
-        let logManager = DebugLogManager()
-        channelUpdate.setLogManager(logManager)
-        channelLogManager = logManager
-        #endif
         channelUpdate.start()
         channelUpdateService = channelUpdate
     }
@@ -178,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "TubeKeep에 대하여", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "TubeKeep 설정…", action: #selector(openSettingsWindow), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "TubeKeep 설정…", action: #selector(openSettingsWindow), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "TubeKeep 숨기기", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthersItem = appMenu.addItem(withTitle: "다른 항목 숨기기", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -199,6 +215,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(withTitle: "붙여넣기", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "모두 선택", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenuItem.submenu = editMenu
+
+        #if DEBUG
+        let debugMenuItem = NSMenuItem()
+        mainMenu.addItem(debugMenuItem)
+        let debugMenu = NSMenu(title: "디버그")
+
+        let debugLogSubmenu = NSMenu()
+        let debugLogItem = NSMenuItem(title: "디버그 로그", action: nil, keyEquivalent: "")
+        debugLogItem.submenu = debugLogSubmenu
+        let debugLogOpenItem = debugLogSubmenu.addItem(withTitle: "디버그 로그 열기", action: #selector(openDebugLogWindow), keyEquivalent: "d")
+        debugLogOpenItem.target = self
+        debugLogSubmenu.addItem(NSMenuItem.separator())
+        debugLogSubmenu.addItem(withTitle: "Mock 상태바 테스트", action: #selector(startStatusBarMockTest), keyEquivalent: "")
+        debugLogSubmenu.addItem(withTitle: "Mock 채널 업데이트 테스트", action: #selector(triggerChannelUpdateTest), keyEquivalent: "")
+        debugMenu.addItem(debugLogItem)
+
+        debugMenuItem.submenu = debugMenu
+        #endif
 
         NSApp.mainMenu = mainMenu
     }
@@ -222,20 +256,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         #if DEBUG
-        if DebugLogManager.shared == nil {
-            let logManager = DebugLogManager()
-            DebugLogManager.shared = logManager
-        }
-        let logManager = DebugLogManager.shared!
-        libraryLogManager = logManager
-        logManager.append("[App] TubeKeep 창 생성")
-        let rootView = MainView(store: store)
-            .debugLogOverlay(manager: logManager)
-            .modelContainer(PersistenceController.shared.container)
-        #else
-        let rootView = MainView(store: store)
-            .modelContainer(PersistenceController.shared.container)
+        DebugLogManager.shared?.append("[App] TubeKeep 창 생성")
         #endif
+        let rootView = MainView(store: store)
+            .modelContainer(PersistenceController.shared.container)
 
         let hostingCtrl = NSHostingController(rootView: rootView)
         let localizedTitle = Locale.preferredLanguages.first?.hasPrefix("ko") == true
@@ -257,108 +281,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // MARK: - Speed Test
-
-    @objc private func startSpeedTest() {
-        store.send(.statusBar(.startSpeedTest))
-        showSpeedTestToast(text: "측정 중...")
-
-        Task { [weak self] in
-            guard let self = self else { return }
-            let testURLs = [
-                "https://speed.cloudflare.com/__down?bytes=200000",
-                "https://proof.ovh.net/files/1Mb.dat",
-                "http://speedtest.tele2.net/1MB.zip",
-            ]
-            var lastError: Error?
-
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForResource = 10
-            let session = URLSession(configuration: config)
-
-            for urlStr in testURLs {
-                guard let url = URL(string: urlStr) else { continue }
-                let start = Date()
-                do {
-                    let (data, response) = try await session.data(from: url)
-                    guard let httpResp = response as? HTTPURLResponse,
-                          (200...299).contains(httpResp.statusCode) else {
-                        throw URLError(.badServerResponse)
-                    }
-                    let elapsed = Date().timeIntervalSince(start)
-                    guard elapsed > 0 else { continue }
-                    let received = data.count
-                    let kbps = Double(received) * 8 / elapsed / 1000
-                    await MainActor.run {
-                        self.store.send(.statusBar(.speedTestUpdate(kbps)))
-                        let display = kbps >= 1000
-                            ? String(format: "%.1f Mbps", kbps / 1000)
-                            : String(format: "%.0f Kbps", kbps)
-                        self.showSpeedTestToast(text: display)
-                        Task { [weak self] in
-                            try? await Task.sleep(for: .seconds(5))
-                            await MainActor.run {
-                                self?.dismissSpeedTestToast()
-                                self?.store.send(.statusBar(.speedTestComplete))
-                            }
-                        }
-                    }
-                    return
-                } catch {
-                    lastError = error
-                    continue
-                }
-            }
-
-            let finalError = lastError
-            let statusCode = (finalError as? URLError)?.errorCode ?? -1
-            let msg = finalError.map { ($0 as NSError).localizedDescription } ?? "알 수 없는 오류"
-            await MainActor.run { [msg, statusCode] in
-                self.showSpeedTestToast(text: "실패(\(statusCode)): \(msg)")
-                Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(4))
-                    await MainActor.run {
-                        self?.dismissSpeedTestToast()
-                        self?.store.send(.statusBar(.speedTestComplete))
-                    }
-                }
-            }
-        }
-    }
-
-    private func showSpeedTestToast(text: String) {
-        dismissSpeedTestToast()
-
-        let hostingCtrl = NSHostingController(rootView: SpeedTestPopoverView(text: text))
-        hostingCtrl.view.wantsLayer = true
-        hostingCtrl.view.layer?.cornerRadius = 8
-        hostingCtrl.view.layer?.masksToBounds = true
-
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.styleMask = [.borderless]
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = true
-        window.level = .floating
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary]
-        window.ignoresMouseEvents = true
-
-                    if let button = statusManager?.statusItem.button {
-            let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
-            let x = buttonFrame.midX - 80
-            let y = buttonFrame.minY - 10 - 36
-            window.setFrame(NSRect(x: x, y: y, width: 160, height: 36), display: false)
-        }
-        window.orderFront(nil)
-        speedTestToastWindow = window
-    }
-
-    private func dismissSpeedTestToast() {
-        speedTestToastWindow?.close()
-        speedTestToastWindow = nil
-    }
-
     // MARK: - Video Downloader Window
 
     @objc func openVideoDownloaderWindow() {
@@ -369,17 +291,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         clipboardMonitor?.dismiss()
-        dismissSpeedTestToast()
 
         #if DEBUG
-        let logManager = DebugLogManager()
-        downloaderLogManager = logManager
-        logManager.append("영상 다운로더 창 생성")
-        let rootView = VideoDownloadView(store: store)
-            .debugLogOverlay(manager: logManager)
-        #else
-        let rootView = VideoDownloadView(store: store)
+        DebugLogManager.shared?.append("[Downloader] 창 생성")
         #endif
+        let rootView = VideoDownloadView(store: store)
 
         let hostingCtrl = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingCtrl)
@@ -398,6 +314,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         videoDownloaderWindow = window
     }
 
+    @objc private func handleDownloaderNotification(_ notification: Notification) {
+        openVideoDownloaderWindow()
+        if let url = notification.userInfo?["url"] as? String {
+            store.send(.home(.setURL(url)))
+            store.send(.home(.autoFetchInfo(url)))
+        }
+    }
+
     // MARK: - Batch Download Window
 
     @objc private func openBatchDownloadWindow() {
@@ -410,17 +334,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         clipboardMonitor?.dismiss()
-        dismissSpeedTestToast()
 
         #if DEBUG
-        let logManager = DebugLogManager()
-        batchLogManager = logManager
-        logManager.append("일괄 다운로더 창 생성")
-        let rootView = BatchDownloadView(store: store)
-            .debugLogOverlay(manager: logManager)
-        #else
-        let rootView = BatchDownloadView(store: store)
+        DebugLogManager.shared?.append("[Batch] 창 생성")
         #endif
+        let rootView = BatchDownloadView(store: store)
 
         let hostingCtrl = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingCtrl)
@@ -459,17 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         clipboardMonitor?.dismiss()
-        dismissSpeedTestToast()
 
         #if DEBUG
-        let logManager = DebugLogManager()
-        channelLogManager = logManager
-        logManager.append("채널 다운로더 창 생성")
-        let rootView = ChannelDownloaderView(store: store, initialChannelId: pendingChannelId, pendingChannelData: pendingChannelData)
-            .debugLogOverlay(manager: logManager)
-        #else
-        let rootView = ChannelDownloaderView(store: store, initialChannelId: pendingChannelId, pendingChannelData: pendingChannelData)
+        DebugLogManager.shared?.append("[Channel] 창 생성")
         #endif
+        let rootView = ChannelDownloaderView(store: store, initialChannelId: pendingChannelId, pendingChannelData: pendingChannelData)
 
         pendingChannelId = nil
         pendingChannelData = nil
@@ -541,6 +453,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = window
     }
 
+    @objc private func openWhisperSettings() {
+        store.send(.settings(.setSelectedTab(.ai)))
+        openSettingsWindow()
+    }
+
     @objc private func openAIWindow() {
         if let window = aiWindow {
             window.makeKeyAndOrderFront(nil)
@@ -574,6 +491,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         aiWindow = window
     }
 
+    // MARK: - Player Window
+
+    @objc private func openPlayerWindow(_ notification: Notification) {
+        guard let playerItem = notification.object as? PlayerItem else { return }
+
+        let playerStore = Store(initialState: PlayerReducer.State(playerItem: playerItem)) {
+            PlayerReducer()
+        }
+        let playerView = PlayerView(store: playerStore)
+        let hostingCtrl = NSHostingController(rootView: playerView)
+        let window = NSWindow(contentViewController: hostingCtrl)
+        window.title = playerItem.title
+        window.styleMask = [.titled, .closable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.managed, .ignoresCycle, .fullScreenPrimary]
+        window.identifier = NSUserInterfaceItemIdentifier("player")
+        window.setContentSize(NSSize(width: 854, height: 480))
+        window.contentMinSize = NSSize(width: 854, height: 480)
+        window.isRestorable = false
+        window.delegate = self
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        playerWindow = window
+    }
+
+    // MARK: - Debug Log Window
+
+    #if DEBUG
+    @objc private func openDebugLogWindow() {
+        if let window = debugLogWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hostingCtrl = NSHostingController(
+            rootView: DebugLogWindowView()
+        )
+        let window = NSWindow(contentViewController: hostingCtrl)
+        window.title = "디버그 로그"
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.managed, .ignoresCycle]
+        window.identifier = NSUserInterfaceItemIdentifier("debugLog")
+        window.contentMinSize = NSSize(width: 520, height: 200)
+        window.setContentSize(NSSize(width: 680, height: 400))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        debugLogWindow = window
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(debugLogWindowWillClose),
+            name: NSWindow.willCloseNotification,
+            object: window
+        )
+    }
+
+    @objc private func debugLogWindowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window == debugLogWindow else { return }
+        debugLogWindow = nil
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
+    }
+
+    @objc private func addMockHistoryItems() {
+        store.send(.addMockHistoryItems)
+    }
+
+    @objc private func startStatusBarMockTest() {
+        store.send(.statusBar(.startStatusBarTest))
+    }
+
+    @objc private func triggerChannelUpdateTest() {
+        Task { await channelUpdateService?.checkForUpdates() }
+        DebugLogManager.shared?.append("[Channel] 업데이트 체크 시작")
+    }
+    #endif
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window.identifier?.rawValue == "player" else { return }
+        playerWindow = nil
+    }
+
     // MARK: - URL Scheme
 
     @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent: NSAppleEventDescriptor) {
@@ -587,27 +592,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.store.send(.home(.setURL(videoURL)))
             self.store.send(.home(.autoFetchInfo(videoURL)))
         }
-    }
-}
-
-// MARK: - Helper Views
-
-struct SpeedTestPopoverView: View {
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "speedometer")
-                .font(.system(size: 14))
-                .foregroundStyle(.blue)
-            Text(text)
-                .font(.system(.body, design: .monospaced).weight(.medium))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(width: 160, height: 36)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -18,9 +18,15 @@
 | **v2.4.1** | 🏁 **릴리스** | OpenRouter Free Tier 통합: OpenRouter → yTeaser → A.X 4.0 → Gemini 4단계 폴백 |
 | **v2.5.0—v2.5.5** | 🏁 **릴리스** | AI 콘텐츠 캐싱 + 챕터/팟캐스트/Q&A/마인드맵 + UI 통합 (SQLite DB) |
 | **v2.5.6** | 🏁 **릴리스** | 마이그레이션 + 최종 테스트 (2026-07-19) |
+| **v2.6.0** | 🏁 **릴리스** | 자체 비디오 플레이어 + 플레이어 모드 (2026-07-20) |
+| **v2.6.1** | 🏁 **릴리스** | H.264 우선 + 트랜스코딩 캐시 + 호버 컨트롤 (2026-07-20) |
+| **v2.6.2** | 🏁 **릴리스** | 스레드 안정성 + 메뉴바 레이아웃 개선 (2026-07-20) |
+| **v2.7.0** | 🏁 **릴리스** | 시스템 언어✅ 쿠키✅ 히스토리✅ Whisper✅ 프리셋/Smart Mode✅ (2026-07-22) |
+| **v2.7.1** | 🏁 **릴리스** | 디버그 로그 UI 개선: 단축키 Cmd+D, 자동스크롤 이미지 토글, 하단 버튼 크기 정규화 (2026-07-22) |
+| **v2.7.2** | 🏁 **릴리스** | 설정 4→5탭 재구성, 채널업데이트 OFF 완전중단, 상태바 큐 색상수정, 체크박스 초기화, 첫재생 속도개선(ffprobe→AVAsset), 툴바 드롭다운 (2026-07-22) |
 
 ---
- 
+
 ## 완료된 작업 (Completed)
 
 ### M1~M4
@@ -439,6 +445,191 @@
 - [x] T-566: PLAN.md 업데이트 ✅
 - [x] T-567: TODO.md 업데이트 ✅
 - [x] T-568: Info.plist 버전 2.5.6 ✅
+
+### v2.6.0 — 자체 비디오 플레이어 + 플레이어 모드 설정 (2026-07-20) 🚀
+
+#### 신규 파일 (6개)
+- [x] `Features/Player/PlayerItem.swift` — PlayerItem 모델 + SubtitleCue 모델
+- [x] `Features/Player/NSPlayerView.swift` — AVPlayerView NSViewRepresentable 래퍼
+- [x] `Features/Player/SubtitleOverlay.swift` — 시간 동기화 자막 오버레이
+- [x] `Features/Player/SubtitlePanel.swift` — 우측 320pt 자막 패널
+- [x] `Features/Player/PlayerReducer.swift` — TCA reducer (재생 상태, 자막, 패널 토글)
+- [x] `Features/Player/PlayerView.swift` — 최종 뷰 (HStack NSPlayerView + SubtitlePanel + toolbar)
+
+#### 수정 파일 (12개)
+- [x] `Models/Settings.swift` — PlayerMode enum + playerMode 필드 추가
+- [x] `Features/Settings/SettingsReducer.swift` — playerMode State/Action/저장
+- [x] `Features/Settings/SettingsView.swift` — 시스템 탭 PlayerMode picker
+- [x] `Helpers/Constants.swift` — openPlayerWindowNotification 추가
+- [x] `App/AppDelegate.swift` — playerWindow + openPlayerWindow 핸들러 (import AVKit)
+- [x] `Features/Library/LibraryReducer.swift` — openFile/openSelected playerMode 분기
+- [x] `Services/YouTubeDLService.swift` — fetchStreamingURL() + fetchSubtitles() + VTT/SRT timed parse
+- [x] `Features/Discover/DiscoverView.swift` — 미리보기 버튼 추가
+- [x] `Info.plist` — v2.6.0 (build 8)
+- [x] `docs/CHANGELOG.md` — v2.6.0 항목 추가
+- [x] `docs/TODO.md` — v2.6.0 작업 목록 추가
+- [x] `docs/PLAN.md` — v2.6.0 완료 처리
+
+#### 주요 설계 결정
+- **PlayerMode 기본값**: `builtIn` (자체 플레이어)
+- **플레이어 창 크기**: 854×480 고정, 리사이즈 불가 (패널 열리면 +320 = 1174×480)
+- **자막 소스**: yt-dlp VTT/SRT 실시간 다운로드 → 타임스탬프 보존 파싱
+- **Discover 미리보기**: `yt-dlp -f best --get-url` → 스트리밍 URL → AVPlayer
+- **Q&A 연동**: 기존 `.seekToTime` notification → PlayerView에서 구독 → AVPlayer seek
+
+### v2.6.1 — H.264 우선 다운로드 + 트랜스코딩 캐시 + 호버 컨트롤 (2026-07-20) 🏁
+
+#### H.264 코덱 필터
+- [x] `YouTubeDLService.buildDownloadArgs()` — `[ext=mp4][vcodec^=avc1]` 첫 번째 선택 포맷 추가
+- [x] `DownloadManager.buildDownloadArgs()` — video-only + combined 포맷 모두 H.264 우선
+- [x] 기존 `bestvideo[height<=N]+bestaudio/best[height<=N]` fallback 유지
+
+#### 기본 해상도 360p
+- [x] `Constants.defaultResolution` 480 → 360
+- [x] Settings 기본값 360p 반영
+
+#### 트랜스코딩 캐시 (SHA256)
+- [x] `Constants.transcodedCacheDirectory` — `~/Library/Caches/com.tubekeep/transcoded/`
+- [x] 캐시 키: SHA256(filePath + fileSize + modDate) → `{hash}.mp4`
+- [x] 소스 파일보다 캐시 파일이 최신이면 바로 재생 (캐시 히트)
+- [x] 캐시 미스 시 ffmpeg 변환 후 캐시에 저장
+
+#### 변환 진행률 + ETA
+- [x] `ffmpeg -progress pipe:1` 추가 → stdout 실시간 파싱
+- [x] `getDuration(ffprobe)`로 전체 duration 획득
+- [x] `out_time_us=` 파싱 → `conversionProgress: Double` (0.0~1.0)
+- [x] ffmpeg `speed=` 파싱 → `conversionETA: String` ("{m:ss}" 포맷)
+- [x] PlayerView: `ProgressView(value:)` + "% 변환 중..." + ETA 텍스트
+
+#### 자막 언어 우선순위
+- [x] `PlayerReducer.fetchSubtitles()` — `.sorted`로 ko 파일을 en 파일보다 먼저 배치
+
+#### 자막 오버레이 기본값 false + 싱글클릭 토글
+- [x] `showSubtitleOverlay` 기본값 `false`
+- [x] 싱글클릭 → `.toggleSubtitleOverlay` (더블클릭은 전체화면 유지)
+
+#### 자막 패널 자동 스크롤 버그 수정
+- [x] `SubtitlePanel` — `onChange`를 `ScrollViewReader` 레벨 단일 onChange로 통합
+- [x] 중복/경합 스크롤 문제 해결
+
+#### 플레이어 컨트롤 호버 오버레이
+- [x] VStack 하단에서 ZStack 오버레이로 이동
+- [x] `.onContinuousHover` → active 시 show, ended 시 3초 후 auto-hide
+- [x] 하단 `.ultraThinMaterial` 바 + 흰색 아이콘/텍스트
+- [x] 우측 상단 전체화면 버튼 (SF Symbol arrow.up.backward.and.arrow.down.forward)
+
+#### PlayerReducer 확장
+- [x] `conversionProgress: Double` State
+- [x] `conversionETA: String` State
+- [x] `updateConversionProgress(Double)` Action
+- [x] `updateConversionETA(String)` Action
+- [x] HTML 디코딩: `decodeHTMLEntities()` static fileprivate 메서드
+
+#### 윈도우/전체화면 수정
+- [x] `WindowAccessor`: `[self]` 캡처 제거, `DispatchQueue.main.async`로 @State window 업데이트
+- [x] `toggleFullscreen()`에 NSApp fallback 추가
+- [x] 윈도우 스타일: `[.titled, .closable, .resizable]`
+- [x] `collectionBehavior`: `[.managed, .ignoresCycle, .fullScreenPrimary]`
+
+#### 릴리스
+- [x] `Info.plist` v2.6.1 (build 9)
+- [x] `docs/CHANGELOG.md` v2.6.1
+- [x] `docs/AGENTS.md` 최신화
+- [x] `docs/PRD.md` 업데이트
+- [x] `docs/DESIGN.md` 업데이트
+
+#### v2.6.1-post — after_move:filepath 경로 검증 + H.264 필터 누락 수정
+- [x] `DownloadManager.actualPath` 검증 로직 추가: after_move 경로가 `.mp4`가 아니면 출력 디렉토리에서 `{videoId}.mp4` 스캔 fallback
+- [x] `--embed-thumbnail`로 생성된 섬네일 파일(.webp/.png)이 after_move를 오염시켜 다운로드 실패로 잘못 표시되는 문제 수정
+- [x] `DownloadManager.buildDownloadArgs()`에 `[ext=mp4][vcodec^=avc1]` H.264 포맷 필터 추가 (YouTubeDLService 쪽만 있고 DownloadManager 쪽 누락)
+- [x] **확인 완료**: 360p 다운로드 후 변환 없이 바로 재생
+- [x] **메뉴바 드롭메뉴 NSView 기반 전면 재작성**: `attributedTitle` → `makeQueueMenuItemView()` (커스텀 NSView + NSTextField 2개)
+- [x] **드롭메뉴 좌우 여백 일반 메뉴와 일치**: `menuLeftPadding: 19`, `menuRightPadding: 14`
+- [x] **드롭메뉴 너비 280→187 축소**: 33% 축소
+- [x] **드롭메뉴 텍스트 변경**: "다운로드 중"→"다운로드 속도", "진행 상태" value = 완료/전체
+- [x] **메뉴바 상태 텍스트 변경**: "완1/4"→"진행 1/4"
+- [x] **`timestamp()` DateFormatter 스레드 안전성**: 정적 Formatter + `OSAllocatedUnfairLock` 적용
+- [x] **DownloadManager data race 수정**: `ManagerState` struct + `stateLock`(OSAllocatedUnfairLock) 도입, 모든 mutable state를 Lock으로 보호
+- [x] **Mock 테스트 서브메뉴 target 누락 수정**: target = self 추가
+- [x] **TTSEngine 기본값 변경**: .apple → .edgeTTS (3군데)
+- [x] **v2.6.2 릴리스**: Info.plist v2.6.2 (build 10), CHANGELOG/PLAN/TODO/AGENTS/DESIGN 업데이트
+
+### v2.7.0 — 시스템 언어 + 쿠키 인증 + Whisper AI 자막 + 프리셋 + 히스토리 (2026-07-22) 🏁
+
+**버전**: 2.7.0 (build 11)
+
+---
+
+#### H-1: 브라우저 쿠키 인증 ✅
+
+- [x] T-702: Settings.cookiesFromBrowser 필드 + Picker UI (Safari/Chrome/Brave/Edge/Firefox/Whale)
+- [x] T-702a: LanguageService.cookiesArgs로 `--cookies-from-browser` 플래그 공통 args 제공
+- [x] T-702b: DownloadManager, YouTubeDLService, SummarizationService 등 모든 yt-dlp 호출에 쿠키 전파
+
+---
+
+#### H-2: 시스템 언어 기반 동적 전환 ✅
+
+- [x] T-700: LanguageService 생성 — systemLanguageCode, subtitleLanguages, ttsVoice, appleTTSLanguage, aiPromptLanguage, cookiesArgs
+- [x] T-701: Settings.subtitleLanguageOverride 옵션 + SettingsView Picker
+- [x] T-701a~h: DownloadManager, YouTubeDLService, PlayerReducer, SummarizationService, LibraryReducer, TTSService, EdgeTTSClient, PodcastService 교체
+
+---
+
+#### H-3: AI 자막 생성 (Whisper) ✅
+
+- [x] T-708: whisper.cpp CLI 번들링 (BundledLibraryManager 등록)
+- [x] T-709: WhisperService (@unchecked Sendable class)
+- [x] T-710a~c: Settings 필드/UI + ToastComponents
+- [x] T-711a~c: PlayerReducer 연동 + SummarizationService fallback + 오디오 추출
+
+---
+
+#### H-5: 다운로드 프리셋 / Smart Mode ✅
+
+- [x] T-705: DownloadPreset 모델 (name, formatType, resolution, includeSubtitles, sponsorBlock, embedMetadata)
+- [x] T-705a~T-707a: Settings 필드/UI + Smart Mode 자동 다운로드
+
+---
+
+#### H-6: 다운로드 히스토리 (DB) ✅
+
+- [x] T-703: DatabaseManager download_history 테이블 + CRUD
+- [x] T-703a: DownloadHistoryItem 모델
+- [x] T-703b: AppReducer.downloadCompleted → 히스토리 저장
+- [x] T-704: HistoryView (테이블 + 검색 + 필터 + 우클릭)
+- [x] T-704a: LibrarySidebarView "다운로드 히스토리" 항목
+
+---
+
+### v2.7.1 — 디버그 로그 UI 개선 (2026-07-22) 🏁
+
+**버전**: 2.7.1 (build 12)
+
+#### D-1: 디버그 로그 창 단축키 Cmd+D ✅
+
+- [x] T-801: AppDelegate keyMonitor에 Cmd+D (keyCode 2) 케이스 추가 — 상태바 모드에서도 동작
+- [x] T-802: StatusBarManager "디버그 로그 열기"에 Cmd+D 단축키 추가
+
+#### D-2: 자동 스크롤 체크박스 → 이미지 토글 ✅
+
+- [x] T-810: toolbar 체크박스 제거, Button 이미지 토글로 교체 (arrow.down.to.line / arrow.down.to.line.circle.fill)
+- [x] T-811: 자동 스크롤 버튼을 Pin 버튼 **오른쪽**으로 이동
+
+#### D-3: 하단 버튼 크기 정규화 ✅
+
+- [x] T-820: 4개 버튼에서 `.controlSize(.small)` 제거 → 기본 버튼 크기
+
+---
+
+#### B-1: keyMonitor keyCode 오류 수정 (bd-TubeKeep-2gw) ✅
+
+- [x] keyMonitor `case 49`는 Space(0x31)였음 → 올바른 Comma keyCode인 **`case 43`(0x2B)**로 수정
+- [x] settings 메뉴 `keyEquivalent: ","` 제거 → menu가 가로채지 않아 keyMonitor가 항상 직접 처리
+- [x] **원인**: 원래 코드에 있던 숨은 버그. 기존에는 메뉴가 keyEquivalent로 먼저 가로채서 responder chain으로 처리했기 때문에 틀린 keyCode가 문제되지 않았음
+- [x] **연쇄 효과**: DebugLogView UI 개선 작업 중 Cmd+D 단축키를 추가하면서 메뉴 vs keyMonitor 이벤트 선점 문제가 드러나, 이미 발견되지 않았던 keyCode 버그까지 함께 수정됨
+
+---
 
 ## 제외된 기능 (Cancelled)
 

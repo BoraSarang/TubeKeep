@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class SubscribedChannel: Identifiable, @unchecked Sendable {
+final class SubscribedChannel: Identifiable {
     @Attribute(.unique) var id: String
     var name: String
     var handle: String?

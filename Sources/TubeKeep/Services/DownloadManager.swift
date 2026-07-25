@@ -6,19 +6,25 @@ import os
 final class DownloadManager: @unchecked Sendable {
     static let shared = DownloadManager()
 
+    private struct ManagerState {
+        var settings = Settings()
+        var storageDirectory = Constants.defaultStorageDirectory
+        var filenameTemplate = Constants.defaultFilenameTemplate
+        var pausedItems: Set<UUID> = []
+    }
+
     private let runner = ProcessRunner()
     private let activeLock = OSAllocatedUnfairLock(initialState: [UUID: Process]())
-    private var pausedItems: Set<UUID> = []
-    private var settings: Settings = Settings()
-    private var storageDirectory: String = Constants.defaultStorageDirectory
-    private var filenameTemplate: String = Constants.defaultFilenameTemplate
+    private let stateLock = OSAllocatedUnfairLock(initialState: ManagerState())
 
     private init() {}
 
     func updateSettings(_ newSettings: Settings) {
-        settings = newSettings
-        storageDirectory = newSettings.storageDirectory
-        filenameTemplate = newSettings.filenameTemplate
+        stateLock.withLock {
+            $0.settings = newSettings
+            $0.storageDirectory = newSettings.storageDirectory
+            $0.filenameTemplate = newSettings.filenameTemplate
+        }
     }
 
     func startDownload(
@@ -27,12 +33,14 @@ final class DownloadManager: @unchecked Sendable {
         completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void,
         logHandler: (@Sendable (UUID, String) -> Void)? = nil
     ) {
-        let outputDir = settings.storageDirectory
+        let s = stateLock.withLock { $0.settings }
+        let outputDir = s.storageDirectory
+        let tmpl = stateLock.withLock { $0.filenameTemplate }
 
         Task { [weak self] in
             guard let self = self else { return }
 
-            var args = buildDownloadArgs(item: item, outputDir: outputDir)
+            var args = buildDownloadArgs(item: item, outputDir: outputDir, settings: s, filenameTemplate: tmpl)
             args += ["--progress-template", "%(progress._percent_str)s|%(progress._speed_str)s"]
 
             let outputPathFile = FileManager.default.temporaryDirectory.appendingPathComponent("tubekeep_output_\(item.id.uuidString).txt").path
@@ -124,21 +132,37 @@ final class DownloadManager: @unchecked Sendable {
 
                 if !Task.isCancelled {
                     let actualPath: String? = {
-                        guard let data = try? Data(contentsOf: URL(fileURLWithPath: outputPathFile)),
-                              let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                              !path.isEmpty
-                        else { return nil }
-                        try? FileManager.default.removeItem(atPath: outputPathFile)
-                        return path
+                        let fm = FileManager.default
+                        // 1) Try after_move:filepath first
+                        let afterMovePath: String? = {
+                            guard let data = try? Data(contentsOf: URL(fileURLWithPath: outputPathFile)),
+                                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                                  !path.isEmpty
+                            else { return nil }
+                            try? fm.removeItem(atPath: outputPathFile)
+                            return path
+                        }()
+                        // 2) Validate: must be .mp4 and file must exist
+                        if let path = afterMovePath, path.hasSuffix(".mp4"), fm.fileExists(atPath: path) {
+                            return path
+                        }
+                        // 3) Fallback: scan output directory for videoId.mp4
+                        let folder = Constants.sanitizeFolderName(item.videoInfo.channel)
+                        let channelDir = "\(outputDir)/\(folder)"
+                        let videoId = item.videoInfo.id
+                        guard let files = try? fm.contentsOfDirectory(atPath: channelDir) else { return nil }
+                        for file in files where file.hasSuffix("\(videoId).mp4") {
+                            return "\(channelDir)/\(file)"
+                        }
+                        return nil
                     }()
-                    let fileExists = actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
 
-                    if process.terminationStatus == 0 || fileExists {
+                    if process.terminationStatus == 0 || (actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false) {
                         if item.includeSubtitles, let path = actualPath {
                             Self.saveSubtitlesToDB(videoPath: path)
                         }
                         completionHandler(item.id, true, actualPath, nil)
-                        if self.settings.playSoundOnComplete {
+                        if s.playSoundOnComplete {
                             _ = await MainActor.run {
                                 NSSound(named: "Purr")?.play()
                             }
@@ -159,20 +183,20 @@ final class DownloadManager: @unchecked Sendable {
         let process = activeLock.withLock { $0[itemId] }
         guard let p = process, p.isRunning else { return }
         p.interrupt()
-        pausedItems.insert(itemId)
+        _ = stateLock.withLock { $0.pausedItems.insert(itemId) }
     }
 
     func resumeDownload(item: DownloadItem,
                         progressHandler: @escaping @Sendable (UUID, Double, String) -> Void,
                         completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void) {
-        pausedItems.remove(item.id)
+        _ = stateLock.withLock { $0.pausedItems.remove(item.id) }
         startDownload(item: item, progressHandler: progressHandler, completionHandler: completionHandler)
     }
 
     func cancelDownload(itemId: UUID) {
         let process = activeLock.withLock { $0.removeValue(forKey: itemId) }
         if let p = process, p.isRunning { p.terminate() }
-        pausedItems.remove(itemId)
+        _ = stateLock.withLock { $0.pausedItems.remove(itemId) }
     }
 
     func cancelAll() {
@@ -184,28 +208,29 @@ final class DownloadManager: @unchecked Sendable {
         for p in processes where p.isRunning {
             p.terminate()
         }
-        pausedItems.removeAll()
+        stateLock.withLock { $0.pausedItems.removeAll() }
     }
 
     var activeCount: Int {
         activeLock.withLock { $0.count }
     }
 
-    func isPaused(_ itemId: UUID) -> Bool { pausedItems.contains(itemId) }
+    func isPaused(_ itemId: UUID) -> Bool { stateLock.withLock { $0.pausedItems.contains(itemId) } }
 
-    private func buildDownloadArgs(item: DownloadItem, outputDir: String) -> [String] {
+    private func buildDownloadArgs(item: DownloadItem, outputDir: String, settings: Settings, filenameTemplate: String) -> [String] {
         let formatId: String = {
             if item.selectedFormat.isVideoOnly {
                 let height = item.selectedFormat.height
-                return "\(item.selectedFormat.id)+bestaudio[ext=m4a]/\(item.selectedFormat.id)+bestaudio/best[height<=\(height)]"
+                let fallback = "\(item.selectedFormat.id)+bestaudio[ext=m4a]/\(item.selectedFormat.id)+bestaudio/best[height<=\(height)]"
+                return "\(item.selectedFormat.id)[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/\(fallback)"
             }
             let id = item.selectedFormat.id
             if id.hasPrefix("best") {
                 let bracket = id.firstIndex(of: "[") ?? id.endIndex
                 let filter = id[bracket...]
-                return "bestvideo\(filter)+bestaudio/\(id)"
+                return "bestvideo[ext=mp4][vcodec^=avc1]\(filter)+bestaudio/\(id)"
             }
-            return id
+            return "\(id)[ext=mp4][vcodec^=avc1]/\(id)"
         }()
         var args: [String] = [
             "--newline",
@@ -216,7 +241,7 @@ final class DownloadManager: @unchecked Sendable {
             "--merge-output-format", "mp4",
             "--remux-video", "mp4",
             "--ignore-no-formats-error",
-            "-o", constructOutputTemplate(item: item, outputDir: outputDir),
+            "-o", constructOutputTemplate(item: item, outputDir: outputDir, filenameTemplate: filenameTemplate),
         ]
 
         if let rate = settings.limitRateArg {
@@ -224,7 +249,11 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if item.includeSubtitles {
-            args += ["--write-subs", "--write-auto-subs", "--sub-langs", "en,ko"]
+            let subLangs = LanguageService.subtitleLanguages
+            args += ["--write-subs", "--write-auto-subs", "--sub-langs", subLangs]
+            #if DEBUG
+            Task { @MainActor in DebugLogManager.shared?.append("[DownloadManager] --sub-langs: \(subLangs)") }
+            #endif
         }
 
         if item.audioOnly {
@@ -236,14 +265,19 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if settings.embedMetadata {
-            args += ["--embed-metadata", "--embed-thumbnail"]
+            args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
         }
 
+        let cookies = LanguageService.cookiesArgs
+        if !cookies.isEmpty { args += cookies }
+        #if DEBUG
+        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[DownloadManager] 쿠키 적용: \(cookies.joined(separator: " "))") } }
+        #endif
         args.append(item.videoInfo.webpageURL)
         return args
     }
 
-    private func constructOutputTemplate(item: DownloadItem, outputDir: String) -> String {
+    private func constructOutputTemplate(item: DownloadItem, outputDir: String, filenameTemplate: String) -> String {
         let folder = Constants.sanitizeFolderName(item.videoInfo.channel)
         let channelDir = "\(outputDir)/\(folder)"
         try? FileManager.default.createDirectory(atPath: channelDir, withIntermediateDirectories: true)

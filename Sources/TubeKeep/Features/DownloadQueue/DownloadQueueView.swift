@@ -20,13 +20,6 @@ struct DownloadQueueView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        #if DEBUG
-        .overlay(alignment: .bottom) {
-            if !store.debugLogs.isEmpty {
-                debugLogView
-            }
-        }
-        #endif
     }
 
     private var sectionHeader: some View {
@@ -197,77 +190,13 @@ struct DownloadQueueView: View {
         }
     }
 
-    @ViewBuilder
     private func toastBanner(_ toast: ToastMessage) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: toast.type == .success
-                ? "checkmark.circle.fill"
-                : toast.type == .error
-                ? "exclamationmark.triangle.fill"
-                : "arrow.clockwise"
-            )
-            .foregroundStyle(toast.type == .success
-                ? .green
-                : toast.type == .error
-                ? .red
-                : .blue
-            )
-            .font(.system(size: 11))
-
-            Text(toast.message)
-                .font(.caption)
-                .lineLimit(1)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button {
-                store.send(.dismissToast)
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
+        ToastBanner(toast: toast) {
+            store.send(.dismissToast)
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(toast.type == .error ? Color.red.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 1)
-        )
         .padding(.bottom, 4)
     }
 
-    #if DEBUG
-    private var debugLogView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(store.debugLogs.suffix(5).enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .textSelection(.enabled)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .id("bottom")
-            }
-            .frame(height: 60)
-            .background(Color(.textBackgroundColor).opacity(0.3))
-            .onChange(of: store.debugLogs.count) { _, _ in
-                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
-            }
-        }
-    }
-    #endif
 }
 
 struct DownloadRow: View {

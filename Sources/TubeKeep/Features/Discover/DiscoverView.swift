@@ -110,6 +110,7 @@ struct DiscoverView: View {
                                 localFilePath: localItem?.filePath,
                                 onOpenInBrowser: { openInBrowser(video, localItem: localItem) },
                                 onAddToQueue: { addToQueue(video) },
+                                onPreview: { previewVideo(video) },
                                 onShowSummary: {
                                     store.send(.library(.discoverRequestSummary(videoId: video.id, title: video.title, channel: video.channel)))
                                 },
@@ -133,6 +134,23 @@ struct DiscoverView: View {
         } else {
             guard let url = URL(string: video.webpageURL) else { return }
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func previewVideo(_ video: TrendingVideo) {
+        Task {
+            do {
+                let service = YouTubeDLService()
+                let url = try await service.fetchStreamingURL(url: video.webpageURL)
+                let playerItem = PlayerItem(
+                    streamURL: url,
+                    title: video.title,
+                    videoId: video.id
+                )
+                NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
+            } catch {
+                print("[Discover] 미리보기 실패: \(error)")
+            }
         }
     }
 
@@ -170,6 +188,7 @@ struct DiscoverCard: View {
     let localFilePath: String?
     let onOpenInBrowser: () -> Void
     let onAddToQueue: () -> Void
+    let onPreview: () -> Void
     let onShowSummary: () -> Void
     let onHideSummary: () -> Void
     @State private var isHovering = false
@@ -221,6 +240,17 @@ struct DiscoverCard: View {
                                 .background(Capsule().fill(Color.green))
                                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                             } else {
+                                Button {
+                                    onPreview()
+                                } label: {
+                                    Label("미리보기", systemImage: "play.tv")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .frame(width: 110, height: 26)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.accentColor)
+                                .controlSize(.small)
+
                                 Button {
                                     onAddToQueue()
                                 } label: {

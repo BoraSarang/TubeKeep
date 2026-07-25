@@ -8,6 +8,7 @@ struct LibrarySidebarView: View {
     @State private var draggedChannelId: String?
     @State private var dropTargetIndex: Int?
     @AppStorage(Constants.channelOrderKey) private var channelOrderData: Data = Data()
+    @State private var historyItems: [DownloadHistoryItem] = []
 
     private var channelOrder: [String] {
         get { (try? JSONDecoder().decode([String].self, from: channelOrderData)) ?? [] }
@@ -47,6 +48,8 @@ struct LibrarySidebarView: View {
                 Divider()
 
                 channelList
+            } else if store.library.sidebarMode == .history {
+                historySidebar
             } else {
                 discoverSearchField
                     .padding(.horizontal, 8)
@@ -60,41 +63,73 @@ struct LibrarySidebarView: View {
                 Divider()
             }
 
+            #if DEBUG
             Button {
-                let dir = store.settings.storageDirectory
-                let url = URL(fileURLWithPath: dir)
-                NSWorkspace.shared.open(url)
+                addMockHistoryItems(count: 50)
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "folder")
+                    Image(systemName: "testtube.2")
                         .font(.system(size: 12))
-                    Text("Finder에서 보기")
+                    Text("Mock 50개 추가")
                         .font(.system(size: 12))
                     Spacer()
-                    Text(formatBytes(store.library.diskUsageBytes))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .help("용량 새로고침")
-                        .onTapGesture {
-                            store.send(.library(.calculateDiskUsage))
-                        }
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                        .help("용량 새로고침")
-                        .onTapGesture {
-                            store.send(.library(.calculateDiskUsage))
-                        }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            Divider()
+            #endif
+
+            HStack(spacing: 0) {
+                Button {
+                    let dir = store.settings.storageDirectory
+                    let url = URL(fileURLWithPath: dir)
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 12))
+                        Text("Finder에서 보기")
+                            .font(.system(size: 12))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    store.send(.library(.calculateDiskUsage))
+                } label: {
+                    HStack(spacing: 2) {
+                        Text(formatBytes(store.library.diskUsageBytes))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.trailing, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("용량 새로고침")
+            }
         }
         .background(Color(.windowBackgroundColor))
         .onChange(of: store.library.items) { _, newItems in
             updateChannelNames(newItems)
+        }
+        .onChange(of: store.library.sidebarMode) { _, mode in
+            if mode == .history { loadHistory() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.downloadHistoryDidChangeNotification)) { _ in
+            if store.library.sidebarMode == .history { loadHistory() }
         }
         .onAppear {
             updateChannelNames(store.library.items)
@@ -108,6 +143,7 @@ struct LibrarySidebarView: View {
         VStack(spacing: 2) {
             navRow(title: "보관함", icon: "square.grid.2x2", mode: .library)
             navRow(title: "트랜드", icon: "flame", mode: .discover)
+            navRow(title: "다운로드 히스토리", icon: "clock.arrow.circlepath", mode: .history)
         }
     }
 
@@ -218,6 +254,169 @@ struct LibrarySidebarView: View {
         }
         categoryRows = sorted
     }
+
+    // MARK: - History
+
+    private var historySidebar: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                historySearchField
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+
+                if historyChannels.count > 1 {
+                    Divider()
+                        .padding(.leading, 12)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("채널 필터")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+
+                        historyChannelRow(name: "전체", isSelected: store.library.historyFilterChannel == nil) {
+                            store.send(.library(.setHistoryFilterChannel(nil)))
+                        }
+
+                        ForEach(historyChannels, id: \.self) { channel in
+                            historyChannelRow(name: channel, isSelected: store.library.historyFilterChannel == channel) {
+                                store.send(.library(.setHistoryFilterChannel(
+                                    store.library.historyFilterChannel == channel ? nil : channel
+                                )))
+                            }
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
+            }
+        }
+    }
+
+    private var historyStats: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("히스토리")
+                    .font(.system(size: 13, weight: .bold))
+                Spacer()
+                Text("\(historyItems.count)개")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var historySearchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 12))
+            TextField("검색...", text: Binding(
+                get: { store.library.historySearchText },
+                set: { store.send(.library(.setHistorySearchText($0))) }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 12))
+
+            if !store.library.historySearchText.isEmpty {
+                Button {
+                    store.send(.library(.setHistorySearchText("")))
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(Color(.textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func historyChannelRow(name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "person")
+                .font(.system(size: 12))
+                .foregroundStyle(isSelected ? .white : .secondary)
+                .frame(width: 20, height: 20)
+
+            Text(name)
+                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : .primary)
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(isSelected ? Color.accentColor : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+    }
+
+    private var historyChannels: [String] {
+        Array(Set(historyItems.compactMap { $0.channelName })).sorted()
+    }
+
+    private func loadHistory() {
+        historyItems = DatabaseManager.shared.loadDownloadHistory()
+        #if DEBUG
+        let comp = historyItems.filter { $0.status == "completed" }.count
+        let fail = historyItems.filter { $0.status == "failed" }.count
+        Task { @MainActor in DebugLogManager.shared?.append("[History] 로드: \(historyItems.count)개 (완료:\(comp) 실패:\(fail))") }
+        #endif
+    }
+
+    #if DEBUG
+    private func addMockHistoryItems(count: Int) {
+        let channels = ["starshipTV", "NewJeans", "aespa", "IVE", "LE SSERAFIM", "BTS", "BLACKPINK", "TWICE"]
+        let titles = [
+            "HEYA - 아이브", "How Sweet - NewJeans", "Supernova - aespa",
+            "EASY - LE SSERAFIM", "Dynamite - BTS", "How You Like That - BLACKPINK",
+            "Talk that Talk - TWICE", "Love Dive - IVE", "Attention - NewJeans",
+            "Spicy - aespa", "UNFORGIVEN - LE SSERAFIM", "Butter - BTS",
+            "Ice Cream - BLACKPINK", "FANCY - TWICE", "After LIKE - IVE",
+            "Hype Boy - NewJeans", "Next Level - aespa", "ANTIFRAGILE - LE SSERAFIM",
+            "Permission to Dance - BTS", "Kill This Love - BLACKPINK",
+        ]
+        let formats = ["mp4", "mp3", "mkv", "webm"]
+        let resolutions = [2160, 1440, 1080, 720, 480, 360, 0]
+
+        for _ in 0..<count {
+            let channel = channels.randomElement()!
+            let title = titles.randomElement()!
+            let format = formats.randomElement()!
+            let resolution = resolutions.randomElement()!
+            let size = Int64.random(in: 10_000_000...2_000_000_000)
+            let daysAgo = Int.random(in: 0...90)
+            let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+            let isAudio = resolution == 0
+            let formatLabel = isAudio ? "audio \(format)" : "\(resolution)p \(format)"
+
+            let item = DownloadHistoryItem(
+                id: 0,
+                videoId: "mock_\(UUID().uuidString.prefix(8))",
+                title: "\(title) #\(Int.random(in: 1...999))",
+                channelName: channel,
+                url: "https://youtube.com/watch?v=mock_\(UUID().uuidString.prefix(8))",
+                formatLabel: formatLabel,
+                resolution: isAudio ? nil : resolution,
+                fileSize: size,
+                filePath: nil,
+                downloadedAt: date,
+                status: Int.random(in: 1...10) > 1 ? "completed" : "failed"
+            )
+            DatabaseManager.shared.saveDownloadHistory(item)
+        }
+        loadHistory()
+        NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+        let completedCount = DatabaseManager.shared.loadDownloadHistory().filter { $0.status == "completed" }.count
+        let failedCount = DatabaseManager.shared.loadDownloadHistory().filter { $0.status == "failed" }.count
+        Task { @MainActor in DebugLogManager.shared?.append("[History] Mock \(count)개 추가 완료 (완료:\(completedCount) 실패:\(failedCount))") }
+    }
+    #endif
 
     private var discoverCategorySection: some View {
         VStack(spacing: 0) {

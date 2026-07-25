@@ -3,6 +3,8 @@ import AppKit
 import ServiceManagement
 import ComposableArchitecture
 
+private struct WhisperDownloadCancelID: Hashable {}
+
 @Reducer
 struct SettingsReducer {
     @ObservableState
@@ -22,7 +24,21 @@ struct SettingsReducer {
         var showMainWindowOnLaunch: Bool = true
         var sponsorBlock: Bool = true
         var embedMetadata: Bool = true
-        var ttsEngine: TTSEngine = .apple
+        var ttsEngine: TTSEngine = .edgeTTS
+        var playerMode: PlayerMode = .builtIn
+        var showChannelBadge: Bool = true
+        var subtitleLanguageOverride: String = ""
+        var cookiesFromBrowser: String = ""
+        var enableWhisperTranscription: Bool = false
+        var whisperModelSize: String = "base"
+        var whisperModelStatus: WhisperModelStatus = .unknown
+        var whisperModelProgress: Double = 0
+        var whisperModelError: String?
+        var showMenuBarNotifications: Bool = true
+        var menuBarNotificationDuration: Int = 60
+        var presets: [DownloadPreset] = Settings.defaultPresets
+        var activePresetId: UUID?
+        var smartMode: Bool = false
         var openRouterAPIKey: String {
             get { UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "openRouterAPIKey") }
@@ -57,7 +73,18 @@ struct SettingsReducer {
                 showMainWindowOnLaunch: showMainWindowOnLaunch,
                 sponsorBlock: sponsorBlock,
                 embedMetadata: embedMetadata,
-                ttsEngine: ttsEngine
+                ttsEngine: ttsEngine,
+                playerMode: playerMode,
+                showChannelBadge: showChannelBadge,
+                subtitleLanguageOverride: subtitleLanguageOverride,
+                cookiesFromBrowser: cookiesFromBrowser,
+                enableWhisperTranscription: enableWhisperTranscription,
+                whisperModelSize: whisperModelSize,
+                showMenuBarNotifications: showMenuBarNotifications,
+                menuBarNotificationDuration: menuBarNotificationDuration,
+                presets: presets,
+                activePresetId: activePresetId,
+                smartMode: smartMode
             )
         }
     }
@@ -81,6 +108,27 @@ struct SettingsReducer {
         case toggleSponsorBlock
         case toggleEmbedMetadata
         case setTTSEngine(TTSEngine)
+        case setPlayerMode(PlayerMode)
+        case toggleShowChannelBadge
+        case setSubtitleLanguageOverride(String)
+        case setCookiesFromBrowser(String)
+        case toggleWhisperTranscription
+        case setWhisperModelSize(String)
+        case checkWhisperModelStatus
+        case downloadWhisperModel
+        case cancelWhisperModelDownload
+        case whisperModelStatusUpdated(WhisperModelStatus)
+        case whisperModelProgressUpdated(Double)
+        case whisperModelDownloadCompleted
+        case whisperModelDownloadFailed(String)
+        case addPreset(DownloadPreset)
+        case updatePreset(DownloadPreset)
+        case deletePreset(UUID)
+        case setActivePreset(UUID?)
+        case setPresets([DownloadPreset])
+        case toggleSmartMode
+        case toggleShowMenuBarNotifications
+        case setMenuBarNotificationDuration(Int)
         case setOpenRouterAPIKey(String)
         case setOpenRouterModel(String)
         case setGeminiAPIKey(String)
@@ -195,6 +243,127 @@ struct SettingsReducer {
 
             case let .setTTSEngine(engine):
                 state.ttsEngine = engine
+                return .send(.saveSettings)
+
+            case let .setPlayerMode(mode):
+                state.playerMode = mode
+                return .send(.saveSettings)
+
+            case .toggleShowChannelBadge:
+                state.showChannelBadge.toggle()
+                return .send(.saveSettings)
+
+            case let .setSubtitleLanguageOverride(value):
+                state.subtitleLanguageOverride = value
+                return .send(.saveSettings)
+
+            case let .setCookiesFromBrowser(value):
+                state.cookiesFromBrowser = value
+                return .send(.saveSettings)
+
+            case .toggleWhisperTranscription:
+                state.enableWhisperTranscription.toggle()
+                return .send(.saveSettings)
+
+            case let .setWhisperModelSize(value):
+                state.whisperModelSize = value
+                return .merge(.send(.saveSettings), .send(.checkWhisperModelStatus))
+
+            case .checkWhisperModelStatus:
+                let size = state.whisperModelSize
+                let installed = WhisperService.shared.isModelDownloaded(size)
+                state.whisperModelStatus = installed ? .installed : .notInstalled
+                state.whisperModelProgress = 0
+                state.whisperModelError = nil
+                return .none
+
+            case .downloadWhisperModel:
+                let size = state.whisperModelSize
+                let force = state.whisperModelStatus == .installed
+                state.whisperModelStatus = .downloading
+                state.whisperModelProgress = 0
+                state.whisperModelError = nil
+                return .run { send in
+                    let service = WhisperService.shared
+                    try await service.downloadModel(
+                        size: size,
+                        progressHandler: { _ in },
+                        numericProgress: { progress in
+                            Task { @MainActor in
+                                send(.whisperModelProgressUpdated(progress))
+                            }
+                        },
+                        force: force
+                    )
+                    await send(.whisperModelDownloadCompleted)
+                } catch: { error, send in
+                    if error is CancellationError {
+                        await send(.cancelWhisperModelDownload)
+                    } else {
+                        await send(.whisperModelDownloadFailed(error.localizedDescription))
+                    }
+                }
+                .cancellable(id: WhisperDownloadCancelID())
+
+            case .cancelWhisperModelDownload:
+                state.whisperModelStatus = .notInstalled
+                state.whisperModelProgress = 0
+                return .cancel(id: WhisperDownloadCancelID())
+
+            case let .whisperModelStatusUpdated(status):
+                state.whisperModelStatus = status
+                return .none
+
+            case let .whisperModelProgressUpdated(progress):
+                state.whisperModelProgress = progress
+                return .none
+
+            case .whisperModelDownloadCompleted:
+                state.whisperModelStatus = .installed
+                state.whisperModelProgress = 1.0
+                return .none
+
+            case let .whisperModelDownloadFailed(error):
+                state.whisperModelStatus = .error
+                state.whisperModelError = error
+                state.whisperModelProgress = 0
+                return .none
+
+            case let .addPreset(preset):
+                state.presets.append(preset)
+                return .send(.saveSettings)
+
+            case let .updatePreset(preset):
+                if let idx = state.presets.firstIndex(where: { $0.id == preset.id }) {
+                    state.presets[idx] = preset
+                }
+                return .send(.saveSettings)
+
+            case let .deletePreset(id):
+                state.presets.removeAll { $0.id == id }
+                if state.activePresetId == id {
+                    state.activePresetId = nil
+                }
+                return .send(.saveSettings)
+
+            case let .setActivePreset(id):
+                state.activePresetId = id
+                return .send(.saveSettings)
+
+            case let .setPresets(presets):
+                state.presets = presets
+                return .send(.saveSettings)
+
+            case .toggleShowMenuBarNotifications:
+                state.showMenuBarNotifications.toggle()
+                return .send(.saveSettings)
+
+            case let .setMenuBarNotificationDuration(value):
+                state.menuBarNotificationDuration = max(10, min(600, value))
+                return .send(.saveSettings)
+
+            case .toggleSmartMode:
+                state.smartMode.toggle()
                 return .send(.saveSettings)
 
             case let .setOpenRouterAPIKey(key):

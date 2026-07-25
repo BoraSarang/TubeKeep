@@ -39,18 +39,15 @@ final class MindmapService {
                 systemMessage: "당신은 YouTube 영상 내용을 마인드맵으로 구조화하는 전문가입니다. 반드시 한국어로만 답변하세요."
             )
         } catch {
-            print("[Mindmap] ❌ API 호출 실패: \(error)")
-            print("[Mindmap] ❌ API 키: \(openRouterAPIKey.prefix(8))...")
+            log("[Mindmap] ❌ API 호출 실패: \(error.localizedDescription)")
             throw MindmapError.apiFailed(error.localizedDescription)
         }
 
         log("[Mindmap] 응답 수신 — 길이: \(responseText.count)")
 
-        log("[Mindmap] 파싱 시작 — 응답 원문: \(responseText.prefix(300))")
-        print("[Mindmap] RAW RESPONSE: \(responseText)")
+        log("[Mindmap] 파싱 시작")
         let node = try parseResponse(responseText)
         log("[Mindmap] 파싱 완료 — 노드: \(countNodes(node))개")
-        print("[Mindmap] 파싱 성공 — 루트: \(node.label), 자식: \(node.children.count)개")
 
         // DB 저장
         if let data = try? JSONEncoder().encode(node) {
@@ -114,7 +111,6 @@ final class MindmapService {
         log("[Mindmap] 정제된 응답 시작: \(cleaned.prefix(500))")
 
         guard let data = cleaned.data(using: .utf8) else {
-            print("[Mindmap] ❌ UTF-8 인코딩 실패")
             log("[Mindmap] ❌ UTF-8 인코딩 실패")
             throw MindmapError.parsingFailed
         }
@@ -124,8 +120,6 @@ final class MindmapService {
             log("[Mindmap] JSON 디코딩 성공 — label: \(node.label)")
             return node
         } catch {
-            print("[Mindmap] ❌ JSON 디코딩 실패: \(error)")
-            print("[Mindmap] ❌ 응답 원문: \(response)")
             log("[Mindmap] ❌ JSON 디코딩 실패: \(error.localizedDescription)")
             throw MindmapError.parsingFailed
         }

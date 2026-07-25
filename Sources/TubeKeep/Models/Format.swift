@@ -41,27 +41,37 @@ struct Format: Identifiable, Equatable, Codable {
     }
 
     static func best(forHeight targetHeight: Int, from formats: [Format]) -> Format? {
-        // 1순위: combined mp4 (영상+소리 통합, re-encode 없음)
+        func closest(to height: Int, in subset: [Format]) -> Format? {
+            let lower = subset.filter { $0.height < height }.sorted { $0.height > $1.height }.first
+            let higher = subset.filter { $0.height > height }.sorted { $0.height < $1.height }.first
+            return lower ?? higher
+        }
+
+        // 1: exact combined mp4
         if let f = formats.first(where: { $0.height == targetHeight && $0.isCombined && $0.isMP4 }) {
             return f
         }
-        // 2순위: combined any (webm 등 포함 — remux-video mp4가 mp4로 변환)
+        // 2: exact combined any
         if let f = formats.first(where: { $0.height == targetHeight && $0.isCombined }) {
             return f
         }
-        // 3순위: target보다 높은 해상도에서 combined 찾기
-        let higherCombined = formats
-            .filter { $0.height > targetHeight && $0.height > 0 && $0.isCombined }
-            .sorted { $0.height < $1.height }
-        if let f = higherCombined.first { return f }
-        // 4순위: video-only mp4 (audio는 buildDownloadArgs에서 +bestaudio 처리)
+        // 3: combined — lower preferred, higher fallback
+        let combined = formats.filter { $0.isCombined }
+        if let f = closest(to: targetHeight, in: combined) { return f }
+        // 4: exact video-only mp4
         if let f = formats.first(where: { $0.height == targetHeight && $0.isVideoOnly && $0.isMP4 }) {
             return f
         }
-        // 5순위: height 매칭 any format
+        // 5: video-only — lower preferred, higher fallback
+        let videoOnly = formats.filter { $0.isVideoOnly && !$0.isAudioOnly }
+        if let f = closest(to: targetHeight, in: videoOnly) { return f }
+        // 6: exact any
         if let f = formats.first(where: { $0.height == targetHeight }) {
             return f
         }
+        // 7: any format — lower preferred, higher fallback
+        let anyVideo = formats.filter { !$0.isAudioOnly }
+        if let f = closest(to: targetHeight, in: anyVideo) { return f }
         return formats.first
     }
 }

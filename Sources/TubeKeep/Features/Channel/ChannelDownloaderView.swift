@@ -20,7 +20,6 @@ struct ChannelDownloaderView: View {
     @State private var isShowingAddDialog = false
     @State private var addChannelURL = ""
     @State private var errorMessage: String?
-    @State private var debugLogs: [String] = []
     @State private var isPinned = false
 
     var body: some View {
@@ -31,7 +30,7 @@ struct ChannelDownloaderView: View {
                     selectedChannel: $selectedChannel,
                     onSelect: { channel in
                         selectedChannel = channel
-                        debugLogs.append("[\(timestamp())] ▶️ 채널 선택: \(channel.name)")
+                        DebugLogManager.shared?.append("[Channel] ▶️ 채널 선택: \(channel.name)")
                         let currentNew = ChannelDownloadCache.loadNewVideoIds(channelId: channel.id)
                         if !currentNew.isEmpty {
                             ChannelDownloadCache.saveSeenVideoIds(channelId: channel.id, videoIds: currentNew)
@@ -71,10 +70,6 @@ struct ChannelDownloaderView: View {
                 .frame(minWidth: 480)
             }
 
-            #if DEBUG
-            debugLogView
-            #endif
-
             if isAddingChannel {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -108,11 +103,9 @@ struct ChannelDownloaderView: View {
         }
         .frame(minWidth: 700, minHeight: 400)
         .onAppear {
-            #if DEBUG
-            debugLogs.append("[\(timestamp())] 🟢 onAppear triggered")
-            #endif
+            DebugLogManager.shared?.append("[Channel] 🟢 onAppear triggered")
             channels = SubscribedChannel.loadAll()
-            debugLogs.append("[\(timestamp())] ℹ️ 저장된 채널 \(channels.count)개 로드 (videoCounts: \(channels.map { "\($0.name):\($0.videoCount)" }.joined(separator: ", ")))")
+            DebugLogManager.shared?.append("[Channel] ℹ️ 저장된 채널 \(channels.count)개 로드 (videoCounts: \(channels.map { "\($0.name):\($0.videoCount)" }.joined(separator: ", ")))")
             // Try pending channel data first (most reliable for new windows)
             if let data = pendingChannelData,
                let chId = data["channelId"] as? String,
@@ -129,39 +122,33 @@ struct ChannelDownloaderView: View {
                     SubscribedChannel.saveAll(channels)
                 }
                 let target = channels.first(where: { $0.id == chId }) ?? ch
-                debugLogs.append("[\(timestamp())] ▶️ 초기 채널 선택: \(target.name) (videoCount=\(target.videoCount))")
+                DebugLogManager.shared?.append("[Channel] ▶️ 초기 채널 선택: \(target.name) (videoCount=\(target.videoCount))")
                 selectedChannel = target
                 loadVideos(for: target)
                 if target.avatarURL.isEmpty {
                     refreshChannelInfo(for: ch)
                 }
             } else if let id = initialChannelId, let channel = channels.first(where: { $0.id == id }) {
-                debugLogs.append("[\(timestamp())] ▶️ 초기 채널 선택: \(channel.name) (videoCount=\(channel.videoCount))")
+                DebugLogManager.shared?.append("[Channel] ▶️ 초기 채널 선택: \(channel.name) (videoCount=\(channel.videoCount))")
                 selectedChannel = channel
                 loadVideos(for: channel)
                 if channel.avatarURL.isEmpty {
                     refreshChannelInfo(for: channel)
                 }
             } else if let id = initialChannelId {
-                debugLogs.append("[\(timestamp())] ⚠️ 초기 채널 ID 없음: \(id)")
+                DebugLogManager.shared?.append("[Channel] ⚠️ 초기 채널 ID 없음: \(id)")
             } else {
-                #if DEBUG
-                debugLogs.append("[\(timestamp())] ℹ️ onAppear: 초기 채널 없음")
-                #endif
+                DebugLogManager.shared?.append("[Channel] ℹ️ onAppear: 초기 채널 없음")
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Constants.openChannelWithIdNotification)) { notification in
             let info = (notification.userInfo as? [String: Any]) ?? [:]
-            #if DEBUG
-            debugLogs.append("[\(timestamp())] 📬 openChannelWithIdNotification received: \(info["channelId"] ?? "nil")")
-            #endif
+            DebugLogManager.shared?.append("[Channel] 📬 openChannelWithIdNotification received: \(info["channelId"] ?? "nil")")
             self.handleChannelNotification(info)
         }
         .onReceive(NotificationCenter.default.publisher(for: Constants.selectChannelNotification)) { notification in
             let info = (notification.userInfo as? [String: Any]) ?? [:]
-            #if DEBUG
-            debugLogs.append("[\(timestamp())] 📬 selectChannelNotification received: \(info["channelId"] ?? "nil")")
-            #endif
+            DebugLogManager.shared?.append("[Channel] 📬 selectChannelNotification received: \(info["channelId"] ?? "nil")")
             self.handleChannelNotification(info)
         }
         .alwaysOnTop(isPinned, windowIdentifier: "channel")
@@ -221,11 +208,11 @@ struct ChannelDownloaderView: View {
             do {
                 let service = ChannelFetchService()
                 await MainActor.run {
-                    debugLogs.append("[\(timestamp())] 채널 정보 조회: \(url)")
+                    DebugLogManager.shared?.append("[Channel] 채널 정보 조회: \(url)")
                 }
                 let channel = try await service.fetchChannelInfo(from: url)
                 await MainActor.run {
-                    debugLogs.append("[\(timestamp())] ✅ \(channel.name) (구독자 \(channel.subscriberCount ?? 0))")
+                    DebugLogManager.shared?.append("[Channel] ✅ \(channel.name) (구독자 \(channel.subscriberCount ?? 0))")
                     if let existing = channels.first(where: { $0.id == channel.id }) {
                         selectedChannel = existing
                         loadVideos(for: existing)
@@ -240,7 +227,7 @@ struct ChannelDownloaderView: View {
             } catch {
                 await MainActor.run {
                     isAddingChannel = false
-                    debugLogs.append("[\(timestamp())] ❌ 채널 추가 실패: \(error.localizedDescription)")
+                    DebugLogManager.shared?.append("[Channel] ❌ 채널 추가 실패: \(error.localizedDescription)")
                     let alert = NSAlert()
                     alert.messageText = "채널을 추가할 수 없습니다"
                     alert.informativeText = error.localizedDescription
@@ -256,7 +243,7 @@ struct ChannelDownloaderView: View {
 
         if !force, isFresh, let cached = ChannelDownloadCache.cachedVideos(channelId: channel.id) {
             channelVideos = cached
-            debugLogs.append("[\(timestamp())] ⏩ 캐시된 영상 목록 사용 (24h, \(cached.count)개)")
+            DebugLogManager.shared?.append("[Channel] ⏩ 캐시된 영상 목록 사용 (24h, \(cached.count)개)")
             updateVideoCount(for: channel, count: cached.count)
             return
         }
@@ -265,14 +252,14 @@ struct ChannelDownloaderView: View {
         if !force, let cached = ChannelDownloadCache.cachedVideos(channelId: channel.id) {
             channelVideos = cached
             updateVideoCount(for: channel, count: cached.count)
-            debugLogs.append("[\(timestamp())] ⏩ 캐시된 영상 사용 (stale, \(cached.count)개, background refresh)")
+            DebugLogManager.shared?.append("[Channel] ⏩ 캐시된 영상 사용 (stale, \(cached.count)개, background refresh)")
         } else {
             isLoadingVideos = true
             channelVideos = force ? [] : channelVideos
             if force { channelVideos = [] }
         }
 
-        debugLogs.append("[\(timestamp())] ▶️ 영상 목록 로딩: \(channel.name)")
+        DebugLogManager.shared?.append("[Channel] ▶️ 영상 목록 로딩: \(channel.name)")
 
         Task {
             do {
@@ -283,7 +270,7 @@ struct ChannelDownloaderView: View {
                     channelVideos = videos
                     ChannelDownloadCache.setCachedVideos(channelId: channel.id, videos: videos)
                     isLoadingVideos = false
-                    debugLogs.append("[\(timestamp())] ✅ 영상 \(count)개 로드 완료")
+                    DebugLogManager.shared?.append("[Channel] ✅ 영상 \(count)개 로드 완료")
                     ChannelDownloadCache.markFetchDate(channelId: channel.id)
                     self.updateVideoCount(for: channel, count: count)
                 }
@@ -306,7 +293,7 @@ struct ChannelDownloaderView: View {
             } catch {
                 await MainActor.run {
                     isLoadingVideos = false
-                    debugLogs.append("[\(timestamp())] ❌ 영상 로드 실패: \(error.localizedDescription)")
+                    DebugLogManager.shared?.append("[Channel] ❌ 영상 로드 실패: \(error.localizedDescription)")
                     errorMessage = "영상 목록을 불러올 수 없습니다: \(error.localizedDescription)"
                 }
             }
@@ -331,7 +318,7 @@ struct ChannelDownloaderView: View {
     }
 
     private func refreshChannelInfo(for channel: SubscribedChannel) {
-        debugLogs.append("[\(timestamp())] ▶️ 채널 정보 갱신: \(channel.name)")
+        DebugLogManager.shared?.append("[Channel] ▶️ 채널 정보 갱신: \(channel.name)")
 
         Task {
             do {
@@ -360,29 +347,23 @@ struct ChannelDownloaderView: View {
                         }
                         SubscribedChannel.saveAll(channels)
                     }
-                    debugLogs.append("[\(timestamp())] ✅ 채널 정보 갱신 완료: \(updated.name)")
+                    DebugLogManager.shared?.append("[Channel] ✅ 채널 정보 갱신 완료: \(updated.name)")
                 }
             } catch {
                 await MainActor.run {
-                    debugLogs.append("[\(timestamp())] ❌ 채널 정보 갱신 실패: \(error.localizedDescription)")
+                    DebugLogManager.shared?.append("[Channel] ❌ 채널 정보 갱신 실패: \(error.localizedDescription)")
                 }
             }
         }
     }
 
-    private func timestamp() -> String {
-        let df = DateFormatter()
-        df.dateFormat = "HH:mm:ss"
-        return df.string(from: Date())
-    }
-
     private func handleChannelNotification(_ info: [String: Any]) {
-        debugLogs.append("[\(timestamp())] 📨 채널 선택 알림 수신: chId=\(info["channelId"] ?? "nil"), currentSelected=\(selectedChannel?.id ?? "nil")(vc=\(selectedChannel?.videoCount ?? -1))")
+        DebugLogManager.shared?.append("[Channel] 📨 채널 선택 알림 수신: chId=\(info["channelId"] ?? "nil"), currentSelected=\(selectedChannel?.id ?? "nil")(vc=\(selectedChannel?.videoCount ?? -1))")
         if let chId = info["channelId"] as? String,
            let chName = info["channelName"] as? String {
             // 이미 같은 채널이 로드되어 있으면 중복 처리하지 않음
             if selectedChannel?.id == chId, selectedChannel?.videoCount ?? 0 > 0 {
-                debugLogs.append("[\(timestamp())] ⏩ 이미 로드된 채널, 스킵 (videoCount=\(selectedChannel?.videoCount ?? 0))")
+                DebugLogManager.shared?.append("[Channel] ⏩ 이미 로드된 채널, 스킵 (videoCount=\(selectedChannel?.videoCount ?? 0))")
                 return
             }
             let handle = (info["channelHandle"] as? String).flatMap { $0.isEmpty ? nil : $0 }
@@ -397,21 +378,21 @@ struct ChannelDownloaderView: View {
                 SubscribedChannel.saveAll(channels)
             }
             let target = channels.first(where: { $0.id == chId }) ?? ch
-            debugLogs.append("[\(timestamp())] ▶️ 채널 선택: \(target.name) (videoCount=\(target.videoCount), channels에서 찾음=\(channels.contains(where: { $0.id == chId })))")
+            DebugLogManager.shared?.append("[Channel] ▶️ 채널 선택: \(target.name) (videoCount=\(target.videoCount), channels에서 찾음=\(channels.contains(where: { $0.id == chId })))")
             selectedChannel = target
             loadVideos(for: target)
             if target.avatarURL.isEmpty {
                 refreshChannelInfo(for: target)
             }
         } else if let channelId = info["channelId"] as? String {
-            debugLogs.append("[\(timestamp())] 📨 채널 ID만 수신: \(channelId)")
+            DebugLogManager.shared?.append("[Channel] 📨 채널 ID만 수신: \(channelId)")
             channels = SubscribedChannel.loadAll()
             if let channel = channels.first(where: { $0.id == channelId }) {
-                debugLogs.append("[\(timestamp())] ▶️ 채널 선택: \(channel.name) (videoCount=\(channel.videoCount))")
+                DebugLogManager.shared?.append("[Channel] ▶️ 채널 선택: \(channel.name) (videoCount=\(channel.videoCount))")
                 selectedChannel = channel
                 loadVideos(for: channel)
             } else {
-                debugLogs.append("[\(timestamp())] ⚠️ 저장된 채널에서 ID 못찾음: \(channelId)")
+                DebugLogManager.shared?.append("[Channel] ⚠️ 저장된 채널에서 ID 못찾음: \(channelId)")
             }
         }
     }
@@ -450,31 +431,6 @@ struct ChannelDownloaderView: View {
         }
     }
 
-    #if DEBUG
-    private var debugLogView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(debugLogs.suffix(5).enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .textSelection(.enabled)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .id("bottom")
-            }
-            .frame(height: 60)
-            .background(Color(.textBackgroundColor).opacity(0.3))
-            .onChange(of: debugLogs.count) {
-                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
-            }
-        }
-    }
-    #endif
+
 }
 

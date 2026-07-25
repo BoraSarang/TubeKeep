@@ -121,40 +121,95 @@ LAUNCHER
     fi
 fi
 
-# ffmpeg
-if [ -f "$CACHE_DIR/ffmpeg" ]; then
+# ffmpeg + ffprobe
+if [ -f "$CACHE_DIR/ffmpeg" ] && [ -f "$CACHE_DIR/ffprobe" ]; then
     cp "$CACHE_DIR/ffmpeg" "$RESOURCES_DIR/ffmpeg"
-    echo "📦 ffmpeg from cache"
+    cp "$CACHE_DIR/ffprobe" "$RESOURCES_DIR/ffprobe"
+    echo "📦 ffmpeg + ffprobe from cache"
 else
-    echo "⬇️  Downloading ffmpeg (static)..."
-    FFMPEG_URL="https://evermeet.cx/ffmpeg/getrelease/zip"
-    TMP_ZIP="/tmp/ffmpeg_$$.zip"
+    echo "⬇️  Downloading ffmpeg + ffprobe (static)..."
     mkdir -p "$CACHE_DIR"
-    if curl -# -f -JL -o "$TMP_ZIP" "$FFMPEG_URL"; then
-        TMP_DIR="/tmp/ffmpeg_extract_$$"
-        mkdir -p "$TMP_DIR"
-        unzip -o "$TMP_ZIP" -d "$TMP_DIR" &> /dev/null
-        FFMPEG_BIN="$TMP_DIR/ffmpeg"
-        if [ -f "$FFMPEG_BIN" ]; then
-            cp "$FFMPEG_BIN" "$CACHE_DIR/ffmpeg"
-            chmod +x "$CACHE_DIR/ffmpeg"
-            cp "$CACHE_DIR/ffmpeg" "$RESOURCES_DIR/ffmpeg"
-            echo "✅ ffmpeg downloaded ($(du -h "$CACHE_DIR/ffmpeg" | cut -f1))"
+    for BIN in ffmpeg ffprobe; do
+        URL="https://evermeet.cx/ffmpeg/getrelease/$BIN/zip"
+        TMP_ZIP="/tmp/${BIN}_$$.zip"
+        if curl -# -f -JL -o "$TMP_ZIP" "$URL"; then
+            TMP_DIR="/tmp/${BIN}_extract_$$"
+            mkdir -p "$TMP_DIR"
+            unzip -o "$TMP_ZIP" -d "$TMP_DIR" &> /dev/null
+            BIN_PATH="$TMP_DIR/$BIN"
+            if [ -f "$BIN_PATH" ]; then
+                cp "$BIN_PATH" "$CACHE_DIR/$BIN"
+                chmod +x "$CACHE_DIR/$BIN"
+                cp "$CACHE_DIR/$BIN" "$RESOURCES_DIR/$BIN"
+                echo "✅ $BIN downloaded ($(du -h "$CACHE_DIR/$BIN" | cut -f1))"
+            else
+                echo "⚠️  $BIN not found in zip"
+            fi
+            rm -rf "$TMP_ZIP" "$TMP_DIR"
         else
-            echo "⚠️  ffmpeg binary not found in zip"
+            rm -f "$TMP_ZIP"
+            echo "⚠️  $BIN download failed, trying system..."
+            if command -v "$BIN" &> /dev/null; then
+                cp "$(command -v "$BIN")" "$RESOURCES_DIR/$BIN"
+                echo "📦 $BIN bundled from system"
+            else
+                echo "❌ $BIN not found. Please install: brew install ffmpeg"
+                exit 1
+            fi
         fi
-        rm -rf "$TMP_ZIP" "$TMP_DIR"
+    done
+fi
+
+# whisper.cpp (optional — for local AI subtitles)
+WHISPER_BIN="whisper-cli"
+
+# Dynamically find libwhisper from Homebrew
+WHISPER_LIB=""
+for libpath in /opt/homebrew/lib/libwhisper.1.dylib /usr/local/lib/libwhisper.1.dylib; do
+    [ -f "$libpath" ] && { WHISPER_LIB="$libpath"; break; }
+done
+if [ -z "$WHISPER_LIB" ] && command -v brew &>/dev/null; then
+    WHISPER_LIB="$(brew --prefix whisper-cpp 2>/dev/null)/lib/libwhisper.1.dylib"
+    [ ! -f "$WHISPER_LIB" ] && WHISPER_LIB=""
+fi
+
+fix_whisper_binary() {
+    local bin="$1"
+    [ ! -f "$bin" ] && return
+    if otool -L "$bin" 2>/dev/null | grep -q "@rpath/libwhisper"; then
+        if [ -n "$WHISPER_LIB" ]; then
+            install_name_tool -change @rpath/libwhisper.1.dylib "$WHISPER_LIB" "$bin" 2>&1 | grep -v "warning" || true
+        else
+            echo "⚠️  libwhisper.dylib not found, whisper-cli may not work"
+        fi
+    fi
+    codesign -f -s - "$bin" 2>/dev/null || true
+}
+
+if [ -f "$CACHE_DIR/$WHISPER_BIN" ]; then
+    cp "$CACHE_DIR/$WHISPER_BIN" "$RESOURCES_DIR/$WHISPER_BIN"
+    fix_whisper_binary "$RESOURCES_DIR/$WHISPER_BIN"
+    echo "📦 whisper from cache"
+else
+    WHISPER_SRC=""
+    for p in /opt/homebrew/bin/whisper-cli /usr/local/bin/whisper-cli; do
+        [ -x "$p" ] && { WHISPER_SRC="$p"; break; }
+    done
+    if [ -z "$WHISPER_SRC" ] && command -v brew &>/dev/null; then
+        echo "⬇️  Installing whisper-cpp via Homebrew..."
+        brew install whisper-cpp 2>&1 | tail -3
+        [ -x /opt/homebrew/bin/whisper-cli ] && WHISPER_SRC="/opt/homebrew/bin/whisper-cli"
+    fi
+    if [ -n "$WHISPER_SRC" ]; then
+        cp "$WHISPER_SRC" "$RESOURCES_DIR/$WHISPER_BIN"
+        cp "$WHISPER_SRC" "$CACHE_DIR/$WHISPER_BIN"
+        chmod +x "$RESOURCES_DIR/$WHISPER_BIN"
+        fix_whisper_binary "$RESOURCES_DIR/$WHISPER_BIN"
+        fix_whisper_binary "$CACHE_DIR/$WHISPER_BIN"
+        echo "✅ whisper bundled ($(du -h "$RESOURCES_DIR/$WHISPER_BIN" | cut -f1))"
     else
-        rm -f "$TMP_ZIP"
-        echo "⚠️  Download failed, trying system ffmpeg..."
-        if command -v ffmpeg &> /dev/null; then
-            cp "$(command -v ffmpeg)" "$RESOURCES_DIR/ffmpeg"
-            chmod +x "$RESOURCES_DIR/ffmpeg"
-            echo "📦 ffmpeg bundled from system"
-        else
-            echo "❌ ffmpeg not found. Please install: brew install ffmpeg"
-            exit 1
-        fi
+        echo "⚠️  whisper not available. Run: brew install whisper-cpp"
+        echo "   Local AI subtitles will be unavailable without it."
     fi
 fi
 
@@ -170,7 +225,7 @@ cp -R "$MAIN_BUNDLE" "$INSTALL_DIR/TubeKeep.app"
 echo "✅ Installed: $INSTALL_DIR/TubeKeep.app"
 
 # Ad-hoc sign to suppress Gatekeeper "Intel 미지원" warning (ARM64-only build)
-codesign --force --deep --sign - "$INSTALL_DIR/TubeKeep.app" 2>/dev/null
+codesign --force --deep --sign - "$INSTALL_DIR/TubeKeep.app" 2>/dev/null || true
 
 echo ""
 echo "🚀 Launching TubeKeep..."

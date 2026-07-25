@@ -3,7 +3,7 @@ import Foundation
 enum Constants {
     static let appName = "TubeKeep"
     static let appGroupSuiteName = "com.tubekeep.shared"
-    static let defaultResolution = 480
+    static let defaultResolution = 360
     static let defaultConcurrentDownloads = 2
     static let minConcurrentDownloads = 1
     static let maxConcurrentDownloads = 5
@@ -12,12 +12,11 @@ enum Constants {
     static let defaultStorageDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Documents/TubeKeep").path
     static let defaultFilenameTemplate = "{index} - {title}.{id}"
-    static let defaultAX4APIKey = "sktax-XyeKFrq67ZjS4EpsDlrHHXV8it"
+    static let defaultAX4APIKey = ""
     static let defaultOpenRouterModel = "openrouter/free"
 
     static var youtubeExtractorArgs: String {
-        let lang = Locale.preferredLanguages.first?.prefix(2) ?? "en"
-        return "youtube:lang=\(lang)"
+        return "youtube:lang=\(LanguageService.systemLanguageCode)"
     }
 
     static let settingsSaveKey = "appSettings"
@@ -41,6 +40,10 @@ enum Constants {
     static let selectChannelNotification = Notification.Name("com.tubekeep.selectChannel")
     static let openSettingsWindowNotification = Notification.Name("com.tubekeep.openSettingsWindow")
     static let openAIWindowNotification = Notification.Name("com.tubekeep.openAIWindow")
+    static let openPlayerWindowNotification = Notification.Name("com.tubekeep.openPlayerWindow")
+    static let downloadHistoryDidChangeNotification = Notification.Name("com.tubekeep.downloadHistoryDidChange")
+    static let openWhisperSettingsNotification = Notification.Name("com.tubekeep.openWhisperSettings")
+    static let videoAIDidChangeNotification = Notification.Name("com.tubekeep.videoAIDidChange")
 
     static let librarySaveKey = "downloadLibrary"
     static let libraryViewModeKey = "libraryViewMode"
@@ -97,6 +100,55 @@ enum Constants {
         }
         return "yt-dlp"
     }()
+
+    static let ffprobePath: String = {
+        if let bundlePath = Bundle.main.resourceURL?.appendingPathComponent("ffprobe").path,
+           FileManager.default.fileExists(atPath: bundlePath) {
+            return bundlePath
+        }
+        let candidates = [
+            "/usr/local/bin/ffprobe",
+            "/opt/homebrew/bin/ffprobe",
+            "/usr/bin/ffprobe",
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return "ffprobe"
+    }()
+
+    static var ffmpegDirectory: String {
+        if let resourcePath = Bundle.main.resourcePath {
+            return resourcePath
+        }
+        return "/usr/local/bin"
+    }
+
+    static var whisperPath: String {
+        if let bundlePath = Bundle.main.resourceURL?.appendingPathComponent("whisper-cli").path,
+           FileManager.default.fileExists(atPath: bundlePath) {
+            return bundlePath
+        }
+        let candidates = [
+            "/opt/homebrew/bin/whisper-cli",
+            "/usr/local/bin/whisper-cli",
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return "whisper-cli"
+    }
+
+    static var transcodedCacheDirectory: URL {
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("com.tubekeep/transcoded")
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
 
     static let ffmpegPath: String = {
         // Bundled path first

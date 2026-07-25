@@ -28,22 +28,31 @@ struct MainView: View {
             case .discover:
                 DiscoverView(store: store)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .history:
+                HistoryView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .overlay {
             if let toast = store.library.subtitleToast {
-                subtitleToastView(toast)
-                    .transition(.opacity.combined(with: .scale))
-                    .animation(.easeInOut(duration: 0.25), value: toast.id)
+                ToastOverlay(toast: toast, videoId: store.library.subtitleToastVideoId) {
+                    store.send(.library(.dismissSubtitleToast))
+                }
+                .transition(.opacity.combined(with: .scale))
+                .animation(.easeInOut(duration: 0.25), value: toast.id)
+                .onAppear { HoverPreviewPanel.isSuppressed = true }
+                .onDisappear { HoverPreviewPanel.isSuppressed = false }
             }
         }
         .overlay(alignment: .top) {
             if let toast = store.downloadQueue.toastMessage {
-                toastBanner(toast)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.3), value: toast.id)
+                ToastBanner(toast: toast) {
+                    store.send(.downloadQueue(.dismissToast))
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: toast.id)
             }
         }
         .alert("Gemini API 키 필요", isPresented: Binding(
@@ -62,20 +71,17 @@ struct MainView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
-                Button("영상 다운로더") {
-                    NotificationCenter.default.post(name: Constants.openDownloaderWindowNotification, object: nil)
+                Menu("영상 다운로드") {
+                    Button("영상 다운로더") {
+                        NotificationCenter.default.post(name: Constants.openDownloaderWindowNotification, object: nil)
+                    }
+                    Button("일괄 다운로더") {
+                        NotificationCenter.default.post(name: Constants.openBatchWindowNotification, object: nil)
+                    }
+                    Button("채널 다운로더") {
+                        NotificationCenter.default.post(name: Constants.openChannelWindowNotification, object: nil)
+                    }
                 }
-                .help("영상 다운로더 열기")
-
-                Button("일괄 다운로더") {
-                    NotificationCenter.default.post(name: Constants.openBatchWindowNotification, object: nil)
-                }
-                .help("일괄 다운로더 열기")
-
-                Button("채널 다운로더") {
-                    NotificationCenter.default.post(name: Constants.openChannelWindowNotification, object: nil)
-                }
-                .help("채널 다운로더 열기")
 
                 Spacer()
 
@@ -101,91 +107,12 @@ struct MainView: View {
         .onAppear {
             store.send(.library(.loadFromDisk))
         }
-    }
-
-    @ViewBuilder
-    private func subtitleToastView(_ toast: ToastMessage) -> some View {
-        ZStack {
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                Image(systemName: toast.type == .success
-                    ? "checkmark.circle.fill"
-                    : "xmark.circle.fill"
-                )
-                .font(.system(size: 64))
-                .foregroundStyle(toast.type == .success ? .green : .red)
-
-                Text(toast.message)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(4)
-
-                if toast.type == .success,
-                   let videoId = store.library.subtitleToastVideoId,
-                   let item = store.library.items.first(where: { $0.id == videoId }) {
-                    Button("Finder에서 보기") {
-                        let url = URL(fileURLWithPath: item.filePath)
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .padding(.top, 4)
-                }
-            }
-            .padding(40)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 6)
-        }
-        .onAppear {
-            HoverPreviewPanel.isSuppressed = true
-        }
-        .onDisappear {
-            HoverPreviewPanel.isSuppressed = false
+        .onReceive(NotificationCenter.default.publisher(for: Constants.videoAIDidChangeNotification)) { _ in
+            store.send(.library(.loadFromDisk))
         }
     }
 
-    @ViewBuilder
-    private func toastBanner(_ toast: ToastMessage) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: toast.type == .success
-                ? "checkmark.circle.fill"
-                : toast.type == .error
-                ? "exclamationmark.triangle.fill"
-                : "arrow.clockwise"
-            )
-            .foregroundStyle(toast.type == .success
-                ? .green
-                : toast.type == .error
-                ? .red
-                : .blue
-            )
-            .font(.system(size: 11))
 
-            Text(toast.message)
-                .font(.caption)
-                .lineLimit(1)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button {
-                store.send(.downloadQueue(.dismissToast))
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(10)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-    }
 }
 
 struct AlwaysOnTopToggle: View {
@@ -273,11 +200,13 @@ struct AIWindowView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("요약 정보를 불러오는 중...")
+                        let msg = store.library.summaryProgressMessage
+                        Text(msg.isEmpty ? "요약 정보를 불러오는 중..." : msg)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
                 }
+                .animation(.default, value: store.library.summaryProgressMessage)
             }
         }
         .alwaysOnTop(alwaysOnTop, windowIdentifier: "ai")
@@ -402,6 +331,13 @@ struct AIWindowView: View {
                     ProgressView()
                         .scaleEffect(0.5)
                         .frame(width: 12, height: 12)
+                    let podcastMsg = store.library.podcastProgressMessage
+                    if !podcastMsg.isEmpty {
+                        Text(podcastMsg)
+                            .font(.system(size: 8))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
                 } else if hasPodcast {
                     if isPlaying {
                         Text("\(formatTime(playbackTime))/\(formatTime(podcastTotalDuration))")

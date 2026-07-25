@@ -59,6 +59,30 @@ actor YouTubeDLService {
         url: String,
         progressHandler: (@Sendable (String) -> Void)? = nil
     ) async throws -> (VideoInfo, [Format]) {
+        let cookies = LanguageService.cookiesArgs
+        do {
+            return try await _runInfoFetch(url: url, cookies: cookies, progressHandler: progressHandler)
+        } catch let error as YTDLPError {
+            if case let .infoFetchFailed(stderr) = error, !cookies.isEmpty {
+                let lower = stderr.lowercased()
+                if lower.contains("cookie") || lower.contains("could not find") || lower.contains("keyring") || lower.contains("browser") {
+                    #if DEBUG
+                    Task { @MainActor in
+                        DebugLogManager.shared?.append("[YouTubeDL] 쿠키 추출 실패, 쿠키 없이 재시도")
+                    }
+                    #endif
+                    return try await _runInfoFetch(url: url, cookies: [], progressHandler: progressHandler)
+                }
+            }
+            throw error
+        }
+    }
+
+    private func _runInfoFetch(
+        url: String,
+        cookies: [String],
+        progressHandler: (@Sendable (String) -> Void)?
+    ) async throws -> (VideoInfo, [Format]) {
         guard checkInstallation() else {
             throw YTDLPError.notInstalled
         }
@@ -82,7 +106,11 @@ actor YouTubeDLService {
             try? fm.removeItem(at: stdoutURL)
         }
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        let args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download", "--extractor-args", Constants.youtubeExtractorArgs, url]
+        var args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download", "--extractor-args", Constants.youtubeExtractorArgs, url]
+        if !cookies.isEmpty { args += cookies }
+        #if DEBUG
+        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 쿠키 적용: \(cookies.joined(separator: " "))") } }
+        #endif
         process.arguments = args
 
         process.standardOutput = stdoutFile
@@ -138,6 +166,14 @@ actor YouTubeDLService {
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
 
         guard process.terminationStatus == 0 else {
+            #if DEBUG
+            let trimmed = stderrOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                Task { @MainActor in
+                    DebugLogManager.shared?.append("[yt-dlp 오류] \(trimmed)")
+                }
+            }
+            #endif
             throw YTDLPError.infoFetchFailed(stderrOutput)
         }
 
@@ -155,6 +191,30 @@ actor YouTubeDLService {
         }
 
         return (videoInfo, formats)
+    }
+
+    func fetchStreamingURL(url: String) async throws -> URL {
+        guard checkInstallation() else {
+            throw YTDLPError.notInstalled
+        }
+        var args = [
+            Constants.ytDlpPath,
+            "-f", "best[ext=mp4]/best",
+            "--get-url",
+            "--no-warnings",
+        ]
+        let cookies = LanguageService.cookiesArgs
+        if !cookies.isEmpty { args += cookies }
+        #if DEBUG
+        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 스트리밍 쿠키 적용: \(cookies.joined(separator: " "))") } }
+        #endif
+        args.append(url)
+        let output = try await runner.runSync(executable: "env", arguments: args)
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let streamURL = URL(string: trimmed) else {
+            throw YTDLPError.infoFetchFailed("스트리밍 URL을 가져올 수 없습니다")
+        }
+        return streamURL
     }
 
     func fetchPlaylist(url: String) async throws -> [VideoInfo] {
@@ -231,11 +291,13 @@ actor YouTubeDLService {
         embedMetadata: Bool = true
     ) -> [String] {
         let formatId: String = {
+            let id = item.selectedFormat.id
             if item.selectedFormat.isVideoOnly {
                 let height = item.selectedFormat.height
-                return "\(item.selectedFormat.id)+bestaudio[ext=m4a]/\(item.selectedFormat.id)+bestaudio/best[height<=\(height)]"
+                let fallback = "\(id)+bestaudio[ext=m4a]/\(id)+bestaudio/best[height<=\(height)]"
+                return "\(id)[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/\(fallback)"
             }
-            return item.selectedFormat.id
+            return "\(id)[ext=mp4][vcodec^=avc1]/\(id)"
         }()
         var args: [String] = [
             "--newline",
@@ -254,7 +316,11 @@ actor YouTubeDLService {
         }
 
         if item.includeSubtitles {
-            args += ["--write-subs", "--write-auto-subs", "--sub-langs", "en,ko"]
+            let subLangs = LanguageService.subtitleLanguages
+            args += ["--write-subs", "--write-auto-subs", "--sub-langs", subLangs]
+            #if DEBUG
+            Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDLService] --sub-langs: \(subLangs)") }
+            #endif
         }
 
         if item.audioOnly {
@@ -266,9 +332,14 @@ actor YouTubeDLService {
         }
 
         if embedMetadata {
-            args += ["--embed-metadata", "--embed-thumbnail"]
+            args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
         }
 
+        let cookies = LanguageService.cookiesArgs
+        if !cookies.isEmpty { args += cookies }
+        #if DEBUG
+        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 다운로드 쿠키 적용: \(cookies.joined(separator: " "))") } }
+        #endif
         args.append(item.videoInfo.webpageURL)
         return args
     }

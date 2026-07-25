@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class LibraryItem: Identifiable, @unchecked Sendable {
+final class LibraryItem: Identifiable {
     @Attribute(.unique) var id: String
     var title: String
     var channelId: String
@@ -50,6 +50,8 @@ final class LibraryItem: Identifiable, @unchecked Sendable {
         return item
     }
 }
+
+extension LibraryItem: @unchecked Sendable {}
 
 extension LibraryItem: Equatable {
     static func == (lhs: LibraryItem, rhs: LibraryItem) -> Bool {

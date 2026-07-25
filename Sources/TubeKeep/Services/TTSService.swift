@@ -21,7 +21,7 @@ final class TTSService: NSObject, AVSpeechSynthesizerDelegate {
         synthesizer.stopSpeaking(at: .immediate)
 
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "ko-KR")
+        utterance.voice = AVSpeechSynthesisVoice(language: LanguageService.appleTTSLanguage)
         utterance.rate = rate
         utterance.pitchMultiplier = 1.0
         utterance.preUtteranceDelay = 0.1
@@ -89,7 +89,7 @@ final class TTSService: NSObject, AVSpeechSynthesizerDelegate {
         if let voiceId = voiceIdentifier, let voice = AVSpeechSynthesisVoice(identifier: voiceId) {
             utterance.voice = voice
         } else {
-            utterance.voice = AVSpeechSynthesisVoice(language: "ko-KR")
+            utterance.voice = AVSpeechSynthesisVoice(language: LanguageService.appleTTSLanguage)
         }
         utterance.rate = rate
         utterance.pitchMultiplier = 1.0

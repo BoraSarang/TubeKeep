@@ -132,7 +132,7 @@ struct State: Equatable {
     // General
     var concurrentDownloads: Int = 2
     var storageDirectory: String = "~/Documents/TubeKeep"
-    var defaultResolution: Int = 480
+    var defaultResolution: Int = 360
     var maxRetries: Int = 3
     var limitRate: Int = 0
 
@@ -146,6 +146,7 @@ struct State: Equatable {
     var clipboardMonitoring: Bool = true
     var maxUploadCheck: Int = 500
     var skipIndexOnFailure: Bool = false
+    var playerMode: PlayerMode = .builtIn
 
     // AI (v2.2.0: SummaryServiceMode 제거, 항상 자동 폴백)
     var geminiAPIKey: String = ""
@@ -310,6 +311,35 @@ var filteredItems: [LibraryItem] {
 ### 2.8 ChannelReducer
 상태: channelURL, channelInfo, videos, isLoading, selectedIDs, preset, filterText, sortOrder, offset 등.
 
+### 2.9 PlayerReducer (v2.6.0)
+
+```swift
+@ObservableState
+struct State: Equatable {
+    var videoURL: URL?
+    var title: String = ""
+    var channelName: String = ""
+    var duration: Int = 0
+    var currentTime: Double = 0
+    var isPlaying: Bool = false
+    var isFullscreen: Bool = false
+    var showPanel: Bool = false
+    var showSubtitleOverlay: Bool = false
+    var subtitles: [SubtitleCue] = []
+    var subtitleError: String?
+    var isLoadingSubtitles: Bool = false
+    var conversionProgress: Double = 0        // v2.6.1
+    var conversionETA: String = ""            // v2.6.1
+}
+```
+
+주요 액션: `openFile(url:title:channelName:duration:)`, `play`, `pause`, `seek(progress:)`, `setCurrentTime`, `togglePlay`, `toggleFullscreen`, `togglePanel`, `toggleSubtitleOverlay`, `subtitlesLoaded`/`subtitleError`/`fetchSubtitles`, `updateConversionProgress`/`updateConversionETA`.
+
+- 자막 로딩 우선순위: DB transcript → 추정 타이밍 (duration 필요) → DB transcript fallback → yt-dlp VTT/SRT
+- 자막 언어 우선순위: `.ko.`가 `.en.`보다 먼저 정렬됨 (v2.6.1)
+- 변환 진행률: ffmpeg `-progress pipe:1` stdout에서 `out_time_us=` 파싱 → `conversionProgress` + `conversionETA`
+- HTML 디코딩: `decodeHTMLEntities()` (static, fileprivate)
+
 ---
 
 ## 3. UIView / AppKit 통합
@@ -333,6 +363,7 @@ NSStatusBar.system.statusItem(withLength: 88)
 | 일괄 다운로더 | `"batch"` | 480×420 | 480×340 | 불가 | 비활성화 |
 | 채널 다운로더 | `"channel"` | 720×520 | 720×400 | 세로만 (maxHeight 9999) | 비활성화 |
 | 설정 | `"settings"` | 560×420 | 560×420 | 고정 (리사이즈 불가) | 비활성화 |
+| 플레이어 (v2.6.0) | `"player"` | 854×480 | 854×480 | 불가 | 비활성화 |
 
 #### FixedWidthWindowController
 - `NSWindowDelegate.windowWillResize(to:)` 구현 → width를 840으로 고정
@@ -441,12 +472,21 @@ enum LibraryViewMode: String, Equatable, CaseIterable {
 - `download(videoInfo:format:)` → AsyncThrowingStream<ProgressUpdate>
 - 내부: Process + yt-dlp, JSON stdout 파싱
 
-### 5.2 DownloadManager (class, singleton)
+### 5.2 DownloadManager (class, singleton, @unchecked Sendable)
 - `startDownload(item:)` → Process 시작
 - `pauseDownload(id:)` / `resumeDownload(id:)` / `cancelDownload(id:)`
-- `activeProcesses` → `OSAllocatedUnfairLock`으로 스레드 세이프
-- 진행률 파싱: stderr에서 `[download] N.N%` 추출
-- 완료 시 NSSound("Glass") 재생
+- **동시성 보호**: 2개의 `OSAllocatedUnfairLock` 사용
+  - `activeLock`: `[UUID: Process]` 사전 보호 (진행 중인 yt-dlp 프로세스 맵)
+  - `stateLock`: `ManagerState` struct 보호 (settings, storageDirectory, filenameTemplate, pausedItems)
+    - `startDownload()` 진입 시 Lock에서 값 복사 후 지역 변수 사용 → 내부에서는 Lock 불필요
+    - `buildDownloadArgs()` / `constructOutputTemplate()`는 파라미터로 설정값 전달받음
+    - `updateSettings()`는 Lock 내부에서 모든 필드 일괄 갱신
+- 진행률 파싱: stdout에서 `%(progress._percent_str)s|%(progress._speed_str)s` 추출
+- 완료 시 NSSound("Purr") 재생
+- **H.264 필터 (v2.6.1)**: `buildDownloadArgs()`에서 모든 포맷에 `[ext=mp4][vcodec^=avc1]` 우선 적용 (YouTubeDLService와 동일)
+- **경로 검증 (v2.6.1)**: `--print-to-file after_move:filepath`로 출력 경로 추적 후 `.mp4` 확장자 검증
+  - after_move 경로가 `.webp`/`.png` 등 비디오 파일이 아니면, 출력 디렉토리에서 `{videoId}.mp4` 스캔 fallback
+  - `--embed-thumbnail`로 생성된 섬네일파일이 after_move를 오염시키는 문제 해결
 
 ### 5.3 ProcessRunner (actor)
 - `run(arguments:)` → AsyncThrowingStream<String, Error> (실시간 stderr)
@@ -634,7 +674,7 @@ VStack(spacing: 0)
 ### 6.7 설정 뷰 (SettingsView) — 네이티브 설정 창 (⌘,)
 - `AppDelegate.openSettingsWindow()` → NSWindow 직접 생성/관리 (`TubeKeepApp`은 빈 Scene)
 - 메뉴바 "설정..." (⌘,) + `NSEvent.addLocalMonitorForEvents` 글로벌 모니터로 모든 창에서 접근 가능
-- **v2.2.0**: 4탭 레이아웃 (일반/저장/시스템/AI 요약) — 좌측 140pt 사이드바 + 우측 ScrollView
+- **v2.2.0**: 4탭 레이아웃 (일반/저장/시스템/AI 요약) → **v2.7.2**: 5탭 (다운로드/저장/알림 신규/시스템/AI 설정) — 좌측 140pt 사이드바 + 우측 ScrollView
 - `SettingsRow<Control>` 제네릭 컴포넌트: Title + Description 수직 스택 + Control
 - `SummaryServiceMode` 제거 (v2.2.0) — 항상 OpenRouter → yTeaser → A.X 4.0 → Gemini 자동 폴백
 - 창 크기: 가로 560px 고정, 세로 420px 고정 (리사이즈 불가)
@@ -678,92 +718,72 @@ extension View {
 ## 8. DebugLogView (DEBUG 전용)
 
 ### 목적
-- 각 window의 동작을 실시간 로그로 확인
+- 모든 서비스/Reducer의 동작을 단일 로그 창에서 실시간 확인
 - 창 생성/포커스/닫힘/버튼 클릭 등 주요 이벤트 기록
 - **DEBUG 빌드에서만 컴파일** (#if DEBUG)
 
-### DebugLogManager (class, ObservableObject)
+### DebugLogManager (class, ObservableObject — Singleton)
 ```swift
 #if DEBUG
 final class DebugLogManager: ObservableObject {
+    nonisolated(unsafe) static var shared: DebugLogManager?
+
     @Published var logs: [String] = []
     
     func append(_ message: String) {
-        let ts = DateFormatter()
-        ts.dateFormat = "HH:mm:ss.SSS"
-        logs.append("[\(ts.string(from: Date()))] \(message)")
+        let timestamp = DateFormatter()
+        timestamp.dateFormat = "HH:mm:ss.SSS"
+        logs.append("[\(timestamp.string(from: Date()))] \(message)")
     }
     
     func clear() { logs.removeAll() }
 }
 #endif
 ```
-- 각 window마다 독립적인 인스턴스
-- AppDelegate 프로퍼티에 저장되어 AppDelegate도 직접 로그 추가 가능
-- View에 `@ObservedObject`로 전달
+- **단일 싱글톤** (`DebugLogManager.shared`) — AppDelegate의 `applicationDidFinishLaunching`에서 1회 생성
+- 모든 서비스/Reducer(View 포함)가 `DebugLogManager.shared?.append()`로 접근
+- `DebugLogManager` 자체가 `#if DEBUG`로 감싸져 있어 릴리즈 빌드에서 개별 호출에 `#if DEBUG` 불필요
 
-### DebugLogView (SwiftUI View)
-```swift
-#if DEBUG
-struct DebugLogView: View {
-    @ObservedObject var manager: DebugLogManager
-    
-    body: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 1) {
-                        ForEach(Array(manager.logs.enumerated()), id: \.offset) { _, entry in
-                            Text(entry)
-                                .font(.system(size: 9, design: .monospaced))
-                                .textSelection(.enabled)  // 복사 가능
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(6)
-                    .onChange(of: manager.logs.count) { _ in
-                        withAnimation { proxy.scrollTo(manager.logs.count - 1, anchor: .bottom) }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: 120)
-                .background(Color(.textBackgroundColor))
-            }
-            Divider()
-            HStack {
-                Button("복사") { /* NSPasteboard */ }.controlSize(.small)
-                Button("지우기") { manager.clear() }.controlSize(.small)
-                Spacer()
-            }
-            .padding(.horizontal, 8).padding(.vertical, 2)
-        }
-    }
-}
-#endif
-```
+### DebugLogView (SwiftUI View) + DebugLogWindowView (독립 창)
+- `DebugLogView`: 공유 뷰 컴포넌트 — `@ObservedObject var manager: DebugLogManager`를 받아 로그 목록 표시
+- `DebugLogWindowView`: 독립 NSWindow로 표시 — 메뉴바 "디버그 로그 열기 (Cmd+D)"로 열림
+- 기능: 라인 선택 (Cmd/Shift 다중 선택), 자동 스크롤, 전체/선택 복사, 클리어, 최상위 고정(pin)
 
 ### 통합 방식
-- 각 window의 SwiftUI root view 최하단에 `DebugLogView` 추가
-- AppDelegate에서 window 생성 시 `DebugLogManager`를 만들어 view에 주입 + AppDelegate에도 저장
-- 주요 로그 포인트:
-  - window 생성/재사용/닫힘
-  - makeKeyAndOrderFront / NSApp.activate
-  - distributed notification 송수신
-  - clipboard 감지 → autoFetch
-  - URL scheme 처리
+- 더 이상 각 window의 root view 하단에 `DebugLogView`를 직접 추가하지 않음
+- `DebugLogWindowView`가 독립 창에서 모든 로그를 통합 표시
+- ChannelDownloaderView 등은 자체 debugLogs 배열 대신 `DebugLogManager.shared?.append()`를 직접 호출
+- `#if DEBUG` 가드 불필요 (DebugLogManager 자체가 DEBUG 전용)
+
+### 로그 프리픽스 규칙
+각 서비스/Reducer는 식별 가능한 프리픽스를 붙인다:
+- `[Channel]` — ChannelDownloaderView
+- `[Download]` — DownloadQueueReducer
+- `[Player]` — PlayerReducer
+- `[Library]` — LibraryReducer
+- `[History]` — LibrarySidebarView / HistoryView
+- `[Podcast]` — PodcastService
+- `[App]` — AppDelegate
+- `[YouTubeDL]` — YouTubeDLService
+- `[Whisper]` — WhisperService
+- `[Subtitle]` — SummarizationService
+- 등
 
 ### 파일 위치
 ```
-Sources/MDownload/Debug/
+Sources/TubeKeep/Debug/
 ├── DebugLogManager.swift
 └── DebugLogView.swift
 ```
 
-## 8. Constants
+---
+
+## 9. Constants
 
 ```swift
 enum Constants {
     static let appName = "TubeKeep"
-    static let defaultResolution = 480
+    static let defaultResolution = 360
     static let defaultConcurrentDownloads = 2
     static let min/maxConcurrentDownloads = 1/5
     static let defaultMaxRetries = 3
@@ -779,15 +799,20 @@ enum Constants {
     static let downloadQueueKey = "downloadQueue"     // T-115
     static let appGroupSuiteName = "com.tubekeep.shared"
 
+    // Cache (v2.6.1)
+    static var transcodedCacheDirectory: URL    // ~/Library/Caches/com.tubekeep/transcoded/
+
     // Notification Center (내부)
     static let openMainWindowNotification = Notification.Name("com.tubekeep.openMainWindow")
     static let openDownloaderWindowNotification = Notification.Name("com.tubekeep.openDownloaderWindow")
     static let openBatchWindowNotification = Notification.Name("com.tubekeep.openBatchWindow")
     static let openChannelWindowNotification = Notification.Name("com.tubekeep.openChannelWindow")
+    static let openPlayerWindowNotification = Notification.Name("com.tubekeep.openPlayerWindow")    // v2.6.0
 
-    // yt-dlp
+    // yt-dlp / ffmpeg
     static var ytDlpPath: String { get }  // 번들 → brew → PATH
     static var ffmpegPath: String { get } // 번들 → brew → PATH
+    static var ffprobePath: String { get } // 번들 → brew → PATH (v2.6.1 ffmpeg 병합용, v2.7.2 코덱 검사는 AVAsset.loadTracks로 대체)
     static var youtubeExtractorArgs: String { get } // "youtube:lang=XX" (시스템 언어 기반)
 
     // URL utils
@@ -799,7 +824,7 @@ enum Constants {
 
 ---
 
-## 9. 파일 목록 (61 Swift 파일)
+## 10. 파일 목록 (84 Swift 파일)
 
 ### App/ (9)
 | 파일 | 설명 |
@@ -809,12 +834,12 @@ enum Constants {
 | `AppReducer.swift` | Root TCA reducer, 브릿지 로직 |
 | `VideoDownloadView.swift` | 영상 다운로더 메인 뷰 (Home+Queue) |
 | `StatusBarView.swift` | StatusBarReducer (메뉴바 상태) |
-| `StatusBarManager.swift` | 메뉴바 상태 관리 + 메뉴 구성 (v2.4.0 AppDelegate 분리) |
+| `StatusBarManager.swift` | 메뉴바 상태 관리 + 메뉴 구성 (v2.4.0 AppDelegate 분리); v2.7.2: queue item action:nil→#selector 수정 |
 | `ClipboardMonitor.swift` | 클립보드 감시 + NSPanel 알림 (v2.4.0 AppDelegate 분리) |
 | `ChannelUpdateService.swift` | 채널 업데이트 30분 타이머 폴링 (v2.4.0 AppDelegate 분리) |
 | `FixedWidthWindowController.swift` | 라이브러리 창 가로 840px 고정 |
 
-### Features/ (21)
+### Features/ (28)
 | 파일 | 설명 |
 |------|------|
 | `AboutView.swift` | 정보 창 |
@@ -826,9 +851,10 @@ enum Constants {
 | `Channel/ChannelContentView.swift` | 채널 콘텐츠 (헤더+비디오목록+다운로드) |
 | `Channel/ChannelDownloaderView.swift` | 채널 다운로더 창 root |
 | `Channel/ChannelListView.swift` | 채널 목록 사이드바 |
-| `Settings/SettingsReducer.swift` | 설정 reducer (v2.2.0: 4탭) |
+| `Settings/SettingsReducer.swift` | 설정 reducer (v2.2.0: 4탭; v2.7.2: 5탭) |
 | `Settings/SettingsView.swift` | 설정 UI (SettingsRow 제네릭 컴포넌트) |
 | `Library/LibraryReducer.swift` | 라이브러리 reducer (v2.5.x: podcast/Q&A/mindmap) |
+| `ToastComponents.swift` | ToastMessage/ToastBanner/ToastOverlay 공유 컴포넌트 (v2.7.0) |
 | `Library/MainView.swift` | 라이브러리 root (sidebar + toolbar + AIWindowView) |
 | `Library/LibrarySidebarView.swift` | 사이드바 (검색/필터/채널목록/디스크사용량) |
 | `Library/LibraryGridView.swift` | 그리드 모드 + LeftClickMenu + 빈 상태 |
@@ -838,8 +864,14 @@ enum Constants {
 | `DownloadQueue/DownloadQueueReducer.swift` | 다운로드 큐 reducer |
 | `DownloadQueue/DownloadQueueView.swift` | 다운로드 큐 UI |
 | `Discover/DiscoverView.swift` | 트렌딩/검색 카드 그리드 (v2.0.0) |
+| `Player/PlayerReducer.swift` | 플레이어 TCA reducer (자막 로딩/파싱, 변환 진행률) (v2.6.0) |
+| `Player/PlayerView.swift` | 플레이어 본문 (트랜스코딩 캐시, 호버 컨트롤, 변환 진행바) (v2.6.0) |
+| `Player/NSPlayerView.swift` | AVPlayerView NSViewRepresentable (autoresizingMask) (v2.6.0) |
+| `Player/PlayerItem.swift` | 플레이어 재생 항목 모델 (v2.6.0) |
+| `Player/SubtitleOverlay.swift` | 비디오 위 자막 오버레이 (v2.6.0) |
+| `Player/SubtitlePanel.swift` | 자막 패널 (로딩/에러/빈 상태) (v2.6.0) |
 
-### Services/ (20)
+### Services/ (22)
 | 파일 | 설명 |
 |------|------|
 | `YouTubeDLService.swift` | yt-dlp 정보 조회 actor |
@@ -857,20 +889,23 @@ enum Constants {
 | `TTSService.swift` | AVSpeechSynthesizer 래퍼 (한국어 TTS) |
 | `QAService.swift` | Q&A 생성 서비스 (v2.5.3) |
 | `MindmapService.swift` | 마인드맵 생성/파싱/DB 저장 서비스 (v2.5.4) |
-| `DatabaseManager.swift` | SQLite DB 관리 (video_ai_data + qna_history 테이블) |
+| `WhisperService.swift` | Whisper CoreML 음성인식 자막 생성 (v2.7.0) |
+| `LanguageService.swift` | 시스템 언어 기반 동적 전환 유틸리티 (v2.7.0) |
+| `DatabaseManager.swift` | SQLite DB 관리 (video_ai_data + qna_history + download_history) |
 | `PersistenceController.swift` | SwiftData ModelContainer 관리 (v2.4.0) |
 | `SwiftDataMigration.swift` | UserDefaults → SwiftData 자동 마이그레이션 (v2.4.0) |
 | `EdgeTTSClient.swift` | Edge TTS API 클라이언트 (실험적) |
 | `ErrorMessageMapper.swift` | yt-dlp 에러 메시지 한글 매핑 (v2.3.0) |
 
-### Models/ (12)
+### Models/ (14)
 | 파일 | 설명 |
 |------|------|
 | `LibraryItem.swift` | `@Model class` — SwiftData 영구 저장 (sortOrder/filterMode/viewMode enum 포함) |
 | `VideoInfo.swift` | YouTube 영상 메타데이터 |
 | `DownloadItem.swift` | 다운로드 작업 모델 |
 | `Format.swift` | 비디오 포맷 |
-| `Settings.swift` | 설정 모델 (SettingsTab enum 포함) |
+| `Settings.swift` | 설정 모델 (SettingsTab enum 포함) — v2.7.0: subtitleLanguageOverride, cookiesFromBrowser, enableAISubtitles, whisperModelDownloaded, presets, smartMode, activePresetId |
+| `DownloadPreset.swift` | 다운로드 프리셋 모델 (v2.7.0) |
 | `SubscribedChannel.swift` | `@Model class` — 구독 채널 SwiftData 모델 |
 | `ChannelModels.swift` | 채널 비디오 + 캐시 |
 | `BatchPreset.swift` | 일괄 다운로드 프리셋 |
@@ -879,10 +914,11 @@ enum Constants {
 | `QAModels.swift` | QAResponse, QATimestamp, QAHistoryItem |
 | `MindmapModels.swift` | MindmapNode (재귀적 Codable, Custom CodingKeys) |
 
-### Helpers/ (4)
+### Helpers/ (5)
 | 파일 | 설명 |
 |------|------|
 | `Constants.swift` | 앱 상수 + 유틸리티 (keyCode 기반 단축키) |
+| `LanguageService.swift` | 시스템 언어 기반 동적 전환 (v2.7.0) |
 | `WindowAccessor.swift` | alwaysOnTop NSViewRepresentable modifier |
 | `BookmarkManager.swift` | Security-scoped bookmark 관리 (저장 폴더 접근 권한) |
 | `ImageCacheEnvironmentKey.swift` | EnvironmentKey 기반 캐시 주입 |
@@ -892,6 +928,11 @@ enum Constants {
 |------|------|
 | `DebugLogManager.swift` | `ObservableObject` 로그 관리자 (타임스탬프 자동 추가) |
 | `DebugLogView.swift` | SwiftUI 로그 뷰 (자동 스크롤, 복사 가능) |
+
+### Features/Library/ (v2.7.0 추가)
+| 파일 | 설명 |
+|------|------|
+| `HistoryView.swift` | 다운로드 히스토리 테이블 뷰 + 검색 + 필터 |
 
 ### Views/ (1)
 | 파일 | 설명 |
@@ -905,7 +946,7 @@ enum Constants {
 
 ---
 
-## 10. 데이터 저장 키 총정리
+## 11. 데이터 저장 키 총정리
 
 ### SwiftData (v2.4.0+)
 | @Model | 테이블 | 주요 속성 |
@@ -931,3 +972,480 @@ enum Constants {
 |--------|------|------|
 | `video_ai_data` | `video_id (PK), transcript, transcript_language, summary, chapters (JSON), mindmap (JSON), podcast_path, tags (JSON), created_at, updated_at` | AI 콘텐츠 캐시 |
 | `qna_history` | `id (PK), video_id (FK), question, answer, timestamps (JSON), created_at` | Q&A 히스토리 |
+| `download_history` (v2.7.0) | `id (PK), video_id, title, channel_name, url, format_label, resolution, file_size, file_path, downloaded_at, status` | 다운로드 완료 내역 |
+
+---
+
+## 12. v2.7.0 — 시스템 언어 + 쿠키 인증 + Whisper AI 자막 + 프리셋 + 히스토리
+
+### 12.1 LanguageService (시스템 언어 동적 전환)
+
+**파일**: `Helpers/LanguageService.swift` (신규)
+
+```swift
+enum LanguageService {
+    /// 시스템 언어 코드 (예: "ko", "en", "ja")
+    static var systemLanguageCode: String {
+        Locale.current.language.languageCode?.identifier ?? "en"
+    }
+    
+    /// 자막 다운로드 언어 리스트 (시스템 언어 우선, 영어 fallback)
+    /// 예: ko→"ko,en", en→"en", ja→"ja,en"
+    static var subtitleLanguages: String {
+        let primary = systemLanguageCode
+        let secondary = primary == "en" ? "" : "en"
+        return secondary.isEmpty ? primary : "\(primary),\(secondary)"
+    }
+    
+    /// Edge TTS 음성 맵핑
+    static func ttsVoice(for engine: TTSEngine) -> (male: String, female: String) {
+        if engine == .apple {
+            return (appleVoice(.male), appleVoice(.female))
+        }
+        let map: [String: (male: String, female: String)] = [
+            "ko": ("ko-KR-InJoonNeural", "ko-KR-SunHiNeural"),
+            "en": ("en-US-ChristopherNeural", "en-US-JennyNeural"),
+            "ja": ("ja-JP-KeitaNeural", "ja-JP-NanamiNeural"),
+            "zh": ("zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural"),
+            "es": ("es-ES-AlvaroNeural", "es-ES-ElviraNeural"),
+            "fr": ("fr-FR-HenriNeural", "fr-FR-DeniseNeural"),
+            "de": ("de-DE-ConradNeural", "de-DE-KatjaNeural"),
+        ]
+        return map[systemLanguageCode] ?? ("ko-KR-InJoonNeural", "ko-KR-SunHiNeural")
+    }
+    
+    static func appleVoice(_ gender: TTSEngine.Gender) -> String {
+        let map: [String: String] = [
+            "ko": "ko-KR.Yuna", "en": "en-US.Samantha", "ja": "ja-JP.Kyoko",
+        ]
+        return map[systemLanguageCode] ?? "ko-KR.Yuna"
+    }
+    
+    /// AI 프롬프트에 주입할 언어 지시문
+    static var aiPromptLanguage: String {
+        switch systemLanguageCode {
+        case "ko": return "한국어로 응답해주세요."
+        case "ja": return "日本語で答えてください。"
+        default:   return "Answer in English."
+        }
+    }
+}
+```
+
+**Settings 연동** (선택적 override):
+```swift
+var subtitleLanguageOverride: String = ""  // 빈 값 = 시스템 언어 따름
+// 사용 시 LanguageService.subtitleLanguages 대신 이 값을 --sub-langs에 사용
+```
+
+**변경 포인트 (12개 파일)**:
+| 파일 | 현재 | 변경 |
+|------|------|------|
+| `DownloadManager.swift:252` | `"en,ko"` | `settings.subtitleLanguages` |
+| `YouTubeDLService.swift` 2곳 | `"en,ko"` | `LanguageService.subtitleLanguages` |
+| `PlayerReducer.swift:238` | `"ko,en"` | `LanguageService.subtitleLanguages` |
+| `SummarizationService.swift:240` | `"en,ko"` | `LanguageService.subtitleLanguages` |
+| `LibraryReducer.swift:419` | `"en,ko"` | `LanguageService.subtitleLanguages` |
+| `TTSService.swift:24,92` | `"ko-KR"` | `LanguageService.appleTTSLanguage` |
+| `EdgeTTSClient.swift:47,105` | `"ko-KR-InJoonNeural"` | `LanguageService.ttsVoice(for:)` |
+| `PodcastService.swift:19-20` | 하드코딩 | `LanguageService.ttsVoice(for:)` |
+
+---
+
+### 12.2 브라우저 쿠키 인증
+
+**설계**: 모든 yt-dlp `Process` 호출에 `--cookies-from-browser {browser}` 플래그 조건부 추가
+
+**Settings 추가 필드**:
+```swift
+var cookiesFromBrowser: String = ""  // 빈 값 = 미사용, 값 = safari/chrome/brave/edge/firefox
+```
+
+**SettingsView** (시스템 탭):
+```swift
+SettingsRow(title: "브라우저 쿠키 사용", description: "비공개/연령 제한 영상 접근") {
+    Picker("", selection: ...) {
+        Text("사용 안 함").tag("")
+        Text("Safari").tag("safari")
+        Text("Chrome").tag("chrome")
+        Text("Brave").tag("brave")
+        Text("Edge").tag("edge")
+        Text("Firefox").tag("firefox")
+    }
+}
+```
+
+**플래그 적용**:
+```swift
+// YouTubeDLService + DownloadManager 공통
+if !settings.cookiesFromBrowser.isEmpty {
+    args += ["--cookies-from-browser", settings.cookiesFromBrowser]
+}
+```
+
+**적용되는 yt-dlp 호출**:
+| 호출 | 함수 | 파일 |
+|------|------|------|
+| 정보 조회 | `fetchVideoInfo()` | YouTubeDLService |
+| 스트리밍 URL | `fetchStreamingURL()` | YouTubeDLService |
+| 자막 다운로드 | `fetchSubtitles()` | YouTubeDLService |
+| 영상 다운로드 | `runDownload()` | DownloadManager |
+| 자막 fetch | `fetchTranscript()` | SummarizationService |
+| Player 자막 | `loadSubtitles()` | PlayerReducer |
+| Library 자막 | `downloadSubtitles()` | LibraryReducer |
+
+---
+
+### 12.3 AI 자막 생성 (Whisper CoreML)
+
+#### 아키텍처
+
+```
+yt-dlp 자막 실패
+       │
+       ▼
+  ┌────────────────────────────┐
+  │  WhisperService (actor)    │
+  │  ┌──────────────────────┐  │
+  │  │ downloadAudio()      │  │  yt-dlp -x --audio-format wav
+  │  │                      │  │
+  │  │ transcribe(wav, lang)│  │  WhisperKit pipeline
+  │  │                      │  │
+  │  │ → [SubtitleCue]      │  │
+  │  └──────────────────────┘  │
+  └────────────────────────────┘
+       │
+       ▼
+  DatabaseManager.updateTranscript(videoId, transcript, language)
+```
+
+#### WhisperService (actor)
+
+```swift
+actor WhisperService {
+    static let shared = WhisperService()
+    private var pipeline: WhisperKit?
+    
+    @MainActor @Published var downloadProgress = DownloadProgress(
+        fraction: 0, speed: "", eta: "", state: .idle
+    )
+    
+    struct DownloadProgress {
+        enum State { case idle, downloading, completed, failed(String) }
+        var fraction: Double, speed: String, eta: String, state: State
+    }
+    
+    var isModelReady: Bool {
+        UserDefaults.standard.bool(forKey: "whisper_model_downloaded")
+    }
+    
+    func downloadModel() async throws {
+        // Hugging Face → ~/Library/Caches/com.tubekeep/whisper/models/
+        // URLSessionDownloadDelegate로 progress 업데이트
+        // 완료 → UserDefaults 저장
+    }
+    
+    func transcribe(audioURL: URL, language: String?) async throws -> [SubtitleCue] {
+        if pipeline == nil {
+            pipeline = try await WhisperKit.loadModel()
+        }
+        let result = try await pipeline!.transcribe(audioPath: audioURL.path, language: language)
+        return result.segments.map { SubtitleCue(startTime: $0.start, endTime: $0.end, text: $0.text) }
+    }
+}
+```
+
+#### 모델 다운로드 UX
+
+```
+Settings AI 탭:
+┌──────────────────────────────────────────────┐
+│  AI 자막 생성 (Whisper)                      │
+│  ─────────────────                           │
+│  영상의 음성을 인식하여 자동으로 자막을       │
+│  생성합니다. 자막이 없는 영상도 한국어/영어   │
+│  등 원하는 언어의 자막을 생성할 수 있습니다.  │
+│                                              │
+│  [■ AI 자막 생성 사용] ← 토글                │
+│                                              │
+│  (모델 미설치 시)                             │
+│  ⚠️ Whisper 음성 인식 모델(~500MB)을        │
+│  다운로드해야 합니다.                        │
+│  [모델 다운로드] [나중에]                    │
+│                                              │
+│  (다운로드 중)                                │
+│  ████████████░░░░ 220/500 MB                │
+│  ⬇ 3.2 MB/s  •  남은 시간: 1분 30초       │
+│  [취소]                                      │
+│                                              │
+│  (완료)                                      │
+│  ✅ Whisper 모델 다운로드 완료              │
+│  [모델 삭제]                                 │
+└──────────────────────────────────────────────┘
+
+앱 전체 토스트 (설정 외 화면에서도 표시):
+┌──────────────────────────────────────┐
+│ ⬇ Whisper 모델 다운로드 중... 45%   │
+└──────────────────────────────────────┘
+완료: "✅ Whisper 모델 다운로드 완료" (3초 후 사라짐)
+실패: "❌ 다운로드 실패 — [재시도]" (유지)
+```
+
+#### 플레이어 통합 (PlayerReducer)
+
+```swift
+// loadSubtitles 3차 fallback
+case .subtitlesFailed:
+    if state.settings.enableAISubtitles, WhisperService.shared.isModelReady {
+        let audioURL = try await downloadAudio(videoId: videoId, url: url)
+        let cues = try await WhisperService.shared.transcribe(audioURL: audioURL, language: LanguageService.systemLanguageCode)
+        let text = cues.map(\.text).joined(separator: " ")
+        DatabaseManager.shared.updateTranscript(videoId: videoId, transcript: text, language: LanguageService.systemLanguageCode)
+        await send(.subtitlesLoaded(cues))
+    }
+```
+
+#### 요약 서비스 통합 (SummarizationService)
+
+```swift
+// fetchTranscript 3차 fallback
+if settings.enableAISubtitles, WhisperService.shared.isModelReady {
+    let audioURL = try await downloadAudio(videoId: videoId, url: "https://youtu.be/\(videoId)")
+    let cues = try await WhisperService.shared.transcribe(audioURL: audioURL, language: LanguageService.systemLanguageCode)
+    // 저장 + 반환
+}
+```
+
+#### 오디오 다운로드 헬퍼
+
+```swift
+private let whisperCacheDir = FileManager.default.temporaryDirectory
+    .appendingPathComponent("com.tubekeep.whisper", isDirectory: true)
+
+func downloadAudio(videoId: String, url: String) async throws -> URL {
+    try FileManager.default.createDirectory(at: whisperCacheDir, withIntermediateDirectories: true)
+    let output = whisperCacheDir.appendingPathComponent("\(videoId).wav")
+    let args = [Constants.ytDlpPath, "-x", "--audio-format", "wav",
+                "--no-warnings", "-o", output.path, url]
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = args
+    try process.run()
+    process.waitUntilExit()
+    return output
+}
+```
+
+---
+
+### 12.4 다운로드 프리셋 / Smart Mode
+
+#### DownloadPreset 모델
+
+```swift
+struct DownloadPreset: Identifiable, Codable, Equatable {
+    var id: UUID
+    var name: String                       // "4K 영상", "오디오만" 등
+    var formatType: PresetFormatType       // .video / .audio
+    var resolution: Int                    // 2160/1080/720/480/360
+    var includeSubtitles: Bool
+    var sponsorBlock: Bool
+    var embedMetadata: Bool
+    var storageDirectory: String?          // nil = Settings 기본값
+    
+    enum PresetFormatType: String, Codable {
+        case video = "영상"
+        case audio = "오디오"
+    }
+}
+```
+
+#### Settings 추가 필드
+
+```swift
+var presets: [DownloadPreset] = [
+    DownloadPreset(id: UUID(), name: "고품질 (4K)", formatType: .video,
+                   resolution: 2160, includeSubtitles: true,
+                   sponsorBlock: true, embedMetadata: true),
+    DownloadPreset(id: UUID(), name: "기본 (1080p)", formatType: .video,
+                   resolution: 1080, includeSubtitles: true,
+                   sponsorBlock: true, embedMetadata: true),
+    DownloadPreset(id: UUID(), name: "오디오만", formatType: .audio,
+                   resolution: 0, includeSubtitles: false,
+                   sponsorBlock: false, embedMetadata: false),
+]
+var activePresetId: UUID?  // nil = 수동 선택 (Smart Mode OFF여도 사용)
+var smartMode: Bool = false
+```
+
+#### 다운로드 플로우 (VideoDownloadView 수정)
+
+```
+Smart Mode OFF (현행 유지):
+  URL 입력 → 정보 조회 → 포맷 선택 → 다운로드 시작
+
+Smart Mode ON:
+  URL 입력 → 정보 조회 → 활성 프리셋 자동 적용 → 큐에 바로 추가
+```
+
+**프리셋 적용 로직**:
+```swift
+func applyPreset(_ preset: DownloadPreset, to item: inout DownloadItem, formats: [Format]) {
+    if preset.formatType == .audio {
+        item.audioOnly = true
+        item.selectedFormat = formats.first(where: { $0.isAudioOnly }) ?? formats.first!
+    } else {
+        item.audioOnly = false
+        item.selectedFormat = formats
+            .filter { !$0.isAudioOnly && $0.height <= preset.resolution }
+            .sorted { $0.height > $1.height }
+            .first ?? formats.first { !$0.isAudioOnly }!
+    }
+    item.includeSubtitles = preset.includeSubtitles
+}
+```
+
+---
+
+### 12.5 다운로드 히스토리 (DB)
+
+#### DB 테이블
+
+```sql
+CREATE TABLE IF NOT EXISTS download_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id TEXT,
+    title TEXT NOT NULL,
+    channel_name TEXT,
+    url TEXT NOT NULL,
+    format_label TEXT,
+    resolution INTEGER,
+    file_size INTEGER,
+    file_path TEXT,
+    downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'completed'
+);
+```
+
+#### DownloadHistoryItem 모델
+
+```swift
+struct DownloadHistoryItem: Identifiable, Equatable {
+    let id: Int64
+    let videoId: String?
+    let title: String
+    let channelName: String?
+    let url: String
+    let formatLabel: String?
+    let resolution: Int?
+    let fileSize: Int64?
+    let filePath: String?
+    let downloadedAt: Date
+    let status: DownloadStatus
+    
+    enum DownloadStatus: String { case completed, failed, cancelled }
+}
+```
+
+#### 저장 시점
+
+```swift
+// AppReducer.downloadCompleted (line 326 부근)
+case let .downloadCompleted(item, success, outputPath, ...):
+    DatabaseManager.shared.saveDownloadHistory(
+        DownloadHistoryItem(
+            videoId: item.videoInfo.videoId,
+            title: item.videoInfo.title,
+            channelName: item.videoInfo.channelName,
+            url: item.videoInfo.webpageURL,
+            formatLabel: item.selectedFormat.label,
+            resolution: item.selectedFormat.height,
+            fileSize: outputPath?.fileSize,
+            filePath: outputPath,
+            downloadedAt: Date(),
+            status: success ? .completed : .failed
+        )
+    )
+```
+
+#### HistoryView UI
+
+```
+┌────────────────────────────────────────────────────┐
+│  ← 보관함    다운로드 히스토리            🔍 검색  │
+├────────────────────────────────────────────────────┤
+│  [오늘 ▼]                                         │
+│  ├ 14:23  아이브(IVE) - 해야 (HEYA)   starshipTV │
+│  │        [1080p MP4 · 342 MB]  [📂] [🗑] [↻]   │
+│  ├ 12:05  뉴진스 How Sweet         NewJeans      │
+│  │        [audio MP3 · 8 MB]     [📂] [🗑] [↻]   │
+│                                                    │
+│  [어제 ▼]                                          │
+│  ├ 23:10  aespa Supernova           aespa         │
+│  │        [2160p MP4 · 1.2 GB]     [📂] [🗑] [↻]  │
+│                                                    │
+│  [이번주 ▼]                                        │
+│  ...                                               │
+└────────────────────────────────────────────────────┘
+```
+
+- **검색**: 제목/채널명 검색
+- **필터**: 오늘 / 어제 / 이번주 / 이번달 / 전체
+- **우클릭 메뉴**: Finder에서 보기 / 삭제 / 다시 다운로드
+- **데이터**: 앱 삭제 시까지 유지 (개별 삭제 가능)
+
+---
+
+## 13. v2.7.1 — 디버그 로그 UI 개선 + v2.7.2 — 설정 재구성 + 재생 속도 개선
+
+### v2.7.1 (2026-07-22)
+
+#### DebugLogView
+- **자동스크롤 토글**: 기존 checkbox 스타일 → `arrow.down.to.line` SF Symbol image toggle로 변경, Pin 버튼 우측으로 이동
+- **하단 버튼 크기 정규화**: 4개 버튼에서 `.controlSize(.small)` 제거 — 일관된 크기로 통일
+
+#### 단축키
+- **Cmd+D**: 디버그 로그 창 열기 단축키 추가 (`AppDelegate.swift` keyMonitor)
+- **Cmd+, keyCode 버그 수정**: Space(49) → Comma(43) — `NSEvent.keyCode`가 Space를 반환하던 문제
+- **툴바 드롭다운 통합**: MainView.swift — 3개 개별 툴바 버튼을 `Menu("영상 다운로드")` 하나로 통합
+
+### v2.7.2 (2026-07-22)
+
+#### 설정 4탭 → 5탭 (SettingsView.swift)
+
+| 이전 (v2.7.1) | 이후 (v2.7.2) |
+|---------------|---------------|
+| 일반 | 다운로드 |
+| 저장 | 저장 |
+| 시스템 | 알림 신규 (신설) |
+| AI 설정 | 시스템 |
+| — | AI 설정 |
+
+- **"채널 업데이트 알림"** → **"알림 신규" 탭으로 이동**, 이름 변경: "채널 업데이트 확인"
+- 기존 시스템 탭의 11개 혼합 항목을 다운로드/알림/시스템에 적절히 재배치
+- `SettingsTab` enum: `.general` → `.downloads`, `.notifications` (신규) 추가, 기존 4개 rawValue 업데이트
+
+#### ChannelUpdateService — Combine observer
+- `store.publisher.map(\.settings.showChannelBadge).removeDuplicates().sink` 구독
+- OFF: 타이머 중단(resetTimer), 뱃지 초기화, API 미호출
+- ON: 타이머 시작 + 즉시 채널 확인
+- 기존: OFF여도 타이머는 계속 돌고 API 결과만 무시
+
+#### StatusBarManager — 큐 항목 렌더링 수정
+- `NSMenuItem`의 `action: nil`이 시스템에 의해 비활성화/흐리게(faded) 표시되는 문제
+- `#selector(queueItemNoop)` + `target: self`로 변경, 항상 활성화
+- 다운로드 상태와 무관하게 3개 큐 항목 항상 표시
+
+#### PlayerView — 첫 재생 성능 개선
+- `needsTranscoding()` 코덱 검사 방식 변경:
+  - **이전**: `Process` + `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name` + `waitUntilExit()` — 프로세스/파이썬/파일 I/O 5~10초 소요
+  - **이후**: `AVURLAsset.loadTracks` + `load(.formatDescriptions)` — 순수 in-process, < 0.5초
+- `codecCache`: static 딕셔너리 → **UserDefaults 저장** — 앱 재시작에도 코덱 캐시 유지
+
+#### Format.best() — lower-first 포맷 선택 알고리즘
+- **이전**: `exact → higher combined → exact video-only → exact any → first`
+- **이후**: `exact → lower combined → higher combined → lower video-only → higher video-only → lower any → higher any → first`
+- 모든 다운로더(Home/Batch/Channel)에 동일 적용
+- ChannelContentView: `best[height<=N]` → `best[height<=N]/best` (fallback 추가)
+- BatchDownloadView/ChannelContentView: 초기 해상도를 `settings.defaultResolution`에서 읽도록 수정 (`@State` init)
+

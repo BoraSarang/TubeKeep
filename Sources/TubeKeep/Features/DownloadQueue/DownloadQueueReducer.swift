@@ -1,18 +1,7 @@
 import Foundation
 import AppKit
 import ComposableArchitecture
-
-struct ToastMessage: Equatable {
-    let id: UUID
-    let message: String
-    let type: ToastType
-}
-
-enum ToastType: Equatable {
-    case success
-    case error
-    case info
-}
+import os
 
 @Reducer
 struct DownloadQueueReducer {
@@ -76,9 +65,6 @@ struct DownloadQueueReducer {
             items.filter { $0.status == .paused }.count
         }
 
-        #if DEBUG
-        var debugLogs: [String] = []
-        #endif
     }
 
     enum Action: Equatable {
@@ -180,7 +166,12 @@ struct DownloadQueueReducer {
                 return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .removeItem(id):
+                let storageDir = state.storageDirectory
+                let item = state.items[id: id]
                 DownloadManager.shared.cancelDownload(itemId: id)
+                if let item {
+                    cleanupTempFiles(for: item, storageDirectory: storageDir)
+                }
                 state.items.remove(id: id)
                 return .send(.saveQueue)
 
@@ -195,12 +186,12 @@ struct DownloadQueueReducer {
                     let settings: Settings = Self.loadSettings()
                     DownloadManager.shared.updateSettings(settings)
                     #if DEBUG
-                    await send(.debugLog("[\(timestamp())] ▶️ 다운로드 시작: \(item.videoInfo.title)"))
+                    await send(.debugLog("▶️ 시작: \(item.videoInfo.title)"))
                     #endif
                     var logHandler: (@Sendable (UUID, String) -> Void)?
                     #if DEBUG
                     logHandler = { id, message in
-                        Task { await send(.debugLog("[\(timestamp())] \(message)")) }
+                        Task { await send(.debugLog(message)) }
                     }
                     #endif
                     DownloadManager.shared.startDownload(
@@ -261,6 +252,9 @@ struct DownloadQueueReducer {
                     state.items[id: id]?.progress = 1.0
                     state.items[id: id]?.downloadSpeed = ""
                     if let outputPath { state.items[id: id]?.outputPath = outputPath }
+                    if let item {
+                        cleanupTempFiles(for: item, storageDirectory: state.storageDirectory)
+                    }
                     let nextEffect = tryStartNextDownloads(state: &state)
                     let title = state.items[id: id]?.videoInfo.title ?? ""
                     let toast = ToastMessage(
@@ -277,17 +271,19 @@ struct DownloadQueueReducer {
                                 channelName: channelName,
                                 videoId: videoId
                             )
-                            let channels = await MainActor.run { SubscribedChannel.loadAll() }
-                            if let channel = channels.first(where: { $0.name == channelName }) {
-                                ChannelDownloadCache.removeSeenVideoIds(
-                                    channelId: channel.id,
-                                    videoId: videoId
-                                )
+                            await MainActor.run {
+                                let channels = SubscribedChannel.loadAll()
+                                if let channel = channels.first(where: { $0.name == channelName }) {
+                                    ChannelDownloadCache.removeSeenVideoIds(
+                                        channelId: channel.id,
+                                        videoId: videoId
+                                    )
+                                }
                             }
                         })
                     }
                     #if DEBUG
-                    effects.append(.send(.debugLog("[\(timestamp())] ✅ 완료: \(item?.videoInfo.title ?? "")")))
+                    effects.append(.send(.debugLog("✅ 완료: \(item?.videoInfo.title ?? "")")))
                     #endif
                         return .merge(.merge(effects), .send(.saveQueue))
                 } else {
@@ -316,7 +312,7 @@ struct DownloadQueueReducer {
                             }
                         ]
                         #if DEBUG
-                        retryEffects.append(.send(.debugLog("[\(timestamp())] ⚠️ 재시도 \(retryCount+1)/\(state.maxRetries): \(item.videoInfo.title)")))
+                        retryEffects.append(.send(.debugLog("⚠️ 재시도 \(retryCount+1)/\(state.maxRetries): \(item.videoInfo.title)")))
                         #endif
                         return .merge(retryEffects)
                     } else {
@@ -329,7 +325,7 @@ struct DownloadQueueReducer {
                             type: .error
                         )
                         #if DEBUG
-                        return .merge(nextEffect, .send(.showToast(toast)), .send(.saveQueue), .send(.debugLog("[\(timestamp())] ❌ 실패: \(title)\(error.map { " - \($0)" } ?? "")")))
+                        return .merge(nextEffect, .send(.showToast(toast)), .send(.saveQueue), .send(.debugLog("❌ 실패: \(title)\(error.map { " - \($0)" } ?? "")")))
                         #else
                         return .merge(nextEffect, .send(.showToast(toast)), .send(.saveQueue))
                         #endif
@@ -462,7 +458,9 @@ struct DownloadQueueReducer {
                 return .none
 
             case let .debugLog(message):
-                state.debugLogs.append(message)
+                #if DEBUG
+                DebugLogManager.shared?.append("[Download] \(message)")
+                #endif
                 return .none
             #endif
             }
@@ -576,10 +574,24 @@ private func formatSpeed(_ mbps: Double) -> String {
     return ""
 }
 
-#if DEBUG
-func timestamp() -> String {
-    let f = DateFormatter()
-    f.dateFormat = "HH:mm:ss"
-    return f.string(from: Date())
+private func cleanupTempFiles(for item: DownloadItem, storageDirectory: String) {
+    let folder = Constants.sanitizeFolderName(item.videoInfo.channel)
+    let channelDir = "\(storageDirectory)/\(folder)"
+    let videoId = item.videoInfo.id
+    let fm = FileManager.default
+
+    guard let files = try? fm.contentsOfDirectory(atPath: channelDir) else { return }
+    for file in files {
+        let path = "\(channelDir)/\(file)"
+        guard file.contains(videoId) else { continue }
+        let ext = (file as NSString).pathExtension.lowercased()
+        if ext == "part" || ext == "webp" || ext == "jpg" || ext == "png" {
+            try? fm.removeItem(atPath: path)
+        }
+    }
+
+    // yt-dlp output path temp file
+    let tempFile = FileManager.default.temporaryDirectory
+        .appendingPathComponent("tubekeep_output_\(item.id.uuidString).txt")
+    try? fm.removeItem(at: tempFile)
 }
-#endif

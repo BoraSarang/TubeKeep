@@ -137,6 +137,15 @@ struct HomeReducer {
             case let .infoResponse(info, formats):
                 state.isFetching = false
                 state.fetchStartTime = nil
+
+                if info.isPlaylist, state.playlistSelection == nil {
+                    state.playlistSelection = PlaylistSelectionReducer.State(
+                        playlistURL: state.urlString,
+                        playlistTitle: info.playlistTitle ?? "재생목록",
+                        videoCount: info.playlistCount ?? 0
+                    )
+                }
+
                 state.videoInfo = info
                 state.availableFormats = formats
                 state.audioOnly = false
@@ -149,14 +158,6 @@ struct HomeReducer {
 
                 if formats.isEmpty {
                     state.errorMessage = "다운로드 가능한 포맷이 없습니다"
-                }
-
-                if info.isPlaylist, state.playlistSelection == nil {
-                    state.playlistSelection = PlaylistSelectionReducer.State(
-                        playlistURL: state.urlString,
-                        playlistTitle: info.playlistTitle ?? "재생목록",
-                        videoCount: info.playlistCount ?? 0
-                    )
                 }
 
                 return .none

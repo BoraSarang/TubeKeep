@@ -20,9 +20,9 @@
 
 | 파일 | 목적 | 설명 |
 |------|------|------|
-| [BRAND.md](BRAND.md) | 브랜드 아이덴티티 | 앱 이름, 슬로건, 브랜드 가치 |
-| [UI_DESIGN.md](UI_DESIGN.md) | UI 설계 문서 | 사이드바, Discover 탭, AI 요약 UI |
 | [IMAGE_CACHING.md](IMAGE_CACHING.md) | 이미지 캐싱 | 캐시 전략, 디렉토리 구조 |
+
+> 과거 문서(BRAND.md, UI_DESIGN.md)는 [archive/](archive/)에서 확인 가능
 
 ### API 문서 (`api/` 폴더)
 
@@ -39,14 +39,16 @@
 | 파일 | 챕터 | 상태 |
 |------|------|------|
 | [tests/v2.3.0.md](tests/v2.3.0.md) | SponsorBlock + 기능 다듬기 | ✅ 완료 (7/8) |
-| [tests/v2.4.0.md](tests/v2.4.0.md) | SwiftData + A.X 4.0 통합 | ⬜ |
-| [tests/v2.5.0.md](tests/v2.5.0.md) | SQLite DB + 자막 캐싱 | ⬜ 진행 중 |
-| [tests/v2.5.1.md](tests/v2.5.1.md) | AI 요약 + 챕터 생성 | ⬜ 대기 |
-| [tests/v2.5.2.md](tests/v2.5.2.md) | AI 팟캐스트 생성 | ⬜ 대기 |
-| [tests/v2.5.3.md](tests/v2.5.3.md) | 트랜스크립트 Q&A | ⬜ 대기 |
-| [tests/v2.5.4.md](tests/v2.5.4.md) | 마인드맵 생성 | ⬜ 대기 |
-| [tests/v2.5.5.md](tests/v2.5.5.md) | UI 통합 | ⬜ 대기 |
-| [tests/v2.5.6.md](tests/v2.5.6.md) | 마이그레이션 + 최종 테스트 | ⬜ 대기 |
+| [tests/v2.4.0.md](tests/v2.4.0.md) | SwiftData + A.X 4.0 통합 | ✅ 완료 (11/11) |
+| [tests/v2.5.0.md](tests/v2.5.0.md) | SQLite DB + 자막 캐싱 | ✅ 완료 (5/5) |
+| [tests/v2.5.1.md](tests/v2.5.1.md) | AI 요약 + 챕터 생성 | ✅ 완료 (5/5) |
+| [tests/v2.5.2.md](tests/v2.5.2.md) | AI 팟캐스트 생성 | ✅ 완료 (10/10) |
+| [tests/v2.5.3.md](tests/v2.5.3.md) | 트랜스크립트 Q&A | ✅ 완료 (8/8) |
+| [tests/v2.5.4.md](tests/v2.5.4.md) | 마인드맵 생성 | ✅ 완료 (5/5) |
+| [tests/v2.5.5.md](tests/v2.5.5.md) | UI 통합 | ✅ 완료 (6/6) |
+| [tests/v2.5.6.md](tests/v2.5.6.md) | 마이그레이션 + 최종 테스트 | ⬜ (1/6) |
+| [tests/v2.6.0.md](tests/v2.6.0.md) | 자체 비디오 플레이어 | ✅ 완료 (12/12) |
+| [tests/v2.7.0.md](tests/v2.7.0.md) | 언어/쿠키/Whisper/프리셋/히스토리 | ✅ 완료 (16/18) |
 
 → 자세한 내용은 [tests/README.md](tests/README.md) 참조
 

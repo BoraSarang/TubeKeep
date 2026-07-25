@@ -336,3 +336,137 @@
 | T-566 | **PLAN.md 업데이트** | medium | completed | |
 | T-567 | **TODO.md 업데이트** | medium | completed | |
 | T-568 | **Info.plist 버전 2.5.6** | medium | completed | |
+
+## v2.6.0 — 자체 비디오 플레이어 + 플레이어 모드 설정 (2026-07-20) 🚀
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-600 | **PlayerItem.swift — 모델 생성** | high | completed | |
+| T-601 | **NSPlayerView.swift — AVPlayerView wrapper** | high | completed | |
+| T-602 | **SubtitleOverlay.swift — 자막 오버레이** | high | completed | |
+| T-603 | **SubtitlePanel.swift — 자막 패널** | high | completed | |
+| T-604 | **PlayerReducer.swift — TCA reducer** | high | completed | |
+| T-605 | **PlayerView.swift — 최종 view + toolbar** | high | completed | |
+| T-606 | **Settings: PlayerMode enum + field** | high | completed | |
+| T-607 | **SettingsReducer: playerMode state/action** | high | completed | |
+| T-608 | **SettingsView: 시스템 탭 picker** | high | completed | |
+| T-609 | **Constants: openPlayerWindowNotification** | high | completed | |
+| T-610 | **AppDelegate: playerWindow + 핸들러** | high | completed | |
+| T-611 | **LibraryReducer: openFile/openSelected 분기** | high | completed | |
+| T-612 | **YouTubeDLService: fetchStreamingURL** | high | completed | |
+| T-613 | **DiscoverView: 미리보기 버튼** | high | completed | |
+| T-614 | **Info.plist 버전 2.6.0** | medium | completed | |
+| T-615 | **문서 업데이트 (CHANGELOG, TODO, PLAN)** | medium | completed | |
+| T-616 | **빌드 검증** | high | completed | |
+| T-617 | **테스트 계획서 작성** | high | completed | |
+
+## v2.6.1 — H.264 우선 다운로드 + 트랜스코딩 캐시 + 호버 컨트롤 (2026-07-20) 🏁
+
+| ID | 작업 | 우선순위 | 상태 | 테스트 |
+|----|------|---------|------|--------|
+| T-618 | **H.264 코덱 필터** — `[ext=mp4][vcodec^=avc1]` 포맷 최우선 선택 | high | completed | |
+| T-619 | **기본 해상도 360p** — Constants.defaultResolution 480→360 | high | completed | |
+| T-620 | **트랜스코딩 캐시** — transcodedCacheDirectory + SHA256 키 + 캐시 히트/미스 | high | completed | |
+| T-621 | **변환 진행률 + ETA** — ffmpeg -progress pipe:1, out_time_us/speed 파싱 | high | completed | |
+| T-622 | **자막 언어 우선순위** — `.sorted`로 ko 먼저 배치 | medium | completed | |
+| T-623 | **자막 오버레이 기본값 false** — 싱글클릭 토글 (더블클릭 전체화면 유지) | medium | completed | |
+| T-624 | **자막 패널 자동 스크롤 버그 수정** — onChange를 ScrollViewReader 레벨로 통합 | medium | completed | |
+| T-625 | **플레이어 컨트롤 호버 오버레이** — ZStack 하단 + 3초 auto-hide + onContinuousHover | high | completed | |
+| T-626 | **PlayerReducer 확장** — conversionProgress/ETA State + Action | high | completed | |
+| T-627 | **전체화면/윈도우 수정** — WindowAccessor, toggleFullscreen, styleMask, collectionBehavior | high | completed | |
+| T-628 | **릴리스 v2.6.1 (build 9)** — Info.plist + CHANGELOG | high | completed | |
+| T-629 | **문서 업데이트** — PRD/DESIGN/PLAN/TODO/AGENTS | medium | completed | |
+| T-630 | **after_move:filepath 경로 검증 fallback** | high | completed | |
+| T-631 | **DownloadManager H.264 필터 추가** | high | completed | |
+| T-632 | **메뉴바 드롭메뉴 NSView 기반 전환** — attributedTitle → makeQueueMenuItemView | medium | completed | |
+| T-633 | **timestamp() DateFormatter 스레드 안전성** — 정적 Formatter + OSAllocatedUnfairLock | high | completed | |
+| T-634 | **DownloadManager data race 수정** — ManagerState + stateLock(OSAllocatedUnfairLock) | high | completed | |
+| T-635 | **드롭메뉴 NSView 기반 전환** — attributedTitle → makeQueueMenuItemView | high | completed | |
+| T-636 | **드롭메뉴 좌우 여백 일치** — menuLeftPadding 19, menuRightPadding 14 | medium | completed | |
+| T-637 | **드롭메뉴 너비 축소** — 280→187 | medium | completed | |
+| T-638 | **Mock 테스트 target 누락 수정** — target = self 추가 | high | completed | |
+| T-639 | **TTSEngine 기본값 변경** — .apple → .edgeTTS (3군데) | medium | completed | |
+| T-640 | **문서 업데이트** — CHANGELOG/AGENTS/PLAN/TODO | medium | completed | |
+
+## v2.7.0 — 시스템 언어 + 쿠키 인증 + Whisper AI 자막 + 프리셋 + 히스토리 (2026-07-20) 🔄
+
+### H-2: 시스템 언어 기반 동적 전환 ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-700 | **LanguageService 생성** — systemLanguageCode, subtitleLanguages, ttsVoice, appleTTSLanguage, aiPromptLanguage | high | completed | Helpers/LanguageService.swift |
+| T-701 | **Settings.subtitleLanguageOverride** — 옵션 + SettingsView picker | medium | completed | |
+| T-701a | **DownloadManager.swift** — `--sub-langs` LanguageService 교체 | high | completed | |
+| T-701b | **YouTubeDLService.swift** — `--sub-langs` 교체 | high | completed | |
+| T-701c | **PlayerReducer.swift** — `--sub-langs` 교체 (시스템 언어 우선) | high | completed | |
+| T-701d | **SummarizationService.swift** — `--sub-langs` 교체 | high | completed | |
+| T-701e | **LibraryReducer.swift** — `--sub-langs` 교체 | high | completed | |
+| T-701f | **TTSService.swift** — AVSpeechSynthesisVoice(language:) 교체 | medium | completed | |
+| T-701g | **EdgeTTSClient.swift** — 음성/언어 교체 | medium | completed | LanguageService.ttsVoice(for:) 적용 |
+| T-701h | **PodcastService.swift** — 하드코딩 음성 교체 | medium | completed | |
+
+### H-1: 브라우저 쿠키 인증 ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-702 | **Settings.cookiesFromBrowser** — 필드 + Picker UI + Common args 반영 | high | completed | |
+
+### H-6: 다운로드 히스토리 (DB) ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-703 | **DatabaseManager download_history 테이블** — CREATE + CRUD + DownloadHistoryItem 모델 | high | completed | |
+| T-703b | **AppReducer.downloadCompleted** — 히스토리 저장 로직 | high | completed | |
+| T-704 | **HistoryView** — 테이블 뷰 + 검색 + 필터 + 우클릭 메뉴 | medium | completed | |
+| T-704a | **LibrarySidebarView** — "다운로드 히스토리" 항목 추가 | medium | completed | |
+
+### H-5: 다운로드 프리셋 / Smart Mode ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-705 | **DownloadPreset 모델 + Settings 통합** — presets, activePresetId, smartMode | high | completed | DownloadPreset.swift + Settings 3개 필드 |
+| T-706 | **SettingsView 프리셋 편집 UI** — 추가/편집/삭제 | medium | completed | downloads 탭: preset/Smart Mode 행 + 목록 + 삭제 |
+| T-707 | **Smart Mode 다운로드 플로우** — 정보 조회 후 프리셋 자동 적용 → 큐 추가 | high | completed | AppReducer.infoResponse에서 activePreset 적용 |
+
+### H-3: AI 자막 생성 (Whisper) ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-708 | **Whisper.cpp CLI 번들링** — BundledLibraryManager에 등록 | high | completed | WhisperKit SPM 대신 whisper.cpp CLI 방식 |
+| T-709 | **WhisperService** — model download/audio extract/transcribe | high | completed | @unchecked Sendable class, whisper.cpp CLI |
+| T-710 | **설정 UI + Settings 필드** — enableWhisperTranscription, whisperModelSize | high | completed | SettingsView Whisper 섹션 |
+| T-711a | **PlayerReducer Whisper fallback** | high | completed | transcribeWithWhisper 액션 + SubtitlePanel UI |
+| T-711b | **SummarizationService Whisper fallback** | high | completed | fetchTranscript: yt-dlp 실패 → Whisper fallback |
+| T-710c | **토스트 알림 독립 컴포넌트** — ToastComponents.swift | medium | completed | ToastMessage/ToastBanner/ToastOverlay + MainView/DownloadQueueView 리팩토링 |
+
+### 문서
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-712 | **문서 업데이트** — CHANGELOG/PLAN/TODO/DESIGN/tests/v2.7.0.md | medium | completed |
+
+## v2.7.1 — 디버그 로그 UI 개선 + 단축키
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-800 | **DebugLogView 자동스크롤 토글** — checkbox → `arrow.down.to.line` image toggle | medium | completed | 자동스크롤 토글 버튼 모양 변경 |
+| T-801 | **DebugLogView 하단 버튼 크기 정규화** — `.controlSize(.small)` 제거 | low | completed | 4개 버튼 크기 통일 |
+| T-802 | **Cmd+D 단축키 - 디버그 로그** — keyMonitor 감지 + openDebugLogWindow | medium | completed | AppDelegate.swift |
+| T-803 | **Cmd+, keyCode 수정** — Space(49) → Comma(43) | high | completed | AppDelegate.swift keyCode 버그 |
+| T-804 | **툴바 드롭다운 통합** — 3개 툴바 버튼 → `Menu("영상 다운로드")` | medium | completed | MainView.swift |
+
+## v2.7.2 — 설정 재구성 + 재생 속도 개선
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-805 | **설정 4탭 → 5탭** — 다운로드·저장·알림 신규·시스템·AI | high | completed | SettingsView.swift + SettingsTab enum |
+| T-806 | **"채널 업데이트 알림" → "채널 업데이트 확인"** — OFF 시 완전 중단 | high | completed | ChannelUpdateService.swift Combine observer |
+| T-807 | **상태바 큐 항목 비활성화 수정** — `action:nil` → `#selector(queueItemNoop)` | high | completed | StatusBarManager.swift |
+| T-808 | **채널 체크박스 선택 미초기화** — `addSelectedToQueue()`에서 `selectedIDs` 누락 | high | completed | ChannelContentView.swift |
+| T-809 | **첫 재생 지연 단축** — ffprobe → AVURLAsset.loadTracks | high | completed | PlayerView.swift needsTranscoding() |
+| T-810 | **codecCache UserDefaults 저장** — 앱 재시작에도 코덱 캐시 유지 | medium | completed | |
+| T-811 | **포맷 선택 lower-first 알고리즘** — `Format.best()` exact→lower→higher | high | completed | Format.swift |
+| T-812 | **BatchDownloadView 설정 동기화** — selectedResolution 초기값 settings.defaultResolution | medium | completed | |
+| T-813 | **ChannelContentView 설정 동기화** — presetResolution 초기값 settings.defaultResolution | medium | completed | |
+
+

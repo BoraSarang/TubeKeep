@@ -26,6 +26,7 @@ final class StatusBarManager {
     var onStartSpeedTest: (() -> Void)?
     var onStartMockTest: (() -> Void)?
     var onTriggerChannelUpdate: (() -> Void)?
+    var onOpenDebugLogWindow: (() -> Void)?
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
@@ -102,7 +103,7 @@ final class StatusBarManager {
                     let active = s.activeCount
                     let completed = s.completedCount
                     let pending = s.totalCount - active - completed
-                    let speed = s.downloadSpeed.isEmpty ? "" : " · \(s.downloadSpeed)"
+                    let speed = s.downloadSpeed.isEmpty ? "" : " \u{00B7} \(s.downloadSpeed)"
 
                     self.menuActiveItem?.title = active > 0 ? "다운로드 중: \(active)개\(speed)" : "다운로드 중: 0개"
                     self.menuCompletedItem?.title = completed > 0 ? "완료: \(completed)개" : "완료: 0개"
@@ -196,7 +197,7 @@ final class StatusBarManager {
             let sb = store.state.statusBar
 
             let activeTitle = sb.activeCount > 0
-                ? "다운로드 중: \(sb.activeCount)개\(sb.downloadSpeed.isEmpty ? "" : " · \(sb.downloadSpeed)")"
+                ? "다운로드 중: \(sb.activeCount)개\(sb.downloadSpeed.isEmpty ? "" : " \u{00B7} \(sb.downloadSpeed)")"
                 : "다운로드 중: 0개"
             menuActiveItem = NSMenuItem(title: activeTitle, action: nil, keyEquivalent: "")
             menuActiveItem?.isEnabled = false

@@ -51,6 +51,15 @@ enum ErrorMessageMapper {
         if lower.contains("download") && lower.contains("denied") {
             return "다운로드가 차단되었습니다."
         }
+        if lower.contains("cookie") && (lower.contains("could not") || lower.contains("not found") || lower.contains("failed")) {
+            return "브라우저 쿠키를 가져올 수 없습니다. 브라우저가 설치되어 있고 YouTube에 로그인되어 있는지 확인하세요."
+        }
+        if lower.contains("could not find") && lower.contains("browser") {
+            return "지정한 브라우저를 찾을 수 없습니다. 설정에서 다른 브라우저를 선택하세요."
+        }
+        if lower.contains("keyring") {
+            return "브라우저 쿠키에 접근할 수 없습니다 (키체인 접근 권한 필요). Safari를 사용해 보세요."
+        }
 
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let lines = trimmed.components(separatedBy: .newlines)

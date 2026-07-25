@@ -18,8 +18,11 @@ struct LibraryListView: View {
 
             Divider()
 
-            if store.library.items.isEmpty && store.library.filteredItems.isEmpty {
+            if store.library.items.isEmpty {
                 emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if store.library.filteredItems.isEmpty {
+                searchEmptyState
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 listContent
@@ -151,6 +154,17 @@ struct LibraryListView: View {
                 downloaderButton("일괄 다운로더", notification: Constants.openBatchWindowNotification)
                 downloaderButton("채널 다운로더", notification: Constants.openChannelWindowNotification)
             }
+        }
+    }
+
+    private var searchEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 36))
+                .foregroundStyle(.tertiary)
+            Text("검색 결과가 없습니다")
+                .font(.headline)
+                .foregroundStyle(.secondary)
         }
     }
 
