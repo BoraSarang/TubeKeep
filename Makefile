@@ -1,7 +1,7 @@
 APP_PATH = $(HOME)/Applications/TubeKeep.app
 VERSION = $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Info.plist 2>/dev/null)
 
-.PHONY: build run release release-dmg release-upload release-skip-build clean
+.PHONY: build run release release-dmg release-upload release-skip-build codesign notarize clean
 
 default: run
 
@@ -18,6 +18,7 @@ release:
 	@echo ""
 	@echo "🚀 Ready to release v$(VERSION)"
 	@echo "   Run 'make release-upload' to upload to GitHub Releases"
+	@echo "   Run 'make notarize' to sign + notarize"
 
 # ── DMG only from existing .app at /tmp/TubeKeep-build/ ──
 release-dmg:
@@ -34,8 +35,28 @@ release-upload:
 	gh release create "v$(VERSION)" "$$DMG" --generate-notes --title "v$(VERSION)" 2>&1 || \
 	gh release upload "v$(VERSION)" "$$DMG" 2>&1
 
+# ── Sign + Notarize (requires Developer ID cert + notary credentials) ──
+codesign:
+	./Tools/codesign.sh
+
+notarize:
+	./Tools/codesign.sh
+
+# ── Full signed release chain ──
+release-signed:
+	./build_and_run.sh release --no-launch
+	./Tools/codesign.sh
+	./Tools/create_dmg.sh
+	./Tools/codesign.sh /tmp/TubeKeep-build/TubeKeep.app Build/TubeKeep-$(VERSION).dmg
+	@echo ""
+	@echo "🚀 Signed release v$(VERSION) ready"
+
 # ── Skip build, use existing .app in /tmp/TubeKeep-build/ ──
 release-skip-build: release-dmg
+
+# ── Only sign (no build, no dmg) ──
+sign-only:
+	./Tools/codesign.sh
 
 clean:
 	swift package clean
