@@ -27,6 +27,7 @@ final class StatusBarManager {
     var onStartMockTest: (() -> Void)?
     var onTriggerChannelUpdate: (() -> Void)?
     var onOpenDebugLogWindow: (() -> Void)?
+    var onOpenBuyMeACoffee: (() -> Void)?
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
@@ -259,6 +260,14 @@ final class StatusBarManager {
         )
         infoItem.target = self
         menu.addItem(infoItem)
+        menu.addItem(NSMenuItem.separator())
+        let coffeeItem = NSMenuItem(
+            title: "☕ 후원하기",
+            action: #selector(openBuyMeACoffee),
+            keyEquivalent: ""
+        )
+        coffeeItem.target = self
+        menu.addItem(coffeeItem)
         let quitItem = NSMenuItem(
             title: "종료",
             action: #selector(quitApp),
@@ -299,6 +308,7 @@ final class StatusBarManager {
     @objc private func openAboutWindow() { onOpenAbout?() }
     @objc private func startSpeedTest() { onStartSpeedTest?() }
     @objc private func quitApp() { NSApp.terminate(nil) }
+    @objc private func openBuyMeACoffee() { onOpenBuyMeACoffee?() }
 
     #if DEBUG
     @objc private func startStatusBarMockTest() { onStartMockTest?() }

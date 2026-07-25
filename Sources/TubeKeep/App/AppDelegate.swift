@@ -162,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusBar.onOpenChannelDownloader = { [weak self] in self?.openChannelDownloaderWindow() }
         statusBar.onOpenSettings = { [weak self] in self?.openSettingsWindow() }
         statusBar.onOpenAbout = { [weak self] in self?.openAboutWindow() }
+        statusBar.onOpenBuyMeACoffee = { [weak self] in self?.openBuyMeACoffee() }
         #if DEBUG
         statusBar.onStartMockTest = { [weak self] in
             self?.store.send(.statusBar(.startStatusBarTest))
@@ -426,6 +427,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func openBuyMeACoffee() {
+        guard let url = URL(string: "https://buymeacoffee.com/YOUR_USERNAME") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Settings Window
