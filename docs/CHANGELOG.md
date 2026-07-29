@@ -1,0 +1,716 @@
+# CHANGELOG
+
+## v2.7.7 (2026-07-28) — 오디오 누락 버그 수정 + DebugPanel v1.7 ✅
+
+### Bug Fixes
+- **다운로드 시 오디오 누락 수정**: `parseFormats()`에서 같은 해상도의 combined 포맷과 video-only 포맷이 경합할 때 filesize 기준으로만 선택하여 combined(오디오 있음)가 video-only에 덮어써지던 문제 수정
+  - `YouTubeDLService.swift` `parseFormats()`: combined 포맷에 우선권 부여 — 기존 entry가 combined면 교체하지 않고, 새 포맷이 combined면 기존 video-only를 교체
+- **`bestaudio[ext=m4a]` → `bestaudio`**: `[ext=m4a]` 필터가 YouTube의 Opus/webm 오디오를 배제하여 `+` 병합 실패를 유발하던 문제 수정
+  - `YouTubeDLService.swift` `buildDownloadArgs()`: `[ext=m4a]` 제거
+  - `DownloadManager.swift` `buildDownloadArgs()`: `[ext=m4a]` 제거
+  - `--merge-output-format mp4`가 ffmpeg로 mp4 리먹싱 보장
+- **채널 다운로더 오디오 누락 근본 수정**: `buildDownloadArgs()`에서 복합 포맷 선택자(`best[height<=360]/best`)가 `id.hasPrefix("best")` 분기에 걸려 `bestvideo+bestaudio`로 잘못 래핑되던 문제 수정
+  - id에 `/` 또는 `+`가 포함된 경우 `bestvideo+bestaudio` 래핑을 건너뜀
+  - `DownloadManager.swift:236` + `YouTubeDLService.swift:293-301` 동시 수정
+
+### DebugPanel v1.7 (AGENTS.md 표준)
+- **`DebugLogLevel` enum 7종**: ACTION, API→, API←, INFO, WARN, ERROR, SYSTEM
+- **`DebugLogEntry` struct**: timestamp + level + platform + category + message + meta + `formatted`
+- **`push()` / `clear()` / `formatForAgent()`**: 표준화된 로그 포맷 + 에이전트 붙여넣기용 출력
+- **`maskSecrets()`**: 토큰/키 마스킹 + 500자 truncation
+- **`maxLogs = 5000`**: FIFO 자동 정리
+- **NSWindow 표준**: 600×320 화면 중앙, 400→2000 리사이즈, `.floating + 100`, `isReleasedWhenClosed=false`, 재사용 패턴
+- **색상 표준**: ERROR=빨강, WARN=노랑, API→=파랑, API←=초록, SYSTEM=보라, INFO=회색, ACTION=흰색
+- **📌 자동 스크롤 토글**: ON/OFF 토글 + 드래그 시 2초 일시정지
+- **줄 선택**: 클릭=1줄, Shift+클릭=범위, Cmd+클릭=개별 토글
+- **선택 복사 / 전체 복사 / 클리어**: NSPasteboard 연동
+
+### Infrastructure
+- **scripts/build-macos.sh** 생성 — build_and_run.sh에서 빌드 로직 분리
+- **build_and_run.sh** → v1.7 멀티 플랫폼 디스패처 (debug/release + macos/ios/android/web)
+- **Package.swift**: `.define("DEBUG", .when(configuration: .debug))` — release에서 DebugPanel 컴파일 타임 제거
+- **Mock/DEBUG 테스트 코드 전면 제거**: LibrarySidebarView, DownloadQueueView, BatchDownloadView, HomeView, StatusBarManager, AppDelegate, AppReducer, HomeReducer, DownloadQueueReducer — 모든 mock 버튼/메뉴/액션 삭제
+- **beads skill 파일 삭제**: `.agents/skills/beads/SKILL.md`, `agents/openai.yaml`
+- **`.codex/hooks.json` 삭제**, `.codex/config.toml` 정리
+- **AGENTS.md → 전역 설치**: `bd setup codex --global`로 `~/.codex/AGENTS.md`로 이동, 프로젝트에서는 제거
+- **AGENTS.local.md**: v1.7 DebugPanel 전체 기능표 + build workflow + v2.7.7 (build 18) 동기화
+- **Info.plist**: v2.7.7 (build 18)
+
+## v2.7.6 (2026-07-25) — 랜딩 페이지 + Buy Me a Coffee ✅
+
+### Features
+- **GitHub Pages 랜딩 페이지** (`docs/index.html`, `docs/style.css`, `docs/app-icon.png`): 앱 소개 + 기능 카드 + 다운로드 링크 + Buy Me a Coffee
+- **Buy Me a Coffee 후원 링크** (`StatusBarManager.swift`, `AppDelegate.swift`): 메뉴바 "☕ 후원하기" 메뉴 항목 추가, `borasarang` 계정 연결
+
+### Fixes
+- **상태바 정렬 통일**: idle/완료/상태표시 모두 `.right` 정렬로 변경 — 아이콘(좌) + 텍스트(우) 균형 개선
+
+## v2.7.5 (2026-07-25) — 자체 업데이트 ✅
+
+### Features
+- **UpdateChecker** (`Services/UpdateChecker.swift`): `appcast.json` 기반 버전 체크, GitHub Releases 다운로드 URL 오픈, "이 버전 건너뛰기" 저장
+- **앱 시작 시 업데이트 확인** (`AppDelegate.swift`): 3초 후 백그라운드 체크 → alert 표시
+- **appcast.json**: 최신 버전 메타데이터 (GitHub raw 호스팅)
+
+## v2.7.4 (2026-07-25) — 코드 서명 + Notarization ✅
+
+### Features
+- **codesign.sh** (`Tools/codesign.sh`): Developer ID 서명 → Notarization 제출 → Ticket Stapling → DMG 서명 자동화
+- **Makefile**: `codesign`/`notarize`/`sign-only`/`release-signed` 타겟 추가
+
+## v2.7.3 (2026-07-25) — DMG 배포 + GitHub Releases ✅
+
+### Features
+- **DMG 생성 스크립트** (`Tools/create_dmg.sh`): TubeKeep.app + Applications symlink 포함, Finder 레이아웃 설정, UDZO 압축
+- **Makefile release 개선**: `release`(빌드→DMG), `release-upload`(gh release), `release-dmg`(DMG만) 타겟
+- **build_and_run.sh**: `--no-launch` 플래그 추가 (release 빌드용)
+
+### Bug Fixes
+- **DebugLogManager**: `#if DEBUG` 제거 — release 빌드 시 심볼 누락으로 빌드 실패하던 문제 수정
+
+### Features
+- **설정 4탭 → 5탭** (`SettingsView.swift`): 다운로드·저장·알림 신규·시스템·AI 설정으로 재구성; "채널 업데이트 알림"을 "알림 신규" 탭으로 이동, 시스템 탭의 11개 혼합 항목을 적절한 탭에 재배치
+- **"채널 업데이트 알림" → "채널 업데이트 확인"** (`ChannelUpdateService.swift`): OFF 시 타이머/API/알림 완전 중단 (Combine observer 패턴)
+- **도구 모음 드롭다운 통합** (`MainView.swift`): 3개 툴바 버튼 → `Menu("영상 다운로드")` 드롭다운으로 통합
+
+### Bug Fixes
+- **상태바 큐 항목 비활성화** (`StatusBarManager.swift`): `action: nil`로 생성한 메뉴 아이템이 시스템에 의해 비활성화/흐리게(faded) 표시되던 문제 — `#selector(queueItemNoop)` + `target: self`로 수정, 다운로드 상태와 무관하게 항상 표시
+- **채널 체크박스 선택 미초기화** (`ChannelContentView.swift`): `addSelectedToQueue()`에서 다운로드 후 `selectedIDs`를 비우지 않아 다운로드 완료 후에도 체크 표시가 유지되던 문제; 채널 전환 시 이전 채널의 `selectedIDs`가 유지되던 문제를 `.onChange(of: channel?.id)`로 수정
+
+### Performance
+- **첫 재생 지연 단축** (`PlayerView.swift`): `needsTranscoding()`에서 ffprobe `Process`+`waitUntilExit()` 호출(프로세스 생성/파이썬 init/파일 I/O 5~10초 소요)을 `AVURLAsset.loadTracks`+`load(.formatDescriptions)`로 대체; `codecCache`를 `UserDefaults`에 저장하여 앱 재시작에도 코덱 캐시 유지
+
+### Infrastructure
+- **Info.plist**: v2.7.2 (build 13)
+
+## v2.7.1 (2026-07-21) — Critical Bug Fixes + 성능 개선 ✅
+
+### Bug Fixes (Critical)
+- **Playlist URL 초기화** (`HomeReducer.swift`): `infoResponse`에서 `state.urlString` 클리어 시점을 playlist 체크 이후로 이동 — 재생목록 URL이 항상 빈 문자열로 전달되던 버그 수정
+- **False 설정 복원** (`AppReducer.swift`): `playSoundOnComplete=false`, `clipboardMonitoring=false`가 앱 재시작 시 무시되던 버그 수정 — `if` 조건을 `!settings.playSoundOnComplete`으로 변경
+- **Actor 차단 해소** (`SummarizationService.swift`): `process.waitUntilExit()`가 actor 협력 스레드를 블로킹하던 문제 — `terminationHandler` 기반 정적 메서드 `runProcess()`로 교체
+- **Data race** (`BookmarkManager.swift`): `nonisolated(unsafe) var activeURLs`에 lock 없이 동시 접근 — `OSAllocatedUnfairLock`으로 동기화
+- **API 키 노출** (`MindmapService.swift`): `print("[Mindmap] ❌ API 키: ...")`이 릴리스 빌드에서 콘솔에 출력 — `log()`로 교체, `print()` 제거
+- **하드코딩 API 키** (`Constants.swift`): `defaultAX4APIKey`가 소스 코드에 포함 — 빈 문자열로 변경
+- **SRT 숫자 텍스트 누락** (`PlayerReducer.swift`, `WhisperService.swift`, `SummarizationService.swift`): `Int($0) == nil` 필터가 숫자로만 된 자막 텍스트를 잘못 제거 — `seenTiming` 플래그로 SRT 인덱스 번호만 필터
+
+### Bug Fixes (High)
+- **이중 컨트롤** (`NSPlayerView.swift`): `controlsStyle = .default`로 AVPlayer 기본 컨트롤 + SwiftUI 커스텀 컨트롤바가 동시에 표시 — `.none`으로 변경
+- **영상 재생 지연** (`PlayerView.swift`): `setupPlayer()`에서 `needsTranscoding()` 호출이 `process.waitUntilExit()`로 메인 스레드 1~5초 차단 — `Task { }`로 비동기 분리하여 즉시 재생
+- **죽은 코드** (`NSPlayerView.swift`): 미사용 `playerLayer` 변수 제거
+
+### Infrastructure
+- **Info.plist**: v2.7.1 (build 12)
+
+## v2.7.0 (2026-07-20) — 시스템 언어 + 쿠키 인증 + Whisper AI 자막 + 프리셋 + 히스토리 ✅
+
+### New Features
+- **시스템 언어 기반 동적 전환**: 하드코딩된 한국어(`"en,ko"`, `"ko-KR"`) → `Locale.current` 기반 자동 전환
+  - 자막 다운로드 언어 (`--sub-langs`), TTS 음성, AI 프롬프트 언어가 시스템 언어를 따라감
+  - `LanguageService.swift` 신규 — 언어별 Edge TTS 음성 맵핑 테이블 포함
+  - Settings에 자막 언어 override 옵션 제공 (자동/한국어/영어/일본어)
+- **브라우저 쿠키 인증**: `--cookies-from-browser` 플래그로 비공개/연령 제한/멤버십 영상 접근
+  - Safari / Chrome / Brave / Edge / Firefox 선택 가능
+  - 모든 yt-dlp 호출(info fetch, subtitle, streaming URL, download)에 쿠키 전파
+- **AI 자막 생성 (Whisper CoreML)**: yt-dlp 자막이 없는 영상도 음성 인식으로 자동 자막 생성
+  - WhisperKit SPM 기반, Apple Silicon CoreML 최적화
+  - 모델(~500MB)은 백그라운드 다운로드 — 다운로드 중에도 앱 사용 가능
+  - Settings UI: 토글 + 모델 다운로드 버튼 + 진행률(속도/ETA/남은시간) + 상태 표시
+  - 플레이어와 요약 서비스 모두 Whisper fallback 연결
+- **다운로드 프리셋 / Smart Mode**: 자주 쓰는 설정을 프리셋으로 저장 → 1클릭 다운로드
+  - 기본 프리셋 3개: "고품질 (4K)", "기본 (1080p)", "오디오만"
+  - Smart Mode ON: URL 입력 → 정보 조회 → 프리셋 자동 적용 → 큐 바로 추가
+  - Settings 저장 탭에서 프리셋 추가/편집/삭제
+- **다운로드 히스토리 (DB)**: 모든 다운로드 완료 내역을 SQLite에 영구 기록
+  - download_history 테이블: video_id, title, channel, url, format, resolution, file_size, file_path, downloaded_at, status
+  - HistoryView: 테이블 뷰 + 검색 + 날짜별 필터 + 우클릭 메뉴
+
+### UI Changes
+- SettingsView 시스템 탭 — "브라우저 쿠키" Picker 추가
+- SettingsView AI 탭 — "AI 자막 생성 (Whisper)" 섹션 추가 (설명 + 토글 + 모델 다운로드 UI)
+- SettingsView 저장 탭 — "다운로드 프리셋" 섹션 추가 (목록 + 추가/편집/삭제)
+- VideoDownloadView — Smart Mode 토글 + 프리셋 Picker
+- LibrarySidebarView — "다운로드 히스토리" 항목 추가
+- 앱 전체 토스트 알림 — Whisper 모델 다운로드 진행률/완료/실패 표시
+
+### Infrastructure
+- **신규 파일 7개**: `Helpers/LanguageService.swift`, `Services/WhisperService.swift`, `Models/DownloadPreset.swift`, `Features/Library/HistoryView.swift`, `Components/ToastView.swift`, `Components/WhisperDownloadView.swift`
+- **설정 6개 추가**: `subtitleLanguageOverride`, `cookiesFromBrowser`, `enableAISubtitles`, `whisperModelDownloaded`, `presets`, `smartMode`, `activePresetId`
+- **DB 테이블 1개 추가**: `download_history`
+- **Info.plist**: v2.7.0 (build 11)
+
+## v2.6.2 (2026-07-20) — 스레드 안정성 + 메뉴바 드롭메뉴 개선 ✅
+
+### Bug Fixes
+- **다운로드 데이터 레이스 크래시 수정**: `DownloadManager`의 `settings`/`storageDirectory`/`filenameTemplate`이 Lock 없이 여러 스레드에서 접근되던 문제 수정
+  - `OSAllocatedUnfairLock`으로 `ManagerState` 전체 보호
+  - `startDownload()` 진입 시 Lock에서 값 복사 후 사용 → 이후 Lock 불필요
+  - `buildDownloadArgs()`/`constructOutputTemplate()`에 파라미터 전달 방식으로 변경
+- **`DateFormatter` 스레드 안전성 수정**: `#if DEBUG` `timestamp()` 함수가 매 호출마다 새 `DateFormatter`를 생성하여 ICU 내부 상태가 손상되는 힙 코럽션 크래시 수정
+  - 정적 `timestampFormatter` + `OSAllocatedUnfairLock`으로 변경
+- **`pausedItems` Lock 누락 수정**: `Set<UUID>`에 대한 모든 접근을 `stateLock`으로 보호
+- **Mock 테스트 서브메뉴 비활성화 수정**: `NSMenuItem`에 `target = self` 누락으로 DEBUG 메뉴 항목이 회색 처리되어 클릭 불가능했던 문제 수정 (`StatusBarManager.swift`)
+- **TTS 엔진 기본값 변경**: `macOS 내장` → `Edge TTS` (Settings.swift, SettingsReducer.swift, PodcastService.swift 3군데)
+
+### UI Changes
+- **메뉴바 드롭메뉴 `NSView` 기반으로 전면 재작성**: `attributedTitle` + `NSTextTab` 방식의 오른쪽 정렬이 NSMenu right inset(~14pt)을 제어할 수 없어 빈 공간이 발생하던 문제를 `NSMenuItem.view`(커스텀 NSView + 두 개 NSTextField) 방식으로 교체
+  - `menuTabStopLocation`/`attributedMenuTitle()` 제거 → `makeQueueMenuItemView()` + `updateLabel()` 추가
+  - `menuLeftPadding: CGFloat = 19`, `menuRightPadding: CGFloat = 14` — 일반 메뉴 항목과 동일한 좌우 여백
+  - `menuItemViewWidth: CGFloat = 187` — 기존 280pt에서 1/3 축소
+- **드롭메뉴 텍스트 변경**: "다운로드 중" → "다운로드 속도", "진행 상태" value = "완료/전체", "남은 시간" 유지
+- **메뉴바 상태 텍스트 변경**: "완1/4" → "진행 1/4"
+
+### Infrastructure
+- **Info.plist**: v2.6.2 (build 10)
+- **AGENTS.md**: `코드 수정 후 반드시 build_and_run.sh 실행` 규칙 추가
+
+## v2.6.1 (2026-07-20) — H.264 다운로드 + 플레이어 개선 ✅
+
+### New Features
+- **H.264 우선 다운로드**: yt-dlp `-f`에 `[ext=mp4][vcodec^=avc1]` 필터 추가 → 새로 받는 영상은 변환 불필요
+- **트랜스코딩 캐시**: SHA256 해시 기반 캐싱 (`~/Library/Caches/com.tubekeep/transcoded/`) → 같은 파일 재변환 방지
+- **변환 진행률 + ETA**: ffmpeg `-progress pipe:1` 파싱 → determinate ProgressBar + "% 변환 중... (남은 시간: XX:XX)"
+- **플레이어 컨트롤 오버레이**: 호버 시에만 나타나는 하단 컨트롤바 (재생/정지, 시크 슬라이더, 시간 표시, 3초 후 자동 숨김)
+- **자막 언어 우선순위**: 한국어(`.ko.`) → 영어(`.en.`) 순서로 정렬
+
+### UI Changes
+- **자막 오버레이 기본값 OFF**: 영상만 먼저 보여주고, 싱글클릭 시 오버레이 표시
+- **자막 패널 자동 스크롤**: 현재 재생 위치의 자막으로 자동 포커스
+- **기본 해상도**: 480p → 360p (Constants.defaultResolution)
+
+### Bug Fixes
+- **전체화면 미동작**: `WindowAccessor` `[self]` 캡처로 window 참조 유실 문제 수정
+- **영문 자막 우선 표시**: 파일 정렬 없이 `contentsOfDirectory` 순회로 영어가 먼저 나오는 문제 수정
+- **다운로드 실패 오진**: `--embed-thumbnail`로 생성된 .webp/.png 섬네일 경로가 `after_move:filepath`를 오염시켜 .mp4가 정상 생성됐음에도 실패로 표시되는 문제 수정
+  - after_move 경로가 .mp4인지 검증 후, 아니면 출력 디렉토리에서 `{videoId}.mp4` 직접 스캔 fallback
+- **H.264 필터 누락**: `DownloadManager.buildDownloadArgs()`에 `[ext=mp4][vcodec^=avc1]` 포맷 필터가 없어 360p 다운로드도 AV1/VP9로 받아 변환 발생하던 문제 수정
+
+### Infrastructure
+- **Info.plist**: v2.6.1 (build 9)
+
+## v2.6.0 (2026-07-20) — 자체 비디오 플레이어 + 플레이어 모드 설정 ✅
+
+### New Features
+- **자체 비디오 플레이어**: AVKit 기반 별도 창 플레이어 (960×640 고정)
+  - `AVPlayerView` 래퍼 — 재생/일시정지/볼륨/타임라인 기본 컨트롤
+  - 우측 자막 패널 (320pt, toggle) — 전체 자막 리스트 + 현재 위치 하이라이트
+  - 비디오 위 자막 오버레이 (toggle) — 시간 동기화 자막 표시
+  - 툴바: 자막 오버레이 토글 / 자막 패널 토글 / Pin(최상위 고정) / Close
+  - `.seekToTime` notification 구독 — Q&A 타임스탬프 클릭 시 seek
+- **플레이어 모드 설정**: 시스템 탭 "비디오 플레이어" picker
+  - `자체 플레이어` (기본값) — "열기" 버튼이 TubeKeep 내장 플레이어 실행
+  - `기본 연결 프로그램` — "열기" 버튼이 `NSWorkspace.shared.open` (기존 동작)
+- **Discover 미리보기**: 미다운로드 영상 hover 시 "미리보기" 버튼
+  - `yt-dlp -f best --get-url` → 스트리밍 URL → 자체 플레이어로 재생
+- **자막 시간 동기화**: yt-dlp VTT/SRT 다운로드 → 타임스탬프 보존 파싱 → 오버레이/패널
+
+### Infrastructure
+- **신규 6개 파일**: Features/Player/ 아래 PlayerItem, PlayerReducer, NSPlayerView, SubtitleOverlay, SubtitlePanel, PlayerView
+- **YouTubeDLService.fetchStreamingURL()** — `--get-url` 스트리밍 URL 조회
+- **YouTubeDLService.fetchSubtitles()** — 시간 동기화 자막 다운로드/파싱
+- **PlayerMode enum**: Settings에 `builtIn` / `systemDefault` 케이스
+- **Info.plist**: v2.6.0 (build 8)
+
+## v2.5.6 (2026-07-19) — 마이그레이션 + 최종 테스트 ✅ 완료
+
+### Testing
+- **자동화 테스트 21개 추가**: MindmapNodeTests(8), QAModelTests(6), PodcastModelTests(7)
+  - 샘플 JSON 테스트 데이터 기반 모델 인코딩/디코딩 검증
+  - MindmapNode UUID 버그 수정 검증 (id 없는 JSON 디코딩)
+- **총 76개 테스트 전원 통과** (기존 55 + 신규 21)
+- **release 빌드 성공** (1개 기존 경고, TTSService @preconcurrency)
+- **수동 테스트 패스**: 배포 전 최종 검증에서 수행 예정
+
+### Infrastructure
+- **Info.plist**: v2.5.6 (build 7)
+- **MindmapNode Equatable**: id 무시하도록 custom `==` 구현 (label/children만 비교)
+
+## v2.5.5 (2026-07-19) — AI 창 UI 통합 + 마인드맵 보기 ✅ 완료
+
+### New Features
+- **마인드맵 보기**: AI 창 내 expandable/collapsible 트리 뷰 (MindmapTreeView, MindmapNodeView)
+- **마인드맵 생성/캐싱**: OpenRouter API → JSON 파싱 → DB 저장, showSummary 시 자동 로드
+
+### UI Changes
+- **AI 요약 팝업 → AIWindowView**: summary+chapters(좌) / mindmap+Q&A(우) 좌우 split 레이아웃
+- **컨텍스트 메뉴 통합**: "AI 요약정보 보기" / "AI 팟캐스트" / "AI Q&A" 3개 → "AI 기능" 단일 메뉴 (sparkles icon)
+- **QAInputBar 이동**: AIWindowView 하단 → qnaSection 상단 (title 아래)
+- **팟캐스트 시간 표시**: 플레이 버튼 오른쪽 → 왼쪽으로 이동
+- **요약 로딩 오버레이 다크모드 대응**: Color.white → .regularMaterial
+- **QAInputBar 자동 포커스 방지**: @FocusState optional nil + AppDelegate makeFirstResponder(nil)
+- **미사용 코드 제거**: MindmapButtonView 삭제
+
+### Bug Fixes
+- **MindmapNode UUID 디코딩 오류 수정**: JSON에 id 필드 없어 파싱 실패 → CodingKeys에서 id 제외, init(from:)에서 UUID() 기본값
+
+### Infrastructure
+- **MindmapService.swift**: 마인드맵 생성/파싱/DB 저장 서비스
+- **MindmapModels.swift**: MindmapNode 모델 (재귀적 Codable)
+- **LibraryReducer mindmap 액션**: generateMindmap / mindmapResult / mindmapFailed / toggleMindmap
+
+## v2.5.4 (2026-07-19) — 마인드맵 생성 (v2.5.5와 통합)
+
+v2.5.4의 마인드맵 기능은 v2.5.5에서 AI 창 UI 통합과 함께 구현됨.
+자세한 내용은 v2.5.5 항목 참조.
+
+## v2.5.3 (2026-07-19) — 트랜스크립트 Q&A ✅ 완료
+
+### New Features
+- **트랜스크립트 Q&A**: 영상 자막 기반 질문/답변 기능
+  - QAService: OpenRouter → yTeaser → A.X 4.0 → Gemini 폴백 체인
+  - qna_history DB 테이블: 질문/답변/타임스탬프 저장/로드
+  - 타임스탬프 클릭 → 영상 재생 위치 이동
+- **QAView UI**: 질문 입력 → 답변 표시 + 히스토리 목록
+
+### Infrastructure
+- **QAService.swift**: Q&A 생성 서비스 (actor, 폴백 체인)
+- **qna_history 테이블**: DatabaseManager에 qna_history CRUD 추가
+- **LibraryReducer Q&A 액션**: askQuestion / questionResult / questionFailed / clearQAHistory
+
+## v2.5.2 (2026-07-18) — AI 팟캐스트 생성 (macOS 내장 TTS) ✅ 완료
+
+### New Features
+- **AI 팟캐스트 생성**: 자막을 분석하여 2인 대화형 팟캐스트를 자동 생성
+  - 대화 스크립트 생성: 기존 LLM 폴백 체인 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+  - TTS 변환: macOS 내장 AVSpeechSynthesizer 사용 (완전 무료, 오프라인)
+  - 한국어 음성 지원 (Yuna, Siwoo 등)
+  - 팟캐스트 생성/재생/삭제 기능
+
+### UI Changes
+- **요약 팝업에 팟캐스트 컨트롤 추가**: 재생/일시정지/정지 버튼 + 진행 바
+- **컨텍스트 메뉴 팟캐스트 항목**: 팟캐스트 만들기/듣기/삭제
+
+### Infrastructure
+- **PodcastService.swift**: 팟캐스트 생성 서비스 (actor)
+- **TTSService**: AVSpeechSynthesizer 래퍼
+- **팟캐스트 저장 위치**: `~/Documents/TubeKeep/Podcasts/{videoId}/`
+- **DB 연동**: `podcast_path` 컬럼 활용
+
+## v2.5.1 (2026-07-18) — AI 요약 + 챕터 생성 ✅ 완료
+
+### New Features
+- **챕터 생성**: AI 요약 시 자동으로 챕터(구간) 정보 생성
+  - SummaryResult.chapters 필드 추가
+  - 모든 LLM 서비스(OpenRouter/yTeaser/A.X 4.0/Gemini) 프롬프트에 챕터 형식 추가
+  - 챕터 응답 파싱 로직 (타임스탬프 + 제목)
+
+### UI Changes
+- **LibraryGridView 챕터 표시**: 썸네일 하단 챕터 리스트
+- **LibraryListView 챕터 표시**: 목록 행에 챕터 표시
+
+### Infrastructure
+- **ChapterInfo 모델**: Codable, Identifiable (startTime, title, endTime)
+- **DB 챕터 저장**: DatabaseManager에 chapters 컬럼 저장/로드
+
+## v2.5.0 (2026-07-18) — SQLite DB 구축 + 자막 DB 저장 + AI 요약 캐싱
+
+### New Features
+- **AI 요약 DB 캐싱**: 요청 시 SQLite에서 기존 요약 확인 → 있으면 API 호출 없이 즉시 표시
+  - `summarizeVideo()` API 폴백 체인 진입 전 DB 캐시 확인
+  - `.showSummary` 시 `item.summary` 먼저 확인
+  - 요약 생성 후 `DatabaseManager.updateSummary()`로 SQLite 저장
+- **자막 가용성 DB 체크**: `hasSubtitles()`가 파일시스템 대신 SQLite에서 transcript 존재 여부 확인
+
+### Bug Fixes
+- **키보드 단축키 한글 레이아웃 호환**: `event.charactersIgnoringModifiers` → `event.keyCode`로 변경
+  - 한글 키보드에서 `c`→`ㅍ`, `v`→`ㅇ` 등으로 매핑되어 단축키 미동작
+  - `keyCode`는 레이어와 관계없이 고정 (0=A, 7=X, 8=C, 9=V, 49=,)
+- **디버그 로그 초기화 시점**: `DebugLogManager.shared`를 `applicationDidFinishLaunching` 즉시 초기화
+
+### Infrastructure
+- **자막 파일 → DB 저장으로 전환**: `.vtt`/`.srt` 파일을 디스크에 저장하지 않고 SQLite DB에 저장
+  - `LibraryReducer.downloadSubtitles`: 임시 디렉토리에 다운로드 → 파싱 → DB 저장 → 파일 삭제
+  - `DownloadManager`: 비디오 다운로드 시 자막도 DB 저장 + 디스크 파일 정리
+  - `SummarizationService.parseVTT`/`parseSRT`를 `static func`으로 변경하여 공유
+- **기존 자막 파일 마이그레이션**: 디스크에 남아있던 17개 `.vtt` 파일을 DB에 저장 후 삭제
+
+## v2.4.0 (2026-07-16) — 기술부채 해소 + SwiftData 전환 + A.X 4.0 통합
+
+**macOS 14+ 전용** | Swift 6.3 | SPM 6.2
+
+### New Features
+- **SKT A.X 4.0 AI 요약/태깅 통합**: 한국어 특화 LLM으로 요약/태깅 품질 향상
+  - A.X 4.0 → yTeaser → Gemini 3단계 무료→유료 폴백 체인
+  - 설정에서 A.X 4.0 API 키 관리 (공개 키 기본값 제공)
+  - AI 요약 설정 탭 분리 (A.X 4.0 / Gemini)
+
+### Breaking Changes
+- **최소 macOS 버전 14.0으로 상향**: SwiftData 지원을 위한 변경 (이전: macOS 13+)
+
+### Infrastructure
+- **SwiftData 마이그레이션**: `LibraryItem`, `SubscribedChannel`을 UserDefaults → SwiftData `@Model` 클래스로 전환
+  - `PersistenceController` 싱글톤 추가 (`ModelContainer` 관리)
+  - `LibraryCacheService`를 actor → `@MainActor` 클래스로 변경, SwiftData 기반 CRUD로 재작성
+  - `SubscribedChannel.loadAll()`/`saveAll()` → SwiftData `FetchDescriptor` 기반으로 변경
+  - UserDefaults → SwiftData 자동 마이그레이션 (`SwiftDataMigration.migrateIfNeeded`)
+- **AppDelegate 분리**: 1056줄 → 536줄 (49% 감소)
+  - `StatusBarManager.swift`: 상태바 + 메뉴 + 큐 요약 추출
+  - `ClipboardMonitor.swift`: 클립보드 감시 + 알림 패널 추출
+  - `ChannelUpdateService.swift`: 채널 업데이트 폴링 추출
+- **Gemini API 백오프 통합**: `SummarizationService.summarizeVideo()` unified 메서드 추가 (yTeaser→Gemini 폴백 일원화)
+  - `TaggingService.queryGemini`에 4회 재시도 + 선형 백오프 추가
+  - HomeReducer, LibraryReducer 중복 폴백 로직 3곳 제거
+- **자동 테스트 55개 추가**: ErrorMessageMapperTests(23), DownloadItemTests(17), ConstantsTests(15)
+
+---
+
+## v2.3.0 (2026-07-16) — SponsorBlock + 기능 다듬기
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+### New Features
+- **SponsorBlock 지원**: 다운로드 시 스폰서/인트로/아웃트로 자동 제거 (시스템 탭 토글)
+- **메타데이터/섬네일 임베딩**: 파일에 제목/채널/업로드 날짜/섬네일 자동 포함 (시스템 탭 토글)
+- **다운로드 큐 개별 제어**: 각 항목 상태에 따라 일시정지/재개/재시도 버튼 제공
+- **실패 시 에러 메시지 표시**: DownloadRow에 간략한 에러 이유 표시
+
+### Improvements
+- **에러 메시지 래핑** (`ErrorMessageMapper`): yt-dlp raw stderr → 한글 친화적 메시지 자동 변환
+  - 403→"권한 필요", 404→"영상 없음", 410→"삭제됨", 연령 제한/비공개/멤버십 등 15개 패턴
+  - `DownloadManager.swift`, `YouTubeDLService.swift` 양쪽 적용
+- **라이브러리 벌크 액션**: 선택 모드에 "Finder에서 보기" + "열기" 버튼 + SF Symbol 아이콘 추가
+  - GridView / ListView 양쪽 selectionBar 동시 적용
+  - Cmd+Click 선택 수정 (`NSApp.currentEvent` → `NSEvent.modifierFlags`)
+- **메뉴바 큐 요약**: 우클릭/클릭 메뉴에 다운로드 중/완료/대기 개수 + 속도 + ETA 표시
+  - `RunLoop.common` 모드 타이머 + `menu.itemChanged()` 실시간 갱신
+  - `startDownload`/`pauseDownload`/`resumeDownload` 시 statusBar 동기화
+- **Home AI 요약 팝오버**: Discover/Library와 동일한 디자인으로 통일 (380×320, ScrollView, 복사 버튼)
+- **채널 목록 우클릭 메뉴**: "Finder에서 채널 폴더 열기" 추가
+- **순번 인덱스 개선**: 일반 URL 다운로드는 `fetchUploadIndex` 건너뜀 → `000 - ` prefix 저장
+- **채널 새로고침 시 파일 rename**: `000 - ` prefix 파일을 올바른 순번으로 자동 변경
+- **해상도 Picker 폭 증가**: 130pt → 200pt (긴 포맷 라벨 대응)
+- **Discover 검색 아이콘 레이아웃 안정화**: ProgressView/Image 동일 frame 적용
+
+### Infrastructure
+- `Services/ErrorMessageMapper.swift` — 신규 파일 (yt-dlp 에러 매핑 유틸리티)
+- `Settings.sponsorBlock`, `Settings.embedMetadata` — Bool 저장 필드 (기본값 true)
+- `docs/TEST.md` — v2.3.0 테스트 명세서 및 결과
+
+### Bug Fixes
+- Cmd+Click으로 라이브러리 선택 안 되던 문제 수정
+- 메뉴바 큐 요약이 다운로드 시작 직후 표시 안 되던 문제 수정
+- 메뉴 열린 상태에서 큐 정보 실시간 갱신 안 되던 문제 수정
+- Discover 검색 Enter 시 아이콘 레이아웃 깨짐 수정
+- 영상 다운로더 해상도 Picker 라벨 잘림 수정
+- **다운로드 성공해도 "실패"로 표시되는 문제 수정**: yt-dlp가 thumbnail/sponsorblock/post-processing 단계에서 non-zero exit code를 반환해도 실제 파일이 생성되었으면 성공으로 처리
+  - `--print-to-file after_move:filepath`로 실제 출력 경로 추적
+  - 종료 코드 + 파일 존재 여부 모두 확인하여 판단
+
+## v2.2.0 (2026-07-16) — 설정 UI 전면 개편 (OpenCode Desktop 스타일)
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+### Breaking Changes
+- **설정 창 UI 전면 개편**: 기존 접이식 VStack 패널 → YouTube/시스템 환경설정 스타일 4탭 레이아웃
+  - 왼쪽: 탭 사이드바 (일반/저장/시스템/AI 요약)
+  - 오른쪽: 선택된 탭의 설정 내용 (SettingsRow 리스트)
+- **창 크기 변경**: 480×580 → 560×420 고정 (리사이즈 불가)
+- **탭 이름 변경**: 다운로드→일반, 기타→시스템
+- **SettingsView 구조 변경**: 기존 `settingRow`/`row`/`infoText` 3개 헬퍼 → 단일 `SettingsRow(title:description:control:)` 컴포넌트
+
+### New Features
+- **4탭 내비게이션** (`SettingsTab` enum): 일반/저장/시스템/AI 요약 — 왼쪽 탭 메뉴로 전환
+  - 각 탭은 SF Symbol 아이콘 + 선택 하이라이트
+- **OpenCode Desktop 스타일 SettingsRow**: Title + Description 수직 스택(좌) + Control(우)
+  - Description은 Title 아래 오른쪽 정렬, 한 줄 고정
+  - 항목 간 하단 border 구분
+- **설명문 가시성 개선**: 모든 설정 설명 11pt, `.lineLimit(1)` + 우측 정렬
+- **⌘, 단축키 글로벌 지원**: `NSEvent.addLocalMonitorForEvents`로 메인 창에서도 단축키 동작
+- **해상도 Picker 순서 변경**: 상단=4K → 하단=144p (SettingsView, ChannelContentView, BatchDownloadView 3곳)
+- **메인창 자동 표시 설정**: 시스템 탭에 토글 추가 (`Settings.showMainWindowOnLaunch`)
+  - 끄면 앱 실행 시 메인 창을 열지 않음
+  - `AppReducer.appDidFinishLaunching`에서 UserDefaults 로드 추가
+
+### Removed
+- **서비스 선택(SummaryServiceMode) 완전 제거**: AI 탭에서 "서비스" 드롭다운 제거, 항상 yTeaser 우선 → Gemini 자동 폴백
+  - `Settings.swift` — `SummaryServiceMode` enum 제거
+  - `Constants.swift` — `summaryServiceModeKey` 제거
+  - `SettingsReducer.swift` — `summaryServiceMode` State/Action/init 제거
+  - `LibraryReducer.swift`/`HomeReducer.swift` — UserDefaults 모드 읽기 제거, 429 시 Gemini 폴백으로 단순화
+  - `SummarizationService.swift` — `SummaryError.quotaExceeded` 케이스 추가로 명확한 할당량 감지
+- **항상 위에 고정 설정 제거**: 설정 창에서 항목 삭제, 각 창이 로컬 `@State`로 자체 관리
+  - `AppReducer.alwaysOnTop` State/Action/handler 제거
+  - `Settings.alwaysOnTop` 필드 제거
+  - `VideoDownloadView` → `@State private var alwaysOnTop` 로컬 상태 전환
+
+### UI Changes
+- **섹션 헤더**: 9pt → 12pt semibold, 상하 여백 증가
+- **설명문**: 8pt → 11pt (`.caption`), `lineLimit(1)` + `minimumScaleFactor(0.7)`로 잘림 방지
+- **AI 요약 설명**: 서비스 전환 시 설명문 동적 변경, 하단 우선순위 안내 추가
+- **API Key 입력**: 180pt → 200pt (파일명 템플릿과 동일), Billing 링크 폰트 증가
+- **저장 폴더/파일명 템플릿**: 200pt 고정 폭 + 우측 정렬
+- **설정 창 하단**: AI 요약 우선순위 안내 (yTeaser → Gemini fallback)
+
+### Infrastructure
+- `SettingsTab` enum: `Models/Settings.swift` 신규 (CaseIterable, icon 매핑)
+- `SettingsRow<Control>`: 제네릭 뷰 컴포넌트 (`SettingsView.swift`)
+- `Constants.showMainWindowOnLaunchKey` 저장 키 추가
+
+## v2.1.0 (2026-07-16) — Google Gemini API 마이그레이션
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+### Breaking Changes
+- **Ollama → Google Gemini API 전환**: SummarizationService 및 TaggingService가 Ollama 로컬 LLM 대신 Google Gemini API 사용
+- **Ollama 의존성 제거**: 더 이상 Ollama 설치/실행 불필요
+
+### New Features
+- **Gemini API 키 설정**: 설정 창에 SecureField 추가 (UserDefaults 저장)
+- **API 키 검증 알럿**: 키 없을 때 요약 버튼 클릭 시 알럿 → "설정 열기" / "키 발급 받기" 버튼
+- 3개 요약 진입점(Home/Library/Discover) 모두 API 키 체크 추가
+
+### Infrastructure
+- `docs/SETUP_OLLAMA.md` → v2.1.0 마이그레이션 노트 추가
+- `docs/SETUP_GEMINI.md` — Gemini 설정 문서 신규 작성
+
+## v2.0.1 (2026-07-16) — AI 요약 팝업 UI 통일 + Discover UX 개선
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+### UI Improvements
+- **사이드바 한글화**: Library→보관함, Discover→트랜드
+- **트랜드 검색창**: 사이드바에 실시간 검색 필드 추가 (discoverSearchText → ytsearch)
+- **카테고리 리스트 리디자인**: 드래그 핸들 + SF Symbol 아이콘 + 이름 + 드래그-드롭 순서변경 (카운트 제거)
+  - `TrendingCategory.systemIcon` 프로퍼티 추가 (flame/music.note/desktopcomputer 등)
+  - `FeaturedCategoryDropDelegate` 구현
+  - 카테고리 순서 @AppStorage("categoryOrder") 영구 저장
+- **DiscoverCard 레이아웃 안정화**: ZStack → `thumbnailView` + 3개 `.overlay()`로 변경
+  - hover 버튼이 셀 레이아웃에 영향을 주지 않음 (제목/정보 밀림 현상 해결)
+- **다운로드 완료 배지 가시성 개선**: 코너 체크마크 → 초록 배경 + 흰 아이콘 + 그림자, hover "다운로드 완료" → 초록 캡슐 배경
+- **Discover popover 방향**: arrowEdge `.leading` → `.trailing` (버튼 오른쪽에 표시)
+
+### AI 요약 UX 통일
+- **Discover AI 요약**: 인라인 뷰 → `.popover(isPresented:arrowEdge:)` 네이티브 팝오버 (로딩/결과/에러 3상태)
+  - `discoverSummaryVideoId`/`discoverSummaryText`/`discoverSummaryLoading` State
+- **Library AI 요약**: 좌클릭 메뉴 → `.sheet` 모달로 변경
+  - `librarySummaryVideoId`/`librarySummaryText`/`librarySummaryLoading` State
+  - 기존 `showSummary`/`summaryResult`/`summaryFailed`/`dismissLibrarySummary` Action
+  - 결과는 여전히 `LibraryItem.summary`에 영구 저장
+- **HomeView(다운로더)**: AI 요약 버튼 + popover 추가
+  - `HomeReducer.summaryText`/`summaryLoading`/`showSummaryPopover` State
+  - `toggleSummaryPopover`/`summaryLoaded`/`summaryFailed`/`dismissSummary` Action
+  - `SummarizationService` 재사용
+- **Library 요약 sheet 내용**: `.frame(maxHeight: .infinity, alignment: .topLeading)` 상단 정렬
+
+### Discover 다운로드 변경
+- **다운로드 버튼**: 큐 직접 추가 → 다운로더 창 열고 URL 자동 조회 (`store.send(.home(.autoFetchInfo(...)))`)
+- **다운로드 완료 감지**: `downloadedIds = Set(store.library.items.map(\.id))`로 Discover 카드에 표시
+  - hover 메뉴: "재생"(로컬 파일 열기) / "다운로드 완료"(비활성화)로 변경
+  - 썸네일 코너에 초록 체크마크 배지
+
+### Bug Fixes
+- **Local file 요약 실패**: `extractTranscriptFromLocalFile`에서 외부 자막 파일 없으면 `fetchTranscript(videoId:)`로 YouTube 자막 다운로드 fallback
+- **LibraryItem 구버전 호환**: Custom `init(from:)`/`encode(to:)` — `tags`/`summary` `decodeIfPresent`로 구버전 JSON에서도 크래시 없이 로드
+- **Library sheet 가려짐**: ZStack overlay → `.sheet`로 변경 (HoverPreviewPanel 등 별도 윈도우 위로 표시)
+
+### Infrastructure
+- `docs/SETUP_OLLAMA.md` — Ollama 설치/실행확인/문제해결 문서화
+
+## v2.0.0 (2026-07-16) — Discover 탭 + AI 요약/자동 태깅
+
+**macOS 26+ 전용** | Swift 6.3 | SPM 6.2
+
+### New Features
+- **Discover 탭**: 사이드바에 Library/Discover 네비게이션 추가, Discover 선택 시 카테고리별 YouTube 트렌딩/인기 영상 표시
+  - 8개 카테고리: 전체, 음악, 기술, 게임, 뉴스, 스포츠, 엔터테인먼트, 교육
+  - yt-dlp `ytsearch` 기반, 30분 TTL 캐싱 (중복 호출 방지)
+  - 각 카드 호버 시 "다운로드" + "AI 요약" 버튼
+  - 원클릭 다운로드 큐 추가
+  - 오프라인 시 "인터넷 연결 필요" 안내 화면
+- **AI 영상 요약** (Library 좌클릭 메뉴): 로컬 자막 → Ollama LLM 요약
+  - 개요 + 핵심 포인트 생성, LibraryItem.summary에 저장/영구 보존
+  - 오프라인에서도 기존 영상 요약 가능 (로컬 자막 파일 활용)
+  - Ollama 필요 (`ollama pull llama3.2`)
+- **AI 자동 태깅**: 다운로드 완료 시 title+channel 기반 자동 분류
+  - Ollama 분류 (우선) + 키워드 기반 fallback
+  - LibraryItem.tags에 저장, 추후 사이드바 필터로 활용
+- **사이드바 네비게이션**: Library/Discover 전환 (SF Symbol + 텍스트)
+  - Library 모드: 기존 검색/필터/채널 목록 유지
+  - Discover 모드: 카테고리 리스트 표시
+
+### Infrastructure
+- **macOS 타겟 26+ 상향**: Package.swift `tools-version: 6.2`, `.macOS(.v26)`
+- **Swift 6 동시성 에러 전면 수정**: 8개 파일 (ChannelModels, ChannelListView, BookmarkManager, DownloadManager, DebugLogManager, AppDelegate, LibraryGridView)
+  - `nonisolated(unsafe)`, `@MainActor`, `@unchecked Sendable` 적용
+- **LibraryCacheService.updateItem()** 추가: 개별 항목 tags/summary 업데이트 지원
+
+### Services
+- `TrendingService` (actor): yt-dlp 검색 + 30분 TTL 캐시
+- `SummarizationService` (actor): 자막(VTT/SRT) 추출 → Ollama LLM 요약
+- `TaggingService` (actor): Ollama 분류 + 키워드 기반 fallback
+
+### New Files (6개)
+- `Models/TrendingVideo.swift` — 트렌딩 영상 모델 + 카테고리 열거형
+- `Features/Discover/DiscoverView.swift` — 카드 그리드 + 호버 메뉴
+- `Services/TrendingService.swift` — yt-dlp 검색/캐싱
+- `Services/SummarizationService.swift` — 자막→Ollama 요약 파이프라인
+- `Services/TaggingService.swift` — Ollama+키워드 자동 분류
+
+### Modified Files (12개)
+- `Package.swift` → tools-version 6.2, macOS .v26
+- `Info.plist` → v2.0.0, LSMinimumSystemVersion 26.0
+- `Models/LibraryItem.swift` → tags, summary 프로퍼티
+- `Features/Library/LibraryReducer.swift` → sidebarMode, discover/ summary/tagging actions
+- `Features/Library/LibrarySidebarView.swift` → 상단 네비게이션 + Discover 카테고리
+- `Features/Library/MainView.swift` → sidebarMode 콘텐츠 전환
+- `Features/Library/LibraryGridView.swift` → "AI 요약" 메뉴, @MainActor 수정
+- `Features/Library/LibraryListView.swift` → "AI 요약" 메뉴
+- `App/AppReducer.swift` → discoverAddToQueue, 태깅 on download
+- `Services/LibraryCacheService.swift` → updateItem() 메서드
+
+### Requirements
+- macOS 26+ (Apple Silicon)
+- Ollama (`ollama pull llama3.2`) — AI 요약/태깅 선택 사항
+
+## v1.2.0 (2026-07-16) — 채널 업데이트 알림 개선 + 디스크 사용량 표시
+
+### New Features
+- **채널 업데이트 알림 (T-114)**: 30분 타이머로 채널 최신 영상 감지, `channelsNewVideos`/`channelsSeenVideoIds` UserDefaults 키로 신규/확인 영상 추적
+  - 뱃지 클릭 → 채널 다운로더 창 오픈 (첫 새 영상 채널 자동 선택)
+  - `seenVideoIds` 도입: 사용자가 확인(채널 선택/새로고침)한 영상은 `seenIds`로 이동, 다운로드 안 해도 재감지 안 됨
+  - 상태바 진행률: "업데이트 확인 중 (N/M)" 표시
+  - DEBUG 로그: `channelLogManager` → `libraryLogManager`로 변경 (메인 창에 출력)
+  - `ChannelRow`: 새 영상 채널에 빨간 ● 배지
+  - `ChannelContentView.channelHeader`: 최신 업로드 날짜 + "새 영상 N개 — 새로고침 필요" 배너
+- **디스크 사용량**: LibrarySidebarView 하단에 `[폴더] Finder에서 보기  12.3 GB  ↻` 표시
+  - `LibraryCacheService.calculateDiskUsage()` — `storageDirectory` + 캐시 디렉토리 합산
+  - 앱 실행 시, 다운로드 완료 시, 항목 삭제 시, ↻ 버튼 클릭 시 재계산
+- **저장 폴더 기본값 변경**: `~/Downloads` → `~/Documents/TubeKeep` (사용자 실수 삭제 방지)
+- **변수명 리팩토링**: `outputDirectory` → `storageDirectory` (코드 전체 일괄 변경)
+- **UI 텍스트 변경**: "출력 폴더" → "저장 폴더" (설정 창, 다운로드 큐)
+- **JSON 키 호환성 유지**: `Settings.CodingKeys`로 `"outputDirectory"` 키 마이그레이션 없이 호환
+
+### Bug Fixes
+- **statusBar badge 자동 리셋 제거**: 뱃지가 10초 후 사라지지 않고 사용자 클릭 시까지 유지
+- **openVideoDownloaderWindow**: `MainView` → `VideoDownloadView`로 수정 (잘못된 뷰 참조)
+- **자막 배지 미표시**: 두 가지 원인 수정
+  - Migration 코드가 자막 파일(`.vtt`/`.srt`)을 비디오로 잘못 인식해 `filePath`를 `.ko.vtt`로 저장하는 버그 — 확장자가 비디오인지 확인 후 강제 재설정
+  - 비디오 파일(NFC)과 자막 파일(NFD) 간 Unicode 정규화 불일치로 `hasSubtitles()`가 자막 파일을 찾지 못하는 버그 — `contentsOfDirectory` + ASCII `hasSuffix` 매칭으로 NFC/NFD 차이에 영향받지 않음
+
+### Migration
+- **저장 폴더 변경 시 LibraryItem.filePath 자동 마이그레이션**: `LibraryCacheService.loadItems()`에서 `filePath`가 실제 파일이 존재하지 않으면 현재 `channelStorageDirectory`에서 video ID로 파일을 찾아 경로 자동 수정
+  - 저장 폴더를 변경하고 기존 파일들을 직접 옮겨도 라이브러리 항목이 정상 동작 (삭제, Finder 열기 등)
+  - `LibraryItem.filePath`를 `let` → `var`로 변경하여 런타임 수정 가능
+
+### Housekeeping
+- 모든 빌드 경고 해결 (Sendable captures, MainActor.run unused result, keypath inference)
+
+## v1.1.0 (2026-07-16) — 설정 창 분리 + 뷰 이름 정리 + 이미지 캐싱 + 라이브러리 편의성
+
+### Breaking Changes
+- **앱 이름 변경**: `VideoDownloader` → **TubeKeep**
+- **번들 ID**: `com.mdownload.videodownloader` → `com.tubekeep`
+- **URL Scheme**: `mdownload://` → `tubekeep://`
+- **설치 경로**: `~/Applications/VideoDownloader.app` → `~/Applications/TubeKeep.app`
+- **UserDefaults Suite**: `com.mdownload.videodownloader.shared` → `com.tubekeep.shared`
+
+### Image Caching
+- **중앙 캐시 서비스 통일**: 모든 썸네일/아바타 로딩이 `LibraryCacheService`(NSCache + 디스크) 경유, 오프라인에서도 표시
+- **캐시 디렉토리 수정**: `~/Library/Caches/com.mdownload.library/` → `com.tubekeep/` (리브랜딩 누락분) + 기존 캐시 자동 마이그레이션
+- **AsyncImage 제거 (5개 뷰)**: 모든 `AsyncImage`를 `CachedThumbnailView`/`CachedAvatarView`로 교체
+  - `HomeView`, `BatchDownloadView`, `DownloadQueueView`, `PlaylistSelectionView`, `ChannelContentView`
+- **중복 뷰 제거**: `ChannelContentView` 내 private `CachedAvatarView`/`CachedThumbnailView` 삭제 → `Views/CachedImageViews.swift` 공유 뷰로 통일
+- **LibrarySidebarView 아바타 버그 수정**: 비디오 `thumbnailURL`을 아바타로 잘못 사용하던 코드 제거, 캐시/플레이스홀더만 사용
+
+### New Features
+- **설정 창 분리 (⌘,)**: `AppDelegate.openSettingsWindow()`로 NSWindow 직접 관리, `TubeKeepApp`은 빈 Scene, 메뉴바 "설정..." + ⌘, 단축키 지원
+- **뷰 이름 정리**: `MainView`(영상 다운로더) → `VideoDownloadView`, `LibraryView` → `MainView` (파일명/구조체명/참조 전체)
+- **영상 다운로더에서 설정 영역 완전 제거**: `VideoDownloadView` 하단 `SettingsView` 삭제
+- **UserDefaults 직접 읽기 → 공유 Store 참조**: `HomeReducer`, `DownloadQueueReducer`, `DownloadManager` 3곳
+- **alwaysOnTop 비활성화**: 설정 창에서 회색 처리 + "영상 다운로더 창에서만 사용 가능" 안내
+- **설정 창 크기 고정**: 가로 480px 고정, 세로 580px (contentMin/MaxSize)
+- **NSUserNotification → UNUserNotificationCenter**: deprecated 해결, 앱 실행 시 권한 요청
+- **라이브러리 앱 분리 → 단일 앱 복원**: 단일 바이너리 → `VideoDownloader.app` + `LibraryDownloader.app` → 단일 `TubeKeep.app`으로 통합
+- **크로스 프로세스 통신 제거**: `DistributedNotificationCenter` + `NSRunningApplication.activate` 제거, `openMainWindow` 직접 호출
+- **데이터 공유**: `UserDefaults(suiteName:)`으로 라이브러리 아이템 앱 간 동기화 + 기존 데이터 자동 마이그레이션
+- **언어 지원**: `Constants.youtubeExtractorArgs` — 시스템 언어 기반 yt-dlp `--extractor-args youtube:lang=XX`
+- **DEBUG Mock 테스트**: "상태바 테스트" + "채널 업데이트" 서브메뉴
+- **채널 업데이트 알림 개선 (T-114)**:
+  - 새 영상 ID를 `UserDefaults("channelsNewVideos")`에 채널별 저장 → 상태바 뱃지 자동 리셋 제거 (클릭 시까지 유지)
+  - 뱃지 클릭 → 채널 다운로더 창 (첫 새 영상 채널 자동 선택)
+  - `ChannelRow`: 새 영상 채널 빨간 ● 배지 (아바타 우상단)
+  - `ChannelContentView.channelHeader`: 최신 업로드 날짜 + "새 영상 N개 — 새로고침 필요" 오렌지 배너
+  - 채널 선택 시 `ChannelDownloadCache.saveSeenVideoIds`로 newIds를 seenIds로 이동 → 다운로드 안 해도 재감지 안 됨
+  - `channelsSeenVideoIds` 도입 (UserDefaults): 확인한 영상은 다음 체크에서 제외
+  - 다운로드 완료 시 `removeSeenVideoIds` 호출 (seenIds 정리)
+  - 체크 진행률: 상태바 `"업데이트 확인 중 (N/M)"` 표시
+  - 체크 DEBUG 로그: 채널 다운로더 창 `channelLogManager`에 출력
+  - DEBUG "채널 업데이트" → 실제 `checkChannelUpdates` 실행으로 변경
+- **라이브러리 재생시간 표시**: `LibraryItem.duration: Int?` + `formatDuration()`; 그리드/목록 뷰에 duration 오버레이
+- **라이브러리 채널 영상 인덱스**: `LibraryItem.channelUploadIndex: Int?` — 채널 내 업로드 순서 추적 (001=최신); `LibraryCacheService.updateChannelUploadIndices()`로 자동 업데이트
+- **정렬 옵션 확장**: `LibrarySortOrder`에 `indexAsc`/"인덱스순", `indexDesc`/"인덱스 역순" 추가; 채널 선택 시 기본 정렬 = 인덱스 역순
+- **UI 인덱스 표시**: 그리드 썸네일 좌하단 `#003` 배지 + 목록 뷰 정보 열에 인덱스 표시
+
+### Bug Fixes
+- **채널 @handle 누락**: `fetchAllVideos`에서 handle에 `@` 자동 추가 (저장된 handle 포맷 차이 대응)
+- **회원 전용 영상 차단**: `--playlist-items 0` → `--flat-playlist --playlist-end 1` (channel metadata fetch)
+- **Short 필터링**: `fetchAllVideos`에서 `webpage_url.contains("/shorts/")` 체크
+- **채널 목록 정렬**: 신규 채널이 항상 맨 위에 추가되도록 `insert(at: 0)` (3개 위치 + LibraryReducer)
+- **창 전환 지연**: `NSWorkspace.shared.openApplication` → `NSRunningApplication.activate` (실행 중인 앱 직접 활성화)
+- **사이드바 채널 아바타 미표시** (v1.0.0): 캐시 미스 시 다운로드 로직 추가
+- **필터 전환 시 썸네일 깨짐** (v1.0.0): 불필요한 removeAll 제거
+- **채널 새로고침 시 다운로드 체크 누락**: `syncDownloadedIDsFromDisk()`가 호출되지 않아 디스크 파일과 UserDefaults 캐시 불일치; refresh 후 호출 추가
+- **macOS 권한 팝업 반복**: `BookmarkManager`(security-scoped bookmark) 도입으로 출력 폴더 접근 권한 1회 획득 후 유지
+- **CachedImageViews actor isolation 경고**: `await` 추가로 Swift 6 준수
+- **AppDelegate Sendable closure capture 경고**: 로컬 상수 캡처로 수정
+
+### UI Improvements
+- **채널 카운트**: `ChannelListView` 하단 `등록된 채널 N개` (아이콘 + 배경)
+- **채널 추가 버튼**: `ChannelContentView` empty state에 "채널 추가" 버튼 (`onAddChannel`)
+- **자막 다운로드 뱃지**: 썸네일 우측 상단 고정
+- **호버 미리보기 위치**: 셀 중앙 기준 왼쪽으로 확장 (`cell.midX - 360`), 하단 기준=셀 상단 → 중앙 (`maxY+5` → `midY`) — 썸네일 우상단 1/4 가림
+- **메뉴바 메뉴**: 모든 항목 `target: self` 명시 (Selector 불일치 방지)
+- **정보 창**: 새로운 "정보" 메뉴 항목 + AboutView
+- **채널 아바타 동그랗게**: `CachedAvatarView`에 `.clipShape(Circle())` 적용; `ChannelListView` 왼쪽 패딩 12px
+- **메뉴바 "설정..." 추가**: ⌘, 단축키, AppDelegate 메뉴 재구성
+
+### Housekeeping
+- `Sources/MDownload/` → `Sources/TubeKeep/` 디렉토리 리네임
+- `Sources/MDownloadCore/` → `Sources/MDownload/` 통합 (단일 모듈)
+- `FixedWidthWindowController` 별도 파일로 분리
+- **단일 `.app` 복원**: `LibraryDownloader.app` 제거, 단일 `TubeKeep.app`으로 통합
+- `DebugLogView`: 각 window에 DEBUG 전용 동작 로그 패널 추가 (자동 스크롤 + 복사 가능)
+- `LibraryInfo.plist` 삭제
+- `build_and_run.sh`: 앱 이름 `VideoDownloader` → `TubeKeep`, `--clean` 옵션 추가 (기본 增量 빌드)
+- `docs/IMAGE_CACHING.md` — 이미지 캐싱 아키텍처 문서 추가
+- `CachedImageViews.swift` — 공유 `CachedThumbnailView`/`CachedAvatarView` 뷰 파일 생성
+- `BookmarkManager.swift` — security-scoped bookmark 관리 유틸리티 (접근 권한 1회 획득 후 재시작 시 자동 복원)
+- 모든 Swift 6 Sendable 경고 수정 (0 warnings)
+
+---
+
+## v1.0.0 (2026-07-14) — Initial Release
+
+### Milestone: 라이브러리 대시보드 (M5) 완료
+- LibraryItem 모델 + LibraryReducer (sort/filter/search + viewMode)
+- LibraryCacheService (메모리+디스크 썸네일/아바타 캐시)
+- LibraryView (HStack: sidebar 200px + content, toolbar)
+- LibrarySidebarView (검색, 전체/최근, 채널 목록 + 우클릭)
+- LibraryGridView (LazyVGrid, 인피니트스크롤, 좌클릭 NSMenu)
+- LibraryListView (LazyVStack, 동일 메뉴)
+- EmptyLibraryCell (full-width 안내 + 3개 다운로더 버튼)
+- AppDelegate 메뉴/창 분리 (라이브러리=main 자동실행, 다운로더=별도)
+- downloadCompleted → library 저장 + race condition 수정
+
+### Bug Fixes
+- `-[NSIndirectTaggedPointerString count]` crash → `OSAllocatedUnfairLock`
+- 다운로드 개수 불일치 → sequential save+load
+- "다운로드" 버튼 잘못된 창 → `openDownloaderWindowNotification`
+- 모든 Swift 6 Sendable 경고 수정 (0 warnings)
+- 그리드 레이아웃 리사이즈 깨짐 → EmptyLibraryCell 분리
+- FixedWidthWindowController dealloc → AppDelegate 프로퍼티 저장
+- 사이드바 채널 아바타 미표시 → 캐시 미스 시 다운로드 로직 추가
+
+### UX Improvements
+- 메뉴바 "라이브러리" 아래 구분선 추가
+- 그리드/목록 뷰모드 전환 (sortBar 우측 토글, UserDefaults 저장)
+- 좌클릭 NSMenu (LeftClickMenu, NSViewRepresentable)
+- 클립보드 감지 — 라이브러리 창 열려 있어도 다운로더 창 오픈
+- 자동 실행 (build_and_run.sh open 추가)
+- build/ 디렉토리 gitignore 추가
+
+### Housekeeping
+- 사용하지 않는 `queueSaveKey` 상수 제거
+- 문서 전용 폴더 `docs/` 생성 및 이동 (AGENTS/PRD/DESIGN/PLAN/TODO)
+- Git init + tag v1.0.0
+- Release 아카이브: `Releases/v1.0.0/` (VideoDownloader.app + source.zip)

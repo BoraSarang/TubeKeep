@@ -1,0 +1,52 @@
+name: Release macOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 2.7.8)'
+        required: true
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install whisper-cpp
+
+      - name: Build release bundle
+        run: |
+          SWIFT_VERSION=$(swift --version | head -1)
+          echo "🔨 $SWIFT_VERSION"
+          CI=true ./scripts/build-macos.sh release
+
+      - name: Compress .app
+        run: |
+          VERSION="${{ inputs.version }}"
+          cd "$HOME/Applications"
+          zip -r "TubeKeep-$VERSION.zip" TubeKeep.app
+          echo "📦 $(pwd)/TubeKeep-$VERSION.zip ($(du -h "TubeKeep-$VERSION.zip" | cut -f1))"
+
+      - name: Create GitHub Release
+        run: |
+          VERSION="${{ inputs.version }}"
+          ASSET="$HOME/Applications/TubeKeep-$VERSION.zip"
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            "$ASSET"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Upload artifact (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeKeep-${{ inputs.version }}
+          path: ${{ env.HOME }}/Applications/TubeKeep.app

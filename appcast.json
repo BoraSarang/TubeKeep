@@ -1,0 +1,7 @@
+{
+  "latestVersion": "2.7.7",
+  "minimumVersion": "2.7.0",
+  "downloadURL": "https://github.com/BoraSarang/TubeKeep/releases/download/v2.7.7/TubeKeep-2.7.7.zip",
+  "releaseNotes": "• 오디오 누락 버그 근본 수정 (복합 포맷 선택자 래핑)\n• DebugPanel v1.7 표준 적용\n• GitHub Actions 릴리스 자동화",
+  "pubDate": "2026-07-28T21:00:00Z"
+}

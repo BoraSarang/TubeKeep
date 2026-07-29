@@ -1,0 +1,581 @@
+import Foundation
+import ComposableArchitecture
+
+@Reducer
+struct PlayerReducer {
+    @ObservableState
+    struct State: Equatable {
+        let playerItem: PlayerItem
+        var currentTime: Double = 0
+        var duration: Double = 0
+        var subtitles: [SubtitleCue] = []
+        var subtitleLoading = false
+        var subtitleError: String?
+        var subtitleAvailable: Bool?
+        var isConverting = false
+        var conversionProgress: Double = 0
+        var conversionETA: String = ""
+        var showSubtitleOverlay = false
+        var showSubtitlePanel = false
+        var isAlwaysOnTop = false
+        var isTranscribing = false
+        var transcribeError: String?
+        var whisperProgressMessage: String?
+    }
+
+    enum Action: Equatable {
+        case timeUpdated(Double)
+        case durationUpdated(Double)
+        case toggleSubtitleOverlay
+        case toggleSubtitlePanel
+        case checkSubtitlesAvailability
+        case subtitlesAvailable(Bool)
+        case downloadSubtitles
+        case subtitlesLoaded([SubtitleCue])
+        case subtitlesFailed(String)
+        case transcribeWithWhisper
+        case whisperProgress(String)
+        case whisperLoaded([SubtitleCue])
+        case whisperFailed(String)
+        case deleteSubtitles
+        case toggleAlwaysOnTop
+        case setConverting(Bool)
+        case updateConversionProgress(Double)
+        case updateConversionETA(String)
+    }
+
+    var body: some ReducerOf<Self> {
+        Reduce { state, action in
+            switch action {
+            case let .timeUpdated(time):
+                state.currentTime = time
+                return .none
+
+            case let .durationUpdated(duration):
+                let hadZeroDuration = state.duration == 0 && duration > 0
+                state.duration = duration
+                if hadZeroDuration && state.playerItem.videoId != nil {
+                    state.subtitles = []
+                    state.subtitleError = nil
+                    state.subtitleAvailable = nil
+                    return .send(.checkSubtitlesAvailability)
+                }
+                return .none
+
+            case .toggleSubtitleOverlay:
+                state.showSubtitleOverlay.toggle()
+                return .none
+
+            case .toggleSubtitlePanel:
+                state.showSubtitlePanel.toggle()
+                return .none
+
+            case .checkSubtitlesAvailability:
+                guard let videoId = state.playerItem.videoId else { return .none }
+                state.subtitleError = nil
+                state.transcribeError = nil
+
+                let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId)
+                if let subtitlesData = data?.subtitlesData,
+                   let cues = try? JSONDecoder().decode([SubtitleCue].self, from: subtitlesData),
+                   !cues.isEmpty {
+                    state.subtitles = cues
+                    state.subtitleAvailable = nil
+                    return .none
+                }
+                if let transcript = data?.transcript, !transcript.isEmpty {
+                    let duration = state.duration
+                    if duration > 0 {
+                        let estimated = PlayerReducer().estimateSubtitles(from: transcript, duration: duration)
+                        if !estimated.isEmpty {
+                            state.subtitles = estimated
+                            state.subtitleAvailable = nil
+                            return .none
+                        }
+                    }
+                    let fallback = PlayerReducer().fallbackCues(from: transcript)
+                    if !fallback.isEmpty {
+                        state.subtitles = fallback
+                        state.subtitleAvailable = nil
+                        return .none
+                    }
+                }
+
+                state.subtitleLoading = true
+                return .run { send in
+                    let available = await YouTubeDLService().checkSubtitlesAvailability(videoId: videoId)
+                    await send(.subtitlesAvailable(available))
+                }
+                .cancellable(id: "checkSubtitlesAvailability", cancelInFlight: true)
+
+            case let .subtitlesAvailable(available):
+                state.subtitleLoading = false
+                state.subtitleAvailable = available
+                if !available {
+                    state.subtitleError = "자막이 없습니다"
+                }
+                return .none
+
+            case .downloadSubtitles:
+                guard let videoId = state.playerItem.videoId else { return .none }
+                state.subtitleLoading = true
+                state.subtitleError = nil
+                return .run { send in
+                    do {
+                        let cues = try await YouTubeDLService().fetchSubtitles(videoId: videoId)
+                        await send(.subtitlesLoaded(cues))
+                    } catch {
+                        await send(.subtitlesFailed(error.localizedDescription))
+                    }
+                }
+                .cancellable(id: "downloadSubtitles", cancelInFlight: true)
+
+            case .transcribeWithWhisper:
+                guard let fileURL = state.playerItem.fileURL else {
+                    state.transcribeError = "로컬 파일만 Whisper 자막을 생성할 수 있습니다"
+                    return .none
+                }
+                #if DEBUG
+                DebugLogManager.shared?.append("[Player] transcribeWithWhisper: \(fileURL.path)")
+                #endif
+                state.isTranscribing = true
+                state.transcribeError = nil
+                state.whisperProgressMessage = nil
+                state.subtitles = []
+                let modelSize = Self.loadSettings().whisperModelSize
+                #if DEBUG
+                DebugLogManager.shared?.append("[Player] whisper model size: \(modelSize)")
+                #endif
+                return .run { send in
+                    do {
+                        let service = WhisperService.shared
+                        await send(.whisperProgress("오디오 추출 중..."))
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Player] starting audio extraction...")
+                        #endif
+                        let audioPath = try await service.extractAudio(videoPath: fileURL.path)
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Player] audio extracted: \(audioPath)")
+                        #endif
+                        await send(.whisperProgress("자막 생성 중..."))
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Player] starting whisper transcription...")
+                        #endif
+                        let cues = try await service.transcribe(
+                            audioPath: audioPath,
+                            modelSize: modelSize,
+                            progressHandler: { msg in
+                                Task { await send(.whisperProgress(msg)) }
+                            }
+                        )
+                        try? FileManager.default.removeItem(atPath: audioPath)
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Player] whisper done: \(cues.count) cues")
+                        #endif
+                        await send(.whisperLoaded(cues))
+                    } catch {
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Player] whisper error: \(error.localizedDescription)")
+                        #endif
+                        await send(.whisperFailed(error.localizedDescription))
+                    }
+                }
+                .cancellable(id: "transcribeWithWhisper", cancelInFlight: true)
+
+            case let .subtitlesLoaded(cues):
+                state.subtitleLoading = false
+                state.subtitleAvailable = nil
+                state.subtitles = cues
+                #if DEBUG
+                DebugLogManager.shared?.append("[Player] 자막 로딩 완료: \(cues.count)개")
+                #endif
+                return .none
+
+            case let .subtitlesFailed(error):
+                state.subtitleLoading = false
+                state.subtitleError = error
+                #if DEBUG
+                DebugLogManager.shared?.append("[Player] 자막 로딩 실패: \(error)")
+                #endif
+                return .none
+
+            case let .whisperProgress(msg):
+                state.subtitleLoading = true
+                state.subtitleError = nil
+                state.whisperProgressMessage = msg
+                return .none
+
+            case let .whisperLoaded(cues):
+                state.isTranscribing = false
+                state.subtitleLoading = false
+                state.subtitleError = nil
+                state.subtitleAvailable = nil
+                state.whisperProgressMessage = nil
+                state.subtitles = cues
+                if let videoId = state.playerItem.videoId {
+                    let text = cues.map { $0.text }.joined(separator: "\n")
+                    var data = DatabaseManager.shared.loadVideoAIData(videoId: videoId) ?? VideoAIData(videoId: videoId)
+                    data.transcript = text
+                    data.transcriptLanguage = "ko"
+                    data.subtitlesData = try? JSONEncoder().encode(cues)
+                    DatabaseManager.shared.saveVideoAIData(data)
+                }
+                return .none
+
+            case let .whisperFailed(error):
+                state.isTranscribing = false
+                state.subtitleLoading = false
+                state.transcribeError = error
+                state.whisperProgressMessage = nil
+                return .none
+
+            case .deleteSubtitles:
+                if let videoId = state.playerItem.videoId {
+                    DatabaseManager.shared.deleteVideoAIData(videoId: videoId)
+                }
+                state.subtitles = []
+                state.subtitleError = "자막이 삭제되었습니다"
+                return .none
+
+            case .toggleAlwaysOnTop:
+                state.isAlwaysOnTop.toggle()
+                return .none
+
+            case let .setConverting(value):
+                state.isConverting = value
+                if !value {
+                    state.conversionProgress = 0
+                    state.conversionETA = ""
+                }
+                return .none
+
+            case let .updateConversionProgress(value):
+                state.conversionProgress = value
+                return .none
+
+            case let .updateConversionETA(value):
+                state.conversionETA = value
+                return .none
+            }
+        }
+    }
+
+    private static func loadSettings() -> Settings {
+        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
+              let data = json.data(using: .utf8),
+              let settings = try? JSONDecoder().decode(Settings.self, from: data)
+        else { return Settings() }
+        return settings
+    }
+
+    private func estimateSubtitles(from transcript: String, duration: Double) -> [SubtitleCue] {
+        guard duration > 0 else { return [] }
+        let sentences = transcript.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map { $0.hasSuffix(".") ? $0 : $0 + "." }
+        if sentences.count <= 1 {
+            let fallback = transcript.components(separatedBy: ". ")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            guard !fallback.isEmpty else { return [] }
+            let avgCueDuration = max(3.0, duration / Double(fallback.count))
+            return fallback.enumerated().map { i, text in
+                SubtitleCue(
+                    startTime: Double(i) * avgCueDuration,
+                    endTime: Double(i + 1) * avgCueDuration,
+                    text: Self.decodeHTMLEntities(text.hasSuffix(".") ? text : text + ".")
+                )
+            }
+        }
+        guard !sentences.isEmpty else { return [] }
+        let targetCueCount = max(3, Int(duration / 6))
+        let sentencesPerCue = max(1, sentences.count / targetCueCount)
+        var cues: [SubtitleCue] = []
+        var chunk: [String] = []
+        for sentence in sentences {
+            chunk.append(sentence)
+            if chunk.count >= sentencesPerCue {
+                let text = Self.decodeHTMLEntities(chunk.joined(separator: ". ") + ".")
+                cues.append(SubtitleCue(startTime: 0, endTime: 0, text: text))
+                chunk = []
+            }
+        }
+        if !chunk.isEmpty {
+            let text = Self.decodeHTMLEntities(chunk.joined(separator: ". ") + ".")
+            cues.append(SubtitleCue(startTime: 0, endTime: 0, text: text))
+        }
+        let segDuration = duration / Double(cues.count)
+        for i in cues.indices {
+            cues[i] = SubtitleCue(
+                startTime: Double(i) * segDuration,
+                endTime: Double(i + 1) * segDuration,
+                text: cues[i].text
+            )
+        }
+        return cues
+    }
+
+    private func fallbackCues(from transcript: String) -> [SubtitleCue] {
+        var lines = transcript.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map { $0.hasSuffix(".") ? $0 : $0 + "." }
+        if lines.count <= 1 {
+            lines = transcript.components(separatedBy: ". ")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                .map { $0.hasSuffix(".") ? $0 : $0 + "." }
+        }
+        let chunkCount = max(10, lines.count / 3)
+        let groupSize = max(1, lines.count / chunkCount)
+        var cues: [SubtitleCue] = []
+        var chunk: [String] = []
+        for line in lines {
+            chunk.append(line)
+            if chunk.count >= groupSize {
+                let text = Self.decodeHTMLEntities(chunk.joined(separator: " "))
+                cues.append(SubtitleCue(startTime: 0, endTime: 0, text: text))
+                chunk = []
+            }
+        }
+        if !chunk.isEmpty {
+            let text = Self.decodeHTMLEntities(chunk.joined(separator: " "))
+            cues.append(SubtitleCue(startTime: 0, endTime: 0, text: text))
+        }
+        let secPerCue = max(3, min(8, 600 / cues.count))
+        return cues.enumerated().map { i, cue in
+            SubtitleCue(startTime: Double(i) * Double(secPerCue), endTime: Double(i + 1) * Double(secPerCue), text: cue.text)
+        }
+    }
+
+    fileprivate static func decodeHTMLEntities(_ string: String) -> String {
+        var result = string
+        let entities = [
+            "&amp;": "&",
+            "&gt;": ">",
+            "&lt;": "<",
+            "&quot;": "\"",
+            "&#39;": "'",
+            "&nbsp;": " ",
+            "&apos;": "'",
+        ]
+        for (entity, char) in entities {
+            result = result.replacingOccurrences(of: entity, with: char)
+        }
+        result = cleanSubtitleMarkers(result)
+        return result
+    }
+
+    fileprivate static func cleanSubtitleMarkers(_ text: String) -> String {
+        var result = text
+        result = result.replacingOccurrences(of: ">>", with: "")
+        result = result.replacingOccurrences(of: "> ", with: " ")
+        result = result.replacingOccurrences(of: "♪", with: "")
+        result = result.replacingOccurrences(of: "[Music]", with: "")
+        result = result.replacingOccurrences(of: "[음악]", with: "")
+        result = result.replacingOccurrences(of: "[Applause]", with: "")
+        result = result.replacingOccurrences(of: "[박수]", with: "")
+        result = result.replacingOccurrences(of: "\n", with: " ")
+        result = result.replacingOccurrences(of: "\r", with: "")
+        while let range = result.range(of: "<[^>]+>", options: .regularExpression) {
+            result.removeSubrange(range)
+        }
+        while let range = result.range(of: "\\[\\d{1,2}:\\d{2}(:\\d{2})?\\]", options: .regularExpression) {
+            result.removeSubrange(range)
+        }
+        while result.contains("  ") {
+            result = result.replacingOccurrences(of: "  ", with: " ")
+        }
+        result = result.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result
+    }
+}
+
+extension YouTubeDLService {
+    func checkSubtitlesAvailability(videoId: String) async -> Bool {
+        let url = "https://www.youtube.com/watch?v=\(videoId)"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            Constants.ytDlpPath,
+            "--skip-download",
+            "--list-subs",
+            url,
+        ] + LanguageService.cookiesArgs
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        guard (try? process.run()) != nil else { return false }
+        let deadline = ContinuousClock.now + .seconds(10)
+        while process.isRunning {
+            if Task.isCancelled { process.terminate(); break }
+            if ContinuousClock.now >= deadline { process.terminate(); break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        let subLangs = LanguageService.subtitleLanguages.components(separatedBy: ",")
+        for lang in subLangs {
+            let trimmed = lang.trimmingCharacters(in: .whitespaces)
+            if output.range(of: "\n\(trimmed) ") != nil || output.range(of: "\n\(trimmed)\t") != nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    func fetchSubtitles(videoId: String) async throws -> [SubtitleCue] {
+        let url = "https://www.youtube.com/watch?v=\(videoId)"
+        let fm = FileManager.default
+        let tmpDir = fm.temporaryDirectory.appendingPathComponent("tubekeep_subs_\(UUID().uuidString.prefix(8))")
+        try fm.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tmpDir) }
+
+        let subLangs = LanguageService.subtitleLanguages
+        #if DEBUG
+        Task { @MainActor in DebugLogManager.shared?.append("[Player] --sub-langs: \(subLangs)") }
+        #endif
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            Constants.ytDlpPath,
+            "--skip-download",
+            "--write-subs", "--write-auto-subs",
+            "--sub-langs", subLangs,
+            "--convert-subs", "srt",
+            "-o", tmpDir.appendingPathComponent("%(id)s.%(ext)s").path,
+        ] + LanguageService.cookiesArgs + [url]
+        #if DEBUG
+        if !LanguageService.cookiesArgs.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[Player] 쿠키 적용: \(LanguageService.cookiesArgs.joined(separator: " "))") } }
+        #endif
+        let tmpLog = fm.temporaryDirectory.appendingPathComponent("ytdlp_subs_\(UUID().uuidString).log")
+        fm.createFile(atPath: tmpLog.path, contents: nil)
+        defer { try? fm.removeItem(at: tmpLog) }
+        let logHandle = try? FileHandle(forWritingTo: tmpLog)
+        process.standardOutput = logHandle ?? FileHandle.nullDevice
+        process.standardError = logHandle ?? FileHandle.nullDevice
+        try process.run()
+        let deadline = ContinuousClock.now + .seconds(30)
+        while process.isRunning {
+            if Task.isCancelled {
+                process.terminate()
+                break
+            }
+            if ContinuousClock.now >= deadline {
+                process.terminate()
+                throw YTDLPError.infoFetchFailed("자막 다운로드 타임아웃 (30초)")
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try? logHandle?.close()
+
+        let stderr = (try? String(contentsOf: tmpLog, encoding: .utf8)) ?? ""
+        #if DEBUG
+        Task { @MainActor in DebugLogManager.shared?.append("[Player] 자막 다운로드 종료 (exit: \(process.terminationStatus))") }
+        #endif
+
+        guard let files = try? fm.contentsOfDirectory(atPath: tmpDir.path) else {
+            throw YTDLPError.infoFetchFailed("자막 다운로드 실패: \(stderr.prefix(200))")
+        }
+
+        let sortedFiles = files.sorted { a, b in
+            let aIsKo = a.contains(".ko.")
+            let bIsKo = b.contains(".ko.")
+            if aIsKo != bIsKo { return aIsKo }
+            return a < b
+        }
+
+        for file in sortedFiles {
+            guard file.hasSuffix(".vtt") || file.hasSuffix(".srt") else { continue }
+            let path = tmpDir.appendingPathComponent(file).path
+            guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { continue }
+            if file.hasSuffix(".vtt") {
+                let cues = parseVTTTimed(content)
+                if !cues.isEmpty { return cues }
+            } else {
+                let cues = parseSRTTimed(content)
+                if !cues.isEmpty { return cues }
+            }
+        }
+        throw YTDLPError.infoFetchFailed("자막을 찾을 수 없습니다 (\(files.count)개 파일)")
+    }
+
+    private func parseVTTTimed(_ content: String) -> [SubtitleCue] {
+        var cues: [SubtitleCue] = []
+        let lines = content.components(separatedBy: .newlines)
+        var i = 0
+        while i < lines.count {
+            let line = lines[i].trimmingCharacters(in: .whitespaces)
+            if line.contains("-->") {
+                let parts = line.components(separatedBy: " --> ")
+                if parts.count == 2 {
+                    let start = parseVTTTime(parts[0])
+                    let end = parseVTTTime(parts[1])
+                    var text = ""
+                    i += 1
+                    while i < lines.count {
+                        let next = lines[i].trimmingCharacters(in: .whitespaces)
+                        if next.isEmpty || next.contains("-->") { break }
+                        if !text.isEmpty { text += "\n" }
+                        text += next
+                        i += 1
+                    }
+                    if !text.isEmpty {
+                        cues.append(SubtitleCue(startTime: start, endTime: end, text: PlayerReducer.decodeHTMLEntities(text)))
+                    }
+                    continue
+                }
+            }
+            i += 1
+        }
+        return cues
+    }
+
+    private func parseSRTTimed(_ content: String) -> [SubtitleCue] {
+        var cues: [SubtitleCue] = []
+        let blocks = content.components(separatedBy: "\n\n")
+        for block in blocks {
+            let lines = block.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            guard lines.count >= 2 else { continue }
+            guard let timingLine = lines.first(where: { $0.contains("-->") }) else { continue }
+            let parts = timingLine.components(separatedBy: " --> ")
+            guard parts.count == 2 else { continue }
+            let start = parseSRTTime(parts[0])
+            let end = parseSRTTime(parts[1])
+            var seenTiming = false
+            let text = lines.filter { line in
+                if line.contains("-->") { seenTiming = true; return false }
+                if !seenTiming, Int(line) != nil { return false }
+                return true
+            }.joined(separator: "\n")
+            if !text.isEmpty {
+                cues.append(SubtitleCue(startTime: start, endTime: end, text: PlayerReducer.decodeHTMLEntities(text)))
+            }
+        }
+        return cues
+    }
+
+    private func parseVTTTime(_ string: String) -> Double {
+        let clean = string.trimmingCharacters(in: .whitespaces)
+        let parts = clean.components(separatedBy: ":")
+        if parts.count == 3 {
+            let h = Double(parts[0]) ?? 0
+            let m = Double(parts[1]) ?? 0
+            let s = Double(parts[2].replacingOccurrences(of: ",", with: ".")) ?? 0
+            return h * 3600 + m * 60 + s
+        }
+        return 0
+    }
+
+    private func parseSRTTime(_ string: String) -> Double {
+        let clean = string.trimmingCharacters(in: .whitespaces)
+        let parts = clean.components(separatedBy: ":")
+        if parts.count == 3 {
+            let h = Double(parts[0]) ?? 0
+            let m = Double(parts[1]) ?? 0
+            let s = Double(parts[2].replacingOccurrences(of: ",", with: ".")) ?? 0
+            return h * 3600 + m * 60 + s
+        }
+        return 0
+    }
+}

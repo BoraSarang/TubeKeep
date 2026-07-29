@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "TubeKeep",
+  "project_id": "ec00a069-64d3-46db-882e-94ec8162ed3d"
+}

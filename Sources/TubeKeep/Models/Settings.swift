@@ -1,0 +1,262 @@
+import Foundation
+
+enum PlayerMode: String, CaseIterable, Codable, Equatable {
+    case builtIn = "자체 플레이어"
+    case systemDefault = "기본 연결 프로그램"
+}
+
+enum TTSEngine: String, CaseIterable, Codable, Equatable {
+    case apple = "macOS 내장"
+    case edgeTTS = "Edge TTS"
+
+    var displayName: String { rawValue }
+
+    var description: String {
+        switch self {
+        case .apple: return "오프라인, 무료, 제한 없음"
+        case .edgeTTS: return "무료, 무제한, 고품질 (Microsoft)"
+        }
+    }
+
+    var maleVoice: String {
+        switch self {
+        case .apple: return "com.apple.eloquence.ko-KR.Reed"
+        case .edgeTTS: return "ko-KR-InJoonNeural"
+        }
+    }
+
+    var femaleVoice: String {
+        switch self {
+        case .apple: return "com.apple.voice.super-compact.ko-KR.Yuna"
+        case .edgeTTS: return "ko-KR-SunHiNeural"
+        }
+    }
+}
+
+enum SettingsTab: String, Equatable, CaseIterable {
+    case downloads = "다운로드"
+    case storage = "저장"
+    case notifications = "알림"
+    case system = "시스템"
+    case ai = "AI 설정"
+
+    var icon: String {
+        switch self {
+        case .downloads: return "arrow.down.circle"
+        case .storage: return "folder"
+        case .notifications: return "bell"
+        case .system: return "gearshape"
+        case .ai: return "sparkle"
+        }
+    }
+}
+
+enum WhisperModelStatus: String, Equatable {
+    case unknown
+    case notInstalled
+    case downloading
+    case installed
+    case error
+}
+
+struct Settings: Equatable, Codable {
+    var concurrentDownloads: Int = Constants.defaultConcurrentDownloads
+    var storageDirectory: String = Constants.defaultStorageDirectory
+    var filenameTemplate: String = Constants.defaultFilenameTemplate
+    var limitRate: Int = 0
+    var playSoundOnComplete: Bool = true
+    var clipboardMonitoring: Bool = true
+    var showOnlyVideo: Bool = true
+    var defaultResolution: Int = Constants.defaultResolution
+    var maxRetries: Int = Constants.defaultMaxRetries
+    var launchAtLogin: Bool = false
+    var maxUploadCheck: Int = Constants.defaultMaxUploadCheck
+    var skipIndexOnFailure: Bool = false
+    var openRouterAPIKey: String = ""
+    var openRouterModel: String = "openrouter/free"
+    var geminiAPIKey: String = ""
+    var ax4APIKey: String = Constants.defaultAX4APIKey
+    var showMainWindowOnLaunch: Bool = true
+    var sponsorBlock: Bool = true
+    var embedMetadata: Bool = true
+    var showThumbnailPreview: Bool = true
+    var ttsEngine: TTSEngine = .edgeTTS
+    var playerMode: PlayerMode = .builtIn
+    var showChannelBadge: Bool = true
+    var subtitleLanguageOverride: String = ""
+    var cookiesFromBrowser: String = ""
+    var enableWhisperTranscription: Bool = false
+    var whisperModelSize: String = "base"
+    var showMenuBarNotifications: Bool = true
+    var menuBarNotificationDuration: Int = 60
+    var presets: [DownloadPreset] = Self.defaultPresets
+    var activePresetId: UUID?
+    var smartMode: Bool = false
+
+    static let defaultPresets: [DownloadPreset] = [
+        DownloadPreset(id: UUID(), name: "고품질 (4K)", formatType: .video,
+                       resolution: 2160, includeSubtitles: true,
+                       sponsorBlock: true, embedMetadata: true),
+        DownloadPreset(id: UUID(), name: "기본 (1080p)", formatType: .video,
+                       resolution: 1080, includeSubtitles: true,
+                       sponsorBlock: true, embedMetadata: true),
+        DownloadPreset(id: UUID(), name: "오디오만", formatType: .audio,
+                       resolution: 0, includeSubtitles: false,
+                       sponsorBlock: false, embedMetadata: false),
+    ]
+
+    enum CodingKeys: String, CodingKey {
+        case concurrentDownloads, filenameTemplate, limitRate
+        case playSoundOnComplete, clipboardMonitoring, showOnlyVideo
+        case defaultResolution, maxRetries, launchAtLogin, maxUploadCheck, skipIndexOnFailure
+        case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, ax4APIKey, showMainWindowOnLaunch
+        case sponsorBlock, embedMetadata, showThumbnailPreview, ttsEngine, playerMode, showChannelBadge
+        case subtitleLanguageOverride, cookiesFromBrowser, enableWhisperTranscription, whisperModelSize
+        case showMenuBarNotifications, menuBarNotificationDuration, presets, activePresetId, smartMode
+    }
+
+    init(
+        concurrentDownloads: Int = Constants.defaultConcurrentDownloads,
+        storageDirectory: String = Constants.defaultStorageDirectory,
+        filenameTemplate: String = Constants.defaultFilenameTemplate,
+        limitRate: Int = 0,
+        playSoundOnComplete: Bool = true,
+        clipboardMonitoring: Bool = true,
+        showOnlyVideo: Bool = true,
+        defaultResolution: Int = Constants.defaultResolution,
+        maxRetries: Int = Constants.defaultMaxRetries,
+        launchAtLogin: Bool = false,
+        maxUploadCheck: Int = Constants.defaultMaxUploadCheck,
+        skipIndexOnFailure: Bool = false,
+        openRouterAPIKey: String = "",
+        openRouterModel: String = "openrouter/free",
+        geminiAPIKey: String = "",
+        ax4APIKey: String = Constants.defaultAX4APIKey,
+        showMainWindowOnLaunch: Bool = true,
+        sponsorBlock: Bool = true,
+        embedMetadata: Bool = true,
+        showThumbnailPreview: Bool = true,
+        ttsEngine: TTSEngine = .edgeTTS,
+        playerMode: PlayerMode = .builtIn,
+        showChannelBadge: Bool = true,
+        subtitleLanguageOverride: String = "",
+        cookiesFromBrowser: String = "",
+        enableWhisperTranscription: Bool = false,
+        whisperModelSize: String = "base",
+        showMenuBarNotifications: Bool = true,
+        menuBarNotificationDuration: Int = 60,
+        presets: [DownloadPreset] = Self.defaultPresets,
+        activePresetId: UUID? = nil,
+        smartMode: Bool = false
+    ) {
+        self.concurrentDownloads = concurrentDownloads
+        self.storageDirectory = storageDirectory
+        self.filenameTemplate = filenameTemplate
+        self.limitRate = limitRate
+        self.playSoundOnComplete = playSoundOnComplete
+        self.clipboardMonitoring = clipboardMonitoring
+        self.showOnlyVideo = showOnlyVideo
+        self.defaultResolution = defaultResolution
+        self.maxRetries = maxRetries
+        self.launchAtLogin = launchAtLogin
+        self.maxUploadCheck = maxUploadCheck
+        self.skipIndexOnFailure = skipIndexOnFailure
+        self.openRouterAPIKey = openRouterAPIKey
+        self.openRouterModel = openRouterModel
+        self.geminiAPIKey = geminiAPIKey
+        self.ax4APIKey = ax4APIKey
+        self.showMainWindowOnLaunch = showMainWindowOnLaunch
+        self.sponsorBlock = sponsorBlock
+        self.embedMetadata = embedMetadata
+        self.showThumbnailPreview = showThumbnailPreview
+        self.ttsEngine = ttsEngine
+        self.playerMode = playerMode
+        self.showChannelBadge = showChannelBadge
+        self.subtitleLanguageOverride = subtitleLanguageOverride
+        self.cookiesFromBrowser = cookiesFromBrowser
+        self.enableWhisperTranscription = enableWhisperTranscription
+        self.whisperModelSize = whisperModelSize
+        self.showMenuBarNotifications = showMenuBarNotifications
+        self.menuBarNotificationDuration = menuBarNotificationDuration
+        self.presets = presets
+        self.activePresetId = activePresetId
+        self.smartMode = smartMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        concurrentDownloads = try c.decode(Int.self, forKey: .concurrentDownloads)
+        storageDirectory = try c.decode(String.self, forKey: .storageDirectory)
+        filenameTemplate = try c.decode(String.self, forKey: .filenameTemplate)
+        limitRate = try c.decode(Int.self, forKey: .limitRate)
+        playSoundOnComplete = try c.decode(Bool.self, forKey: .playSoundOnComplete)
+        clipboardMonitoring = try c.decode(Bool.self, forKey: .clipboardMonitoring)
+        showOnlyVideo = try c.decode(Bool.self, forKey: .showOnlyVideo)
+        defaultResolution = try c.decode(Int.self, forKey: .defaultResolution)
+        maxRetries = try c.decode(Int.self, forKey: .maxRetries)
+        launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
+        maxUploadCheck = try c.decode(Int.self, forKey: .maxUploadCheck)
+        skipIndexOnFailure = try c.decode(Bool.self, forKey: .skipIndexOnFailure)
+        openRouterAPIKey = try c.decode(String.self, forKey: .openRouterAPIKey)
+        openRouterModel = try c.decode(String.self, forKey: .openRouterModel)
+        geminiAPIKey = try c.decode(String.self, forKey: .geminiAPIKey)
+        ax4APIKey = try c.decode(String.self, forKey: .ax4APIKey)
+        showMainWindowOnLaunch = try c.decode(Bool.self, forKey: .showMainWindowOnLaunch)
+        sponsorBlock = try c.decode(Bool.self, forKey: .sponsorBlock)
+        embedMetadata = try c.decode(Bool.self, forKey: .embedMetadata)
+        showThumbnailPreview = try c.decode(Bool.self, forKey: .showThumbnailPreview)
+        ttsEngine = try c.decode(TTSEngine.self, forKey: .ttsEngine)
+        playerMode = try c.decode(PlayerMode.self, forKey: .playerMode)
+        showChannelBadge = try c.decode(Bool.self, forKey: .showChannelBadge)
+        subtitleLanguageOverride = try c.decode(String.self, forKey: .subtitleLanguageOverride)
+        cookiesFromBrowser = try c.decode(String.self, forKey: .cookiesFromBrowser)
+        enableWhisperTranscription = try c.decode(Bool.self, forKey: .enableWhisperTranscription)
+        whisperModelSize = try c.decode(String.self, forKey: .whisperModelSize)
+        showMenuBarNotifications = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarNotifications) ?? true
+        menuBarNotificationDuration = try c.decodeIfPresent(Int.self, forKey: .menuBarNotificationDuration) ?? 60
+        presets = try c.decode([DownloadPreset].self, forKey: .presets)
+        activePresetId = try c.decodeIfPresent(UUID.self, forKey: .activePresetId)
+        smartMode = try c.decode(Bool.self, forKey: .smartMode)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(concurrentDownloads, forKey: .concurrentDownloads)
+        try c.encode(storageDirectory, forKey: .storageDirectory)
+        try c.encode(filenameTemplate, forKey: .filenameTemplate)
+        try c.encode(limitRate, forKey: .limitRate)
+        try c.encode(playSoundOnComplete, forKey: .playSoundOnComplete)
+        try c.encode(clipboardMonitoring, forKey: .clipboardMonitoring)
+        try c.encode(showOnlyVideo, forKey: .showOnlyVideo)
+        try c.encode(defaultResolution, forKey: .defaultResolution)
+        try c.encode(maxRetries, forKey: .maxRetries)
+        try c.encode(launchAtLogin, forKey: .launchAtLogin)
+        try c.encode(maxUploadCheck, forKey: .maxUploadCheck)
+        try c.encode(skipIndexOnFailure, forKey: .skipIndexOnFailure)
+        try c.encode(openRouterAPIKey, forKey: .openRouterAPIKey)
+        try c.encode(openRouterModel, forKey: .openRouterModel)
+        try c.encode(geminiAPIKey, forKey: .geminiAPIKey)
+        try c.encode(ax4APIKey, forKey: .ax4APIKey)
+        try c.encode(showMainWindowOnLaunch, forKey: .showMainWindowOnLaunch)
+        try c.encode(sponsorBlock, forKey: .sponsorBlock)
+        try c.encode(embedMetadata, forKey: .embedMetadata)
+        try c.encode(showThumbnailPreview, forKey: .showThumbnailPreview)
+        try c.encode(ttsEngine, forKey: .ttsEngine)
+        try c.encode(playerMode, forKey: .playerMode)
+        try c.encode(showChannelBadge, forKey: .showChannelBadge)
+        try c.encode(subtitleLanguageOverride, forKey: .subtitleLanguageOverride)
+        try c.encode(cookiesFromBrowser, forKey: .cookiesFromBrowser)
+        try c.encode(enableWhisperTranscription, forKey: .enableWhisperTranscription)
+        try c.encode(whisperModelSize, forKey: .whisperModelSize)
+        try c.encode(showMenuBarNotifications, forKey: .showMenuBarNotifications)
+        try c.encode(menuBarNotificationDuration, forKey: .menuBarNotificationDuration)
+        try c.encode(presets, forKey: .presets)
+        try c.encodeIfPresent(activePresetId, forKey: .activePresetId)
+        try c.encode(smartMode, forKey: .smartMode)
+    }
+
+    var limitRateArg: String? {
+        guard limitRate > 0 else { return nil }
+        return "\(limitRate)M"
+    }
+}
