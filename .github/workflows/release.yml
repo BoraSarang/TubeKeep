@@ -11,6 +11,9 @@ concurrency:
   group: release-${{ inputs.version }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
