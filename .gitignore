@@ -11,3 +11,6 @@ Releases/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+.agent/
+.claude/
+.codex/
