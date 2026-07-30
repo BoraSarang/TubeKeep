@@ -55,6 +55,7 @@ final class DownloadManager: @unchecked Sendable {
             args += ["--print-to-file", "after_move:filepath", outputPathFile]
 
             let process = Process()
+            ProcessRegistry.register(process)
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
             process.arguments = [Constants.ytDlpPath] + args
 
@@ -150,16 +151,16 @@ final class DownloadManager: @unchecked Sendable {
                             try? fm.removeItem(atPath: outputPathFile)
                             return path
                         }()
-                        // 2) Validate: must be .mp4 and file must exist
-                        if let path = afterMovePath, path.hasSuffix(".mp4"), fm.fileExists(atPath: path) {
+                        // 2) Validate: file must exist
+                        if let path = afterMovePath, fm.fileExists(atPath: path) {
                             return path
                         }
-                        // 3) Fallback: scan output directory for videoId.mp4
+                        // 3) Fallback: scan output directory for videoId
                         let folder = Constants.sanitizeFolderName(item.videoInfo.channel)
                         let channelDir = "\(outputDir)/\(folder)"
                         let videoId = item.videoInfo.id
                         guard let files = try? fm.contentsOfDirectory(atPath: channelDir) else { return nil }
-                        for file in files where file.hasSuffix("\(videoId).mp4") {
+                        for file in files where file.contains(videoId) {
                             return "\(channelDir)/\(file)"
                         }
                         return nil
@@ -207,7 +208,8 @@ final class DownloadManager: @unchecked Sendable {
         _ = stateLock.withLock { $0.pausedItems.remove(itemId) }
     }
 
-    func cancelAll() {
+    @discardableResult
+    func cancelAll() -> Int {
         let processes = activeLock.withLock {
             let values = Array($0.values)
             $0.removeAll()
@@ -217,6 +219,7 @@ final class DownloadManager: @unchecked Sendable {
             p.terminate()
         }
         stateLock.withLock { $0.pausedItems.removeAll() }
+        return processes.count
     }
 
     var activeCount: Int {
@@ -230,15 +233,15 @@ final class DownloadManager: @unchecked Sendable {
             if item.selectedFormat.isVideoOnly {
                 let height = item.selectedFormat.height
                 let fallback = "\(item.selectedFormat.id)+bestaudio/best[height<=\(height)]"
-                return "\(item.selectedFormat.id)[ext=mp4][vcodec^=avc1]+bestaudio/\(fallback)"
+                return "\(item.selectedFormat.id)+bestaudio/\(fallback)"
             }
             let id = item.selectedFormat.id
             if id.hasPrefix("best") && !id.contains("/") && !id.contains("+") {
                 let bracket = id.firstIndex(of: "[") ?? id.endIndex
                 let filter = id[bracket...]
-                return "bestvideo[ext=mp4][vcodec^=avc1]\(filter)+bestaudio/\(id)"
+                return "bestvideo\(filter)+bestaudio/\(id)"
             }
-            return "\(id)[ext=mp4][vcodec^=avc1]/\(id)"
+            return "\(id)/\(id)"
         }()
         var args: [String] = [
             "--newline",
@@ -265,7 +268,7 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if item.audioOnly {
-            args += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+            args += ["-x", "--audio-format", "aac", "--audio-quality", "0"]
         }
 
         if settings.sponsorBlock {

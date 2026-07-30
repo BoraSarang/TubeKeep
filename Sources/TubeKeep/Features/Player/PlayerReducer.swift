@@ -1,31 +1,48 @@
 import Foundation
+import AppKit
 import ComposableArchitecture
 
 @Reducer
 struct PlayerReducer {
     @ObservableState
     struct State: Equatable {
-        let playerItem: PlayerItem
+        var playerItem: PlayerItem
+        var streamURL: URL?
+        var isStreamLoading = false
         var currentTime: Double = 0
         var duration: Double = 0
         var subtitles: [SubtitleCue] = []
         var subtitleLoading = false
         var subtitleError: String?
         var subtitleAvailable: Bool?
-        var isConverting = false
-        var conversionProgress: Double = 0
-        var conversionETA: String = ""
+        var isPlaying = false
         var showSubtitleOverlay = false
         var showSubtitlePanel = false
         var isAlwaysOnTop = false
         var isTranscribing = false
         var transcribeError: String?
         var whisperProgressMessage: String?
+
+        // Up Next
+        var recommendations: [LibraryItem] = []
+        var showUpNext = false
+        var autoPlayCountdown = 0
+        var playerItemId: UUID = UUID()
+        var fileMissing = false
     }
 
     enum Action: Equatable {
+        case loadVideo(PlayerItem)
+        case streamURLFetched(URL)
+        case streamFetchFailed
         case timeUpdated(Double)
         case durationUpdated(Double)
+        case videoDidEnd
+        case loadRecommendations
+        case recommendationsLoaded([LibraryItem])
+        case startAutoPlay(String)
+        case cancelAutoPlay
+        case updateCountdown(Int)
         case toggleSubtitleOverlay
         case toggleSubtitlePanel
         case checkSubtitlesAvailability
@@ -38,15 +55,151 @@ struct PlayerReducer {
         case whisperLoaded([SubtitleCue])
         case whisperFailed(String)
         case deleteSubtitles
+        case fileMissing
+        case removeFromLibrary(String)
         case toggleAlwaysOnTop
-        case setConverting(Bool)
-        case updateConversionProgress(Double)
-        case updateConversionETA(String)
+        case playingChanged(Bool)
     }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .loadVideo(item):
+                #if DEBUG
+                let vid = item.videoId ?? "nil"
+                Task { @MainActor in DebugLogManager.shared?.append("[Player] loadVideo: videoId=\(vid) fileURL=\(item.fileURL?.lastPathComponent ?? "nil")") }
+                #endif
+                state.playerItem = item
+                state.streamURL = nil
+                state.currentTime = 0
+                state.duration = 0
+                state.subtitles = []
+                state.subtitleLoading = false
+                state.subtitleError = nil
+                state.subtitleAvailable = nil
+                state.showUpNext = false
+                state.autoPlayCountdown = 0
+                state.recommendations = []
+                state.playerItemId = UUID()
+                if item.fileURL != nil {
+                    state.isStreamLoading = false
+                    return .none
+                }
+                guard item.videoId != nil else {
+                    state.isStreamLoading = false
+                    return .none
+                }
+                state.isStreamLoading = true
+                return .run { send in
+                    let res = Self.readResolution()
+                    let url = "https://www.youtube.com/watch?v=\(item.videoId!)"
+                    do {
+                        let service = YouTubeDLService()
+                        let streamURL = try await service.fetchStreamingURL(url: url, resolution: res)
+                        await send(.streamURLFetched(streamURL))
+                    } catch {
+                        #if DEBUG
+                        Task { @MainActor in DebugLogManager.shared?.append("[Player] 스트리밍 URL 실패: \(error)") }
+                        #endif
+                        await send(.streamFetchFailed)
+                    }
+                }
+                .cancellable(id: "streamFetch", cancelInFlight: true)
+
+            case let .streamURLFetched(url):
+                #if DEBUG
+                Task { @MainActor in DebugLogManager.shared?.append("[Player] streamURLFetched: \(url.absoluteString.prefix(80))") }
+                #endif
+                state.streamURL = url
+                state.isStreamLoading = false
+                state.playerItemId = UUID()
+                return .none
+
+            case .streamFetchFailed:
+                #if DEBUG
+                let failedId = state.playerItem.videoId
+                Task { @MainActor in DebugLogManager.shared?.append("[Player] streamFetchFailed: \(failedId ?? "?")") }
+                #endif
+                state.isStreamLoading = false
+                return .none
+
+            case .fileMissing:
+                state.isStreamLoading = false
+                state.fileMissing = true
+                return .none
+
+            case let .removeFromLibrary(videoId):
+                state.fileMissing = false
+                let title = state.playerItem.title
+                return .run { _ in
+                    await MainActor.run {
+                        LibraryCacheService.shared.removeItem(id: videoId)
+                        NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
+                        if let window = NSApp.keyWindow, window.identifier?.rawValue == "player" {
+                            window.close()
+                        } else if let window = NSApp.windows.first(where: { $0.title == title }) {
+                            window.close()
+                        }
+                    }
+                }
+
+            case .videoDidEnd:
+                state.showUpNext = true
+                return .send(.loadRecommendations)
+
+            case .loadRecommendations:
+                return .run { [videoId = state.playerItem.videoId] send in
+                    let items = await MainActor.run { LibraryCacheService.shared.loadItems() }
+                    guard !items.isEmpty else {
+                        await send(.recommendationsLoaded([]))
+                        return
+                    }
+                    let scored = RecommendationService.recommendFromLibrary(from: items, exclude: videoId)
+                    await send(.recommendationsLoaded(scored))
+                }
+
+            case let .recommendationsLoaded(items):
+                state.recommendations = items
+                state.autoPlayCountdown = 5
+                return .run { [items] send in
+                    guard let first = items.first, let videoId = first.id as String? else { return }
+                    for remaining in stride(from: 5, through: 1, by: -1) {
+                        await send(.updateCountdown(remaining))
+                        try? await Task.sleep(for: .seconds(1))
+                    }
+                    await send(.startAutoPlay(videoId))
+                }
+                .cancellable(id: "autoPlayCountdown", cancelInFlight: true)
+
+            case let .startAutoPlay(videoId):
+                state.showUpNext = false
+                state.autoPlayCountdown = 0
+                return .run { _ in
+                    let data = await MainActor.run { () -> (filePath: String, title: String, id: String, duration: Int?)? in
+                        guard let item = LibraryCacheService.shared.loadItems().first(where: { $0.id == videoId }) else { return nil }
+                        return (item.filePath, item.title, item.id, item.duration)
+                    }
+                    guard let data else { return }
+                    let playerItem = PlayerItem(
+                        fileURL: URL(fileURLWithPath: data.filePath),
+                        title: data.title,
+                        videoId: data.id,
+                        duration: Double(data.duration ?? 0)
+                    )
+                    await MainActor.run {
+                        NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
+                    }
+                }
+
+            case .cancelAutoPlay:
+                state.showUpNext = false
+                state.autoPlayCountdown = 0
+                return .cancel(id: "autoPlayCountdown")
+
+            case let .updateCountdown(value):
+                state.autoPlayCountdown = value
+                return .none
+
             case let .timeUpdated(time):
                 state.currentTime = time
                 return .none
@@ -241,23 +394,19 @@ struct PlayerReducer {
                 state.isAlwaysOnTop.toggle()
                 return .none
 
-            case let .setConverting(value):
-                state.isConverting = value
-                if !value {
-                    state.conversionProgress = 0
-                    state.conversionETA = ""
-                }
-                return .none
-
-            case let .updateConversionProgress(value):
-                state.conversionProgress = value
-                return .none
-
-            case let .updateConversionETA(value):
-                state.conversionETA = value
+            case let .playingChanged(value):
+                state.isPlaying = value
                 return .none
             }
         }
+    }
+
+    static func readResolution() -> Int {
+        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
+              let data = json.data(using: .utf8),
+              let settings = try? JSONDecoder().decode(Settings.self, from: data)
+        else { return Constants.defaultResolution }
+        return settings.defaultResolution
     }
 
     private static func loadSettings() -> Settings {

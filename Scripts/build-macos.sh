@@ -12,7 +12,10 @@ BUILD_DIR="$PROJECT_DIR/.build"
 
 cd "$PROJECT_DIR"
 
-# Kill existing app
+# Kill existing app and its children
+for pid in $(pgrep -x "$APP_NAME" 2>/dev/null); do
+  pkill -9 -P "$pid" 2>/dev/null || true
+done
 pkill -9 "$APP_NAME" 2>/dev/null || true
 killall "$APP_NAME" 2>/dev/null || true
 
@@ -197,6 +200,18 @@ else
     else
         echo "⚠️  whisper not available. Run: brew install whisper-cpp"
     fi
+fi
+
+# Bundle libmpv
+LIBMPV_SRC="/opt/homebrew/opt/mpv/lib/libmpv.2.dylib"
+if [ -f "$LIBMPV_SRC" ]; then
+    mkdir -p "$MAIN_BUNDLE/Contents/Frameworks"
+    cp "$LIBMPV_SRC" "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib"
+    chmod 755 "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib"
+    install_name_tool -id @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
+    install_name_tool -change /opt/homebrew/opt/mpv/lib/libmpv.2.dylib @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+    install_name_tool -add_rpath @loader_path/../Frameworks "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+    echo "📦 libmpv embedded ($(du -h "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" | cut -f1))"
 fi
 
 # Install

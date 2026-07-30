@@ -4,6 +4,7 @@ import ComposableArchitecture
 import UserNotifications
 import SwiftData
 import AVKit
+import Darwin
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var settingsWindow: NSWindow?
     private var aiWindow: NSWindow?
     private var playerWindow: NSWindow?
+    private var playerStore: Store<PlayerReducer.State, PlayerReducer.Action>?
     private var pendingChannelId: String?
     private var pendingChannelData: [String: Any]?
     private var keyMonitor: Any?
@@ -26,7 +28,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var debugLogWindow: NSWindow?
     #endif
 
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(terminateCleanup),
+            name: NSApplication.willTerminateNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func terminateCleanup() {
+        print("[App] terminateCleanup 시작 PID=\(ProcessInfo.processInfo.processIdentifier)")
+        print("[App] ProcessRegistry.killAll: \(ProcessRegistry.killAll())개")
+        print("[App] DownloadManager.cancelAll: \(DownloadManager.shared.cancelAll())개")
+        print("[App] 1차 killAllChildProcesses")
+        killAllChildProcesses()
+        usleep(500_000)
+        print("[App] 2차 killAllChildProcesses")
+        killAllChildProcesses()
+        print("[App] terminateCleanup 완료")
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ProcessInfo.processInfo.disableSuddenTermination()
         store.send(.appDidFinishLaunching)
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -535,10 +564,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func openPlayerWindow(_ notification: Notification) {
         guard let playerItem = notification.object as? PlayerItem else { return }
 
-        let playerStore = Store(initialState: PlayerReducer.State(playerItem: playerItem)) {
+        if let existingStore = playerStore, let window = playerWindow, window.isVisible {
+            existingStore.send(.loadVideo(playerItem))
+            window.title = playerItem.title
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let newStore = Store(initialState: PlayerReducer.State(playerItem: playerItem)) {
             PlayerReducer()
         }
-        let playerView = PlayerView(store: playerStore)
+        playerStore = newStore
+        if playerItem.fileURL == nil, playerItem.videoId != nil {
+            newStore.send(.loadVideo(playerItem))
+        }
+        let playerView = PlayerView(store: newStore)
         let hostingCtrl = NSHostingController(rootView: playerView)
         let window = NSWindow(contentViewController: hostingCtrl)
         window.title = playerItem.title
@@ -645,6 +686,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let window = notification.object as? NSWindow,
               window.identifier?.rawValue == "player" else { return }
         playerWindow = nil
+    }
+
+    // MARK: - Process Cleanup
+
+    private func killAllChildProcesses() {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        // 1. pkill -P 로 전체 자식 정리
+        let cmd = "pkill -9 -P \(pid) 2>/dev/null; pkill -9 -f yt-dlp 2>/dev/null; pkill -9 -f yt_dlp 2>/dev/null"
+        let bash = Process()
+        bash.executableURL = URL(fileURLWithPath: "/bin/bash")
+        bash.arguments = ["-c", cmd]
+        do {
+            try bash.run()
+            bash.waitUntilExit()
+        } catch {
+            print("[App] killAllChildProcesses: bash fail \(error)")
+        }
+        // 2. 남은 자식 확인
+        let remain = childPIDs(pid)
+        if remain.isEmpty {
+            print("[App] killAllChildProcesses: 자식 없음")
+        } else {
+            print("[App] killAllChildProcesses: \(remain.count)개 남음 PIDs=\(remain)")
+            for leftover in remain {
+                kill(leftover, SIGKILL)
+                print("[App] 직접 SIGKILL: PID=\(leftover)")
+            }
+            usleep(200_000)
+            let remain2 = childPIDs(pid)
+            print("[App] 재시도 후: \(remain2.count)개 남음")
+        }
+    }
+
+    private func childPIDs(_ pid: Int32) -> [Int32] {
+        let pgrep = Process()
+        pgrep.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        pgrep.arguments = ["-P", "\(pid)"]
+        let out = Pipe()
+        pgrep.standardOutput = out
+        try? pgrep.run()
+        pgrep.waitUntilExit()
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        return output.split(separator: "\n").compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
     }
 
     // MARK: - URL Scheme

@@ -105,6 +105,7 @@ actor YouTubeDLService {
             try? fm.removeItem(at: stderrURL)
             try? fm.removeItem(at: stdoutURL)
         }
+        ProcessRegistry.register(process)
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         var args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download", "--extractor-args", Constants.youtubeExtractorArgs, url]
         if !cookies.isEmpty { args += cookies }
@@ -193,13 +194,29 @@ actor YouTubeDLService {
         return (videoInfo, formats)
     }
 
-    func fetchStreamingURL(url: String) async throws -> URL {
+    static func streamingFormat(for resolution: Int) -> String {
+        let steps: [Int]
+        if resolution >= 2160 { steps = [2160, 1080, 720] }
+        else if resolution >= 1440 { steps = [1440, 1080, 720] }
+        else if resolution >= 1080 { steps = [1080, 720, 480] }
+        else if resolution >= 720 { steps = [720, 480] }
+        else if resolution >= 480 { steps = [480, 360] }
+        else if resolution >= 360 { steps = [360, 240, 144] }
+        else if resolution >= 240 { steps = [240, 144] }
+        else { steps = [144] }
+        let parts = steps.map { "best[height<=\($0)]" }
+        return (parts + ["best"]).joined(separator: "/")
+    }
+
+    func fetchStreamingURL(url: String, resolution: Int = 0) async throws -> URL {
         guard checkInstallation() else {
             throw YTDLPError.notInstalled
         }
+
+        let format = Self.streamingFormat(for: resolution)
         var args = [
             Constants.ytDlpPath,
-            "-f", "best[ext=mp4]/best",
+            "-f", format,
             "--get-url",
             "--no-warnings",
         ]
@@ -295,14 +312,14 @@ actor YouTubeDLService {
             if item.selectedFormat.isVideoOnly {
                 let height = item.selectedFormat.height
                 let fallback = "\(id)+bestaudio/best[height<=\(height)]"
-                return "\(id)[ext=mp4][vcodec^=avc1]+bestaudio/\(fallback)"
+                return "\(id)+bestaudio/\(fallback)"
             }
             if id.hasPrefix("best") && !id.contains("/") && !id.contains("+") {
                 let bracket = id.firstIndex(of: "[") ?? id.endIndex
                 let filter = id[bracket...]
-                return "bestvideo[ext=mp4][vcodec^=avc1]\(filter)+bestaudio/\(id)"
+                return "bestvideo\(filter)+bestaudio/\(id)"
             }
-            return "\(id)[ext=mp4][vcodec^=avc1]/\(id)"
+            return "\(id)/\(id)"
         }()
         var args: [String] = [
             "--newline",
@@ -329,7 +346,7 @@ actor YouTubeDLService {
         }
 
         if item.audioOnly {
-            args += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+            args += ["-x", "--audio-format", "aac", "--audio-quality", "0"]
         }
 
         if sponsorBlock {

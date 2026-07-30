@@ -44,6 +44,8 @@ enum Constants {
     static let downloadHistoryDidChangeNotification = Notification.Name("com.tubekeep.downloadHistoryDidChange")
     static let openWhisperSettingsNotification = Notification.Name("com.tubekeep.openWhisperSettings")
     static let videoAIDidChangeNotification = Notification.Name("com.tubekeep.videoAIDidChange")
+    static let channelInfoDidUpdateNotification = Notification.Name("com.tubekeep.channelInfoDidUpdate")
+    static let libraryDataDidChangeNotification = Notification.Name("com.tubekeep.libraryDataDidChange")
 
     static let librarySaveKey = "downloadLibrary"
     static let libraryViewModeKey = "libraryViewMode"

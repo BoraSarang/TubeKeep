@@ -62,7 +62,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
     var optionsLabel: String {
         var parts = [selectedFormat.label]
         if includeSubtitles { parts.append("자막") }
-        if audioOnly { parts.append("MP3") }
+        if audioOnly { parts.append("AAC") }
         return parts.joined(separator: " + ")
     }
 
@@ -100,7 +100,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
         }
         let name = formatFilename(template: template)
         let base = (name as NSString).deletingPathExtension
-        let extensions: [String] = audioOnly ? ["mp3"] : ["mp4", "mkv", "webm", "mp3"]
+        let extensions: [String] = audioOnly ? ["m4a", "mp3", "aac"] : ["mp4", "m4a", "mkv", "webm"]
         for ext in extensions {
             let path = "\(channelDir)/\(base).\(ext)"
             if FileManager.default.fileExists(atPath: path) { return path }
@@ -145,7 +145,8 @@ struct DownloadItem: Identifiable, Equatable, Codable {
             )
         result = result.replacingOccurrences(of: "{id}", with: "")
         result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".- "))
-        result += ".\(videoInfo.id).\(selectedFormat.ext)"
+        let ext = audioOnly ? "m4a" : selectedFormat.ext
+        result += ".\(videoInfo.id).\(ext)"
         return result
     }
 

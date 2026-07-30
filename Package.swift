@@ -11,6 +11,13 @@ let package = Package(
         ),
     ],
     targets: [
+        .systemLibrary(
+            name: "Clibmpv",
+            pkgConfig: "mpv",
+            providers: [
+                .brew(["mpv"])
+            ]
+        ),
         .executableTarget(
             name: "TubeKeep",
             dependencies: [
@@ -18,6 +25,7 @@ let package = Package(
                     name: "ComposableArchitecture",
                     package: "swift-composable-architecture"
                 ),
+                "Clibmpv",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5),

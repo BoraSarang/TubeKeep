@@ -40,7 +40,7 @@ final class LibraryCacheService {
         guard let items = try? context.fetch(descriptor) else { return [] }
 
         BookmarkManager.ensureAccess()
-        let videoExts = Set(["mp4", "mkv", "webm"])
+        let videoExts = Set(["mp4", "m4a", "mkv", "webm"])
         var changed = false
         let fixed = items.map { item -> LibraryItem in
             let currentExt = (item.filePath as NSString).pathExtension
@@ -195,6 +195,14 @@ final class LibraryCacheService {
         guard let data = try? Data(contentsOf: file), let img = NSImage(data: data) else { return nil }
         avatarCache.setObject(img, forKey: key)
         return img
+    }
+
+    func clearAvatarCache(for channelId: String) {
+        let key = "avatar_\(channelId)" as NSString
+        avatarCache.removeObject(forKey: key)
+        guard let dir = cacheDir else { return }
+        let file = dir.appendingPathComponent("avatar_\(channelId).jpg")
+        try? FileManager.default.removeItem(at: file)
     }
 
     func cacheAvatar(for channelId: String, data: Data) {
