@@ -46,13 +46,18 @@ struct LibraryListView: View {
             Button {
                 store.send(.library(.toggleThumbnailPreview))
             } label: {
-                Image(systemName: "photo")
-                    .font(.system(size: 11))
-                    .foregroundStyle(store.library.showThumbnailPreview ? .white : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(store.library.showThumbnailPreview ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                Label {
+                    Text("썸네일")
+                        .font(.system(size: 11))
+                } icon: {
+                    Image(systemName: store.library.showThumbnailPreview ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(store.library.showThumbnailPreview ? .white : .secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(store.library.showThumbnailPreview ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             .buttonStyle(.plain)
             .help(store.library.showThumbnailPreview ? "썸네일 미리보기 끄기" : "썸네일 미리보기 켜기")
