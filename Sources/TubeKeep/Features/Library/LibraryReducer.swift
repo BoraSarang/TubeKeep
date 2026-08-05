@@ -163,6 +163,7 @@ struct LibraryReducer {
         case dismissDigest
         case setSearchText(String)
         case searchResultsUpdated([SearchResult])
+        case playSearchMatch(String)
         case setSelectedChannel(String?)
         case setSortOrder(LibrarySortOrder)
         case setFilterMode(LibraryFilterMode)
@@ -306,6 +307,33 @@ struct LibraryReducer {
             case let .searchResultsUpdated(results):
                 state.searchResults = results
                 return .none
+
+            case let .playSearchMatch(videoId):
+                guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+                let query = state.searchText
+                let duration = Double(item.duration ?? 0)
+                let playerItem = PlayerItem(
+                    fileURL: URL(fileURLWithPath: item.filePath),
+                    title: item.title,
+                    videoId: item.id,
+                    duration: duration
+                )
+                return .run { send in
+                    let time = await SearchService.locateMatch(videoId: videoId, query: query, duration: duration)
+                    await MainActor.run {
+                        var seekItem = playerItem
+                        if let time, time > 0 {
+                            seekItem = PlayerItem(
+                                fileURL: playerItem.fileURL,
+                                title: playerItem.title,
+                                videoId: playerItem.videoId,
+                                duration: playerItem.duration,
+                                initialSeekTime: time
+                            )
+                        }
+                        NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: seekItem)
+                    }
+                }
 
             case .setSelectedChannel(let channelId):
                 state.selectedChannel = channelId

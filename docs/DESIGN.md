@@ -1449,3 +1449,47 @@ case let .downloadCompleted(item, success, outputPath, ...):
 - ChannelContentView: `best[height<=N]` → `best[height<=N]/best` (fallback 추가)
 - BatchDownloadView/ChannelContentView: 초기 해상도를 `settings.defaultResolution`에서 읽도록 수정 (`@State` init)
 
+
+---
+
+## 8. v3.0 설계 (신규 기능)
+
+### 8.1 전역 검색 (자막·요약) — Phase A
+
+- `DatabaseManager.searchContent(query:) -> [(videoId, matchedField, snippet)]`
+  - 대상: `video_ai_data`(transcript, summary, subtitlesData) + `library`(title, channelName)
+  - 구현: `LIKE '%query%'` 매칭, 매칭 문맥 60자 스니펫 추출 (SQLite FTS5는 규모상 보류)
+- `LibraryReducer`:
+  - `searchScope: .title / .content` State 추가 (기본 .title)
+  - `.content`면 `filteredItems`를 `searchContent` 결과 videoId 목록으로 대체 + 스니펫 저장
+  - 사이드바 검색창: 스코프 토글 버튼 + 결과 수 표시
+
+### 8.2 플레이어 고도화 — Phase B
+
+- `MPVClient` 추가 명령
+  - `setPlaybackRate(_ rate: Double)` → `mpv_set_property("speed")`
+  - `setABLoop(a:b:)` → `mpvCommand(["ab-loop-a", time])` / `["ab-loop-b", time]`
+  - `clearABLoop()` → `["ab-loop-off"]`
+- `PlayerReducer` State 추가: `playbackRate`, `aLoop: Double?`, `bLoop: Double?`, `queue: [PlayerItem]`, `queueIndex: Int`
+  - `setQueue(items:startIndex:)`, `playNext`/`playPrevious`, `setPlaybackRate`, `setALoop`/`setBLoop`/`clearLoop`
+  - 이전/다음 재생 시 `loadVideo(queue[i])` 재사용
+- `PlayerView` 컨트롤바: 속도 메뉴(0.75/1.0/1.25/1.5/2.0), A/B 반복 버튼, 이전/다음 버튼, 자막 스타일(크기/색) 패널
+- 자막 스타일: `SubtitleOverlay`에 `fontSize`/`textColor` 바인딩 (mpv 자막 스타일 대신 SwiftUI 오버레이)
+
+### 8.3 홈 화면 위젯 — Phase C
+
+- SwiftPM에 `TubeKeepWidget` app extension 타깃 추가 (WidgetKit)
+- 앱 그룹 `group.com.tubekeep` App Group UserDefaults:
+  - `widget_activeItems`: [id, title, progress, speed]
+  - `widget_queueStats`: { downloading, waiting, completedToday }
+  - `widget_recent`: [title, completedAt]
+  - `AppReducer`/`DownloadQueueReducer` 상태 변경 시 기록 (`WidgetCenter.reloadAllTimelines()` 호출)
+- `build_and_run.sh`: 위젯 번들을 `Contents/PlugIns/TubeKeepWidget.appex`에 포함 (release/debug 공통)
+- 위젯 종류: 큐 진행률 링(medium), 진행 중 목록(large), 최근 완료(medium)
+
+### 8.4 브라우저 통합 (scheme 확장) — Phase D
+
+- `tubekeep://add?url=<encoded>` — 다운로더 창 열고 자동 정보 조회 (클립보드 감시와 동일 플로우)
+- `tubekeep://open?id=<videoId>` — 해당 영상 요약/AI 창 열기
+- `AppDelegate.application(_:open:)` — 기존 scheme 처리와 통합 (AppReducer에 액션 전달)
+- Safari/Chrome 확장 앱은 별도 PLAN

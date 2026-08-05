@@ -204,7 +204,8 @@ struct LibraryListView: View {
                         onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                         onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
                         onOpenAI: { store.send(.library(.showSummary(item.id))) },
-                        onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
+                        onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
+                        onPlaySnippet: snippetMap[item.id] != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
                     )
                     .onAppear {
                         loadThumbnail(for: item)
@@ -249,6 +250,7 @@ private struct LibraryListRow: View {
     let onChannelDownload: () -> Void
     let onOpenAI: () -> Void
     let onToggleSelection: () -> Void
+    let onPlaySnippet: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -297,11 +299,23 @@ private struct LibraryListRow: View {
                 }
 
                 if let snippet = snippet {
-                    Text(snippet)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.top, 2)
+                    Button {
+                        onPlaySnippet?()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            SnippetTextView(text: snippet)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                    .padding(.top, 2)
                 }
             }
 

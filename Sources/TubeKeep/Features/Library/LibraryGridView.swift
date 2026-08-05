@@ -71,9 +71,10 @@ struct LibraryGridView: View {
                              onDelete: { store.send(.library(.removeItem(item.id))) },
                              onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                               onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                              onOpenAI: { store.send(.library(.showSummary(item.id))) },
-                             onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
-                        )
+                               onOpenAI: { store.send(.library(.showSummary(item.id))) },
+                              onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
+                              onPlaySnippet: snip != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
+                         )
                             .onAppear {
                                 loadThumbnail(for: item)
                                 if item.id == displayItems.last?.id {
@@ -305,6 +306,7 @@ struct LibraryGridCell: View {
     let onChannelDownload: () -> Void
     let onOpenAI: () -> Void
     let onToggleSelection: () -> Void
+    let onPlaySnippet: (() -> Void)?
     @State private var bounceUp = false
     @State private var isHovering = false
 
@@ -429,11 +431,22 @@ struct LibraryGridCell: View {
                 .truncationMode(.tail)
 
             if let snippet = snippet {
-                Text(snippet)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                Button {
+                    onPlaySnippet?()
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                        SnippetTextView(text: snippet)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
             }
 
             HStack(spacing: 2) {

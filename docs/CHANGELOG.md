@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v3.0 (2026-08-05) — 신규 기능 (검색/플레이어/위젯/브라우저) 🔶 진행 중
+
+> v2.9 리팩토링 후 첫 메이저 기능 버전. Phase A(전역 검색) 완료, B/C/D 진행 예정.
+
+### Phase A — 전역 검색 보강
+- **T-1003**: 검색 결과 스니펫 개선
+  - `SnippetTextView` (Views) — FTS snippet의 `<b>` 마크업을 파싱해 검색어를 accent색 굵게 하이라이트
+  - `SearchService.locateMatch(videoId:query:duration:)` — DB 자막(SubtitleCue) 정확 매칭 → transcript 문자 오프셋 비율 추정으로 재생 시간 반환
+  - `LibraryReducer.playSearchMatch` — 해당 시간으로 플레이어를 열고 재생 (v2.9.1의 initialSeekTime 경유)
+  - 그리드/목록 셀 스니펫을 클릭 가능한 버튼으로 변경 (재생 아이콘 + 하이라이트, 호버 포인터)
+- 전역 검색 자체(FTS5 `video_fts`, `SearchService.search`, searchResults→스니펫 표시)는 기존에 이미 구현·활성화되어 있어 보강만 진행
+
+### Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (12.73s)
+- `swift test` ✅ 76/76 (0 failures)
+
 ## v2.9.1 (2026-08-05) — 타임스탬프/챕터 플레이어 연동 (macOS) ✅
 
 > R4 서브리듀서 분리 회귀 확인 중 발견된 UX 픽스. 플레이어가 닫힌 상태에서 챕터·Q&A 타임스탬프 클릭 시 무동작이던 것을 개선.
