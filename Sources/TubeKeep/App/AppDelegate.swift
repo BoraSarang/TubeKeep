@@ -584,7 +584,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let playerView = PlayerView(store: newStore)
         let hostingCtrl = NSHostingController(rootView: playerView)
-        let window = NSWindow(contentViewController: hostingCtrl)
+        let window = PlayerWindow(contentViewController: hostingCtrl)
         window.title = playerItem.title
         window.styleMask = [.titled, .closable, .resizable]
         window.isReleasedWhenClosed = false
