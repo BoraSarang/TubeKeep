@@ -50,6 +50,8 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 - AppDelegate `application(_:open:)` 핸들러 확장 (현재 scheme 처리와 통합)
 - 브라우저 확장(Safari/Chrome)은 별도 PLAN 검토
 
+> **위젯(Phase C) 보류 안내 (2026-08-05)**: T-1020/T-1021 구현 완료했으나, ad-hoc 서명 환경에서는 macOS 위젯 갤러리 등록이 불가함 (Developer ID 인증서 필요, chronod `extensionsPendingDescriptorRefetch` 확인). 코드/인프라는 유지하며 Developer ID 인증서 보유 시 재활성화한다. 대안(메뉴바 진행률 표시)은 별도 검토 항목.
+
 ## 4. 구현 단계 (T-번호)
 
 | T-번호 | 작업 | 진행 상태 |

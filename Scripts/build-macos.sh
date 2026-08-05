@@ -211,8 +211,16 @@ if [ -f "$LIBMPV_SRC" ]; then
     install_name_tool -id @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
     install_name_tool -change /opt/homebrew/opt/mpv/lib/libmpv.2.dylib @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
     install_name_tool -add_rpath @loader_path/../Frameworks "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+    codesign --force --sign - "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
     echo "📦 libmpv embedded ($(du -h "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" | cut -f1))"
 fi
+
+# Sign embedded resource binaries individually (avoids --deep overwriting widget entitlements)
+for BIN in ffmpeg ffprobe whisper-cli; do
+    if [ -f "$RESOURCES_DIR/$BIN" ]; then
+        codesign --force --sign - "$RESOURCES_DIR/$BIN" 2>/dev/null || true
+    fi
+done
 
 # Install
 INSTALL_DIR="$HOME/Applications"
@@ -238,6 +246,6 @@ cp "$PROJECT_DIR/Info-Widget.plist" "$WIDGET_BUNDLE/Contents/Info.plist"
 codesign --force --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeepWidget.entitlements" "$WIDGET_BUNDLE" 2>/dev/null || true
 echo "📦 Widget embedded: $WIDGET_BUNDLE"
 
-codesign --force --deep --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
+codesign --force --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
 
 echo "[build] macOS $MODE DebugPanel: $([ "$MODE" = debug ] && echo ON || echo OFF)"
