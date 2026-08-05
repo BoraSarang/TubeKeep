@@ -93,9 +93,6 @@ struct DownloadQueueReducer {
         case debugLog(String)
         case showToast(ToastMessage)
         case dismissToast
-        #if DEBUG
-
-        #endif
     }
 
     var body: some ReducerOf<Self> {

@@ -7,22 +7,6 @@ enum GeminiError: LocalizedError {
     case connectionFailed
     case parsingFailed
 
-    var errorCode: String {
-        switch self {
-        case .quotaExceeded: return "E-COM-API-1001"
-        case .apiError(let httpCode, _):
-            switch httpCode {
-            case 400: return "E-COM-API-1002"
-            case 403: return "E-COM-API-1003"
-            case 404: return "E-COM-API-1004"
-            default: return "E-COM-API-1005"
-            }
-        case .invalidResponse: return "E-COM-API-3001"
-        case .connectionFailed: return "E-COM-NET-1006"
-        case .parsingFailed: return "E-COM-API-3002"
-        }
-    }
-
     var errorDescription: String? {
         switch self {
         case .quotaExceeded(let detail): return detail.map { "요청 한도 초과: \($0)" } ?? "요청 한도 초과"

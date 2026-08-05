@@ -29,6 +29,35 @@ struct AppReducer {
         case dismissToastNotification(UUID)
     }
 
+    private static func syncStatusBar(_ state: inout State) {
+        state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
+        state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
+        state.statusBar.activeCount = state.downloadQueue.activeCount
+        state.statusBar.totalCount = state.downloadQueue.items.count
+        state.statusBar.completedCount = state.downloadQueue.completedCount
+        state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+    }
+
+    /// 큐에 아이템 추가 공통 처리 (중복 검사 + 기존 파일 확인 + append + shouldStart 계산)
+    /// - Returns: 중복이면 nil, 성공 시 (itemId, 완료여부, 시작가능여부)
+    private static func addItemToQueue(_ item: DownloadItem, into state: inout State) -> (itemId: UUID, isCompleted: Bool, shouldStart: Bool)? {
+        guard !state.downloadQueue.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
+            return nil
+        }
+        var mutableItem = item
+        if let path = mutableItem.checkExistingFile(
+            storageDirectory: state.settings.storageDirectory,
+            template: state.settings.filenameTemplate
+        ) {
+            mutableItem.status = .completed
+            mutableItem.outputPath = path
+        }
+        state.downloadQueue.items.append(mutableItem)
+        state.statusBar.totalCount = state.downloadQueue.items.count
+        let shouldStart = state.downloadQueue.activeCount < state.downloadQueue.maxConcurrent
+        return (itemId: mutableItem.id, isCompleted: mutableItem.status == .completed, shouldStart: shouldStart)
+    }
+
     var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
             HomeReducer()
@@ -168,7 +197,7 @@ struct AppReducer {
                 return .none
 
             case .home(.addToQueueResponse(let item)):
-                guard !state.downloadQueue.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
+                guard let (itemId, isCompleted, shouldStart) = Self.addItemToQueue(item, into: &state) else {
                     state.home.urlString = ""
                     state.home.videoInfo = nil
                     state.home.availableFormats = []
@@ -176,25 +205,13 @@ struct AppReducer {
                     state.home.lastAutoFetchedURL = ""
                     return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 목록에 있습니다", type: .info))))
                 }
-                var mutableItem = item
-                if let path = mutableItem.checkExistingFile(
-                    storageDirectory: state.settings.storageDirectory,
-                    template: state.settings.filenameTemplate
-                ) {
-                    mutableItem.status = .completed
-                    mutableItem.outputPath = path
-                }
-                state.downloadQueue.items.append(mutableItem)
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                let shouldStart = state.downloadQueue.activeCount < state.downloadQueue.maxConcurrent
-                let itemId = mutableItem.id
                 state.home.urlString = ""
                 state.home.videoInfo = nil
                 state.home.availableFormats = []
                 state.home.selectedFormatId = nil
                 state.home.lastAutoFetchedURL = ""
 
-                if mutableItem.status == .completed {
+                if isCompleted {
                     return .concatenate(
                         .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info)))),
                         .run { _ in
@@ -218,8 +235,8 @@ struct AppReducer {
                 }
 
                 // index=0이면 먼저 fetch 후 startDownload (race condition 방지)
-                if mutableItem.channelUploadIndex == 0, mutableItem.isChannelDownload {
-                    let capturedItem = mutableItem
+                if item.channelUploadIndex == 0, item.isChannelDownload {
+                    let capturedItem = item
                     return .run { send in
                         let service = UploadOrderService()
                         let index = (try? await service.fetchUploadIndex(
@@ -284,12 +301,7 @@ struct AppReducer {
                 return .none
 
             case .downloadQueue(.updateProgress(_, _, _)):
-                state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
-                state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
-                state.statusBar.activeCount = state.downloadQueue.activeCount
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                state.statusBar.completedCount = state.downloadQueue.completedCount
-                state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                Self.syncStatusBar(&state)
                 return .none
 
             case let .downloadQueue(.downloadCompleted(id, success, outputPath, _)):
@@ -297,12 +309,7 @@ struct AppReducer {
                 if completed > 0 {
                     state.statusBar.badgeCount = completed
                 }
-                state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
-                state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
-                state.statusBar.activeCount = state.downloadQueue.activeCount
-                state.statusBar.completedCount = state.downloadQueue.completedCount
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                Self.syncStatusBar(&state)
                 let historyItem = state.downloadQueue.items[id: id].map { item in
                     DownloadHistoryItem(
                         id: 0,
@@ -357,21 +364,11 @@ struct AppReducer {
                 }
 
                 case .downloadQueue(.removeItem), .downloadQueue(.retryAllFailed):
-                state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
-                state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
-                state.statusBar.activeCount = state.downloadQueue.activeCount
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                state.statusBar.completedCount = state.downloadQueue.completedCount
-                state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                Self.syncStatusBar(&state)
                 return .none
 
             case .downloadQueue(.startDownload), .downloadQueue(.pauseDownload), .downloadQueue(.resumeDownload):
-                state.statusBar.hasActiveDownloads = state.downloadQueue.hasActiveDownloads
-                state.statusBar.downloadSpeed = state.downloadQueue.aggregateSpeed
-                state.statusBar.activeCount = state.downloadQueue.activeCount
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                state.statusBar.completedCount = state.downloadQueue.completedCount
-                state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+                Self.syncStatusBar(&state)
                 return .none
 
             case .downloadQueue(.clearCompleted), .downloadQueue(.clearAll):
@@ -402,23 +399,11 @@ struct AppReducer {
                 return .none
 
             case let .discoverAddToQueue(item):
-                guard !state.downloadQueue.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
+                guard let (itemId, isCompleted, shouldStart) = Self.addItemToQueue(item, into: &state) else {
                     return .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 목록에 있습니다", type: .info))))
                 }
-                var mutableItem = item
-                if let path = mutableItem.checkExistingFile(
-                    storageDirectory: state.settings.storageDirectory,
-                    template: state.settings.filenameTemplate
-                ) {
-                    mutableItem.status = .completed
-                    mutableItem.outputPath = path
-                }
-                state.downloadQueue.items.append(mutableItem)
-                state.statusBar.totalCount = state.downloadQueue.items.count
-                let shouldStart = state.downloadQueue.activeCount < state.downloadQueue.maxConcurrent
-                let itemId = mutableItem.id
 
-                if mutableItem.status == .completed {
+                if isCompleted {
                     return .merge(
                         .send(.downloadQueue(.showToast(ToastMessage(id: UUID(), message: "이미 다운로드된 파일입니다", type: .info)))),
                         .run { _ in

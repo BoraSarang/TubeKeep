@@ -23,22 +23,6 @@ actor YouTubeDLService {
         }
     }
 
-    static func checkInstallationStatic() async -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [Constants.ytDlpPath, "--version"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
-    }
-
     func checkInstallation() -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -238,129 +222,6 @@ actor YouTubeDLService {
         return videos
     }
 
-    func download(
-        item: DownloadItem,
-        outputDir: String,
-        limitRate: String? = nil,
-        sponsorBlock: Bool = true,
-        embedMetadata: Bool = true,
-        progressHandler: (@Sendable (String) -> Void)? = nil
-    ) -> AsyncThrowingStream<String, Error> {
-        let args = buildDownloadArgs(
-            item: item,
-            outputDir: outputDir,
-            limitRate: limitRate,
-            sponsorBlock: sponsorBlock,
-            embedMetadata: embedMetadata
-        )
-
-        return AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    let stream = await self.runner.run(
-                        executable: Constants.ytDlpPath,
-                        arguments: args,
-                        progressHandler: progressHandler
-                    )
-
-                    for try await output in stream {
-                        continuation.yield(output)
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-
-    private func buildDownloadArgs(
-        item: DownloadItem,
-        outputDir: String,
-        limitRate: String?,
-        sponsorBlock: Bool = true,
-        embedMetadata: Bool = true
-    ) -> [String] {
-        let formatId: String = {
-            let id = item.selectedFormat.id
-            if item.selectedFormat.isVideoOnly {
-                let height = item.selectedFormat.height
-                let fallback = "\(id)+bestaudio/best[height<=\(height)]"
-                return "\(id)+bestaudio/\(fallback)"
-            }
-            if id.hasPrefix("best") && !id.contains("/") && !id.contains("+") {
-                let bracket = id.firstIndex(of: "[") ?? id.endIndex
-                let filter = id[bracket...]
-                return "bestvideo\(filter)+bestaudio/\(id)"
-            }
-            return "\(id)/\(id)"
-        }()
-        var args: [String] = [
-            "--newline",
-            "--progress",
-            "--no-warnings",
-            "--print-to-file", "after_move:filepath", "/dev/null",
-            "--extractor-args", Constants.youtubeExtractorArgs,
-            "-f", formatId,
-            "--merge-output-format", "mp4",
-            "--remux-video", "mp4",
-            "-o", constructOutputTemplate(item: item, outputDir: outputDir),
-        ]
-
-        if let rate = limitRate {
-            args += ["--limit-rate", rate]
-        }
-
-        if item.includeSubtitles {
-            let subLangs = LanguageService.subtitleLanguages
-            args += ["--write-subs", "--write-auto-subs", "--sub-langs", subLangs]
-            #if DEBUG
-            Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDLService] --sub-langs: \(subLangs)") }
-            #endif
-        }
-
-        if item.audioOnly {
-            args += ["-x", "--audio-format", "aac", "--audio-quality", "0"]
-        }
-
-        if sponsorBlock {
-            args += ["--sponsorblock-remove", "all"]
-        }
-
-        if embedMetadata {
-            args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
-        }
-
-        args.append(item.videoInfo.webpageURL)
-        return args
-    }
-
-    private func constructOutputTemplate(item: DownloadItem, outputDir: String) -> String {
-        if item.isChannelDownload {
-            let folder = Constants.sanitizeFolderName(item.videoInfo.channel)
-            let channelDir = "\(Constants.channelStorageDirectory)/\(folder)"
-            try? FileManager.default.createDirectory(atPath: channelDir, withIntermediateDirectories: true)
-            return "\(channelDir)/\(String(format: "%03d", item.channelUploadIndex)) - %(title)s.%(id)s.%(ext)s"
-        }
-        let settings = Settings.loadSettings()
-        var template = settings.filenameTemplate
-
-        if item.channelUploadIndex == 0,
-            settings.skipIndexOnFailure == true {
-            template = DownloadItem.removeIndexPlaceholder(from: template)
-        }
-
-        let ytdlTemplate = template
-            .replacingOccurrences(of: "{channel}", with: "%(channel)s")
-            .replacingOccurrences(of: "{title}", with: "%(title)s")
-            .replacingOccurrences(of: "{index}", with: String(format: "%03d", item.channelUploadIndex))
-            .replacingOccurrences(of: "{date}", with: "%(upload_date)s")
-            .replacingOccurrences(of: "{resolution}", with: "%(height)sp")
-            .replacingOccurrences(of: "{id}", with: "%(id)s")
-
-        return "\(outputDir)/\(ytdlTemplate).%(ext)s"
-    }
-
     private func parseVideoInfo(from json: [String: Any], originalURL: String = "") throws -> VideoInfo {
         guard let id = json["id"] as? String,
               let title = json["title"] as? String,
@@ -469,8 +330,9 @@ actor YouTubeDLService {
             }
         }
 
+        let hasAnySize = formatMap.values.contains { $0.filesize != nil }
         return formatMap.values
-            .filter { $0.filesize != nil || !formatMap.values.contains(where: { $0.height == $0.height && $0.filesize != nil }) }
+            .filter { $0.filesize != nil || !hasAnySize }
             .sorted { $0.height > $1.height }
     }
 
