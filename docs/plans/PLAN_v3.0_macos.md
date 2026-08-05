@@ -49,15 +49,15 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 
 ## 4. 구현 단계 (T-번호)
 
-| T-번호 | 작업 | Phase |
-|--------|------|-------|
+| T-번호 | 작업 | 진행 상태 |
+|--------|------|-----------|
 | T-1000 | PLAN_v3.0 + TODO 등록 | 완료 |
 | T-1001 | DatabaseManager.searchContent + 테스트 | 완료 — 기존 video_fts(FTS5)+searchFTS로 이미 구현 확인 |
 | T-1002 | LibraryReducer 검색 모드 + 사이드바 검색 UI | 완료 — 기존 setSearchText→SearchService→searchResults로 이미 구현 |
 | T-1003 | 콘텐츠 검색 결과 보강: 스니펫 하이라이트 + 클릭 시 해당 시간 재생 | 완료 — SnippetTextView + locateMatch + playSearchMatch |
-| T-1010 | MPVClient 속도/A-B 반복 명령 | B |
-| T-1011 | PlayerReducer 재생 속도·A-B·재생 목록 State | B |
-| T-1012 | PlayerView 컨트롤바 확장 (속도/A-B/이전·다음/자막 스타일) | B |
+| T-1010 | MPVClient 속도/A-B 반복 명령 | 완료 — speed + ab-loop-a/b/off |
+| T-1011 | PlayerReducer 재생 속도·A-B·재생 목록 State | 완료 — queue/queueIndex, setQueue/playNext/playPrevious |
+| T-1012 | PlayerView 컨트롤바 확장 | 완료 — 속도(0.75~2.0x)/A-B(3단계)/이전·다음, onChange→mpv 반영 |
 | T-1020 | WidgetKit 타깃 + App Group 상태 공유 | C |
 | T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | C |
 | T-1030 | tubekeep:// scheme 확장 (add/open) | D |

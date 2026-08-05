@@ -29,6 +29,13 @@ struct PlayerReducer {
         var autoPlayCountdown = 0
         var playerItemId: UUID = UUID()
         var fileMissing = false
+
+        // v3.0 Phase B
+        var playbackRate: Double = 1.0
+        var aLoop: Double?
+        var bLoop: Double?
+        var queue: [PlayerItem] = []
+        var queueIndex: Int = -1
     }
 
     enum Action: Equatable {
@@ -59,6 +66,16 @@ struct PlayerReducer {
         case removeFromLibrary(String)
         case toggleAlwaysOnTop
         case playingChanged(Bool)
+
+        // v3.0 Phase B
+        case setPlaybackRate(Double)
+        case cyclePlaybackRate
+        case setALoop(Double)
+        case setBLoop(Double)
+        case clearABLoop
+        case setQueue([PlayerItem], startIndex: Int)
+        case playNext
+        case playPrevious
     }
 
     var body: some ReducerOf<Self> {
@@ -81,6 +98,8 @@ struct PlayerReducer {
                 state.autoPlayCountdown = 0
                 state.recommendations = []
                 state.playerItemId = UUID()
+                state.aLoop = nil
+                state.bLoop = nil
                 if item.fileURL != nil {
                     state.isStreamLoading = false
                     return .none
@@ -397,6 +416,51 @@ struct PlayerReducer {
             case let .playingChanged(value):
                 state.isPlaying = value
                 return .none
+
+            // v3.0 Phase B
+            case let .setPlaybackRate(rate):
+                state.playbackRate = rate
+                return .none
+
+            case .cyclePlaybackRate:
+                let rates: [Double] = [0.75, 1.0, 1.25, 1.5, 2.0]
+                let idx = rates.firstIndex(of: state.playbackRate) ?? 1
+                state.playbackRate = rates[(idx + 1) % rates.count]
+                return .none
+
+            case let .setALoop(time):
+                state.aLoop = time
+                if let b = state.bLoop, b <= time { state.bLoop = nil }
+                return .none
+
+            case let .setBLoop(time):
+                state.bLoop = time
+                if let a = state.aLoop, a >= time { state.aLoop = nil }
+                return .none
+
+            case .clearABLoop:
+                state.aLoop = nil
+                state.bLoop = nil
+                return .none
+
+            case let .setQueue(queue, startIndex):
+                state.queue = queue
+                state.queueIndex = startIndex
+                return .none
+
+            case .playNext:
+                guard !state.queue.isEmpty else { return .none }
+                let idx = state.queueIndex + 1
+                guard idx < state.queue.count else { return .none }
+                state.queueIndex = idx
+                return .send(.loadVideo(state.queue[idx]))
+
+            case .playPrevious:
+                guard !state.queue.isEmpty else { return .none }
+                let idx = state.queueIndex - 1
+                guard idx >= 0 else { return .none }
+                state.queueIndex = idx
+                return .send(.loadVideo(state.queue[idx]))
             }
         }
     }

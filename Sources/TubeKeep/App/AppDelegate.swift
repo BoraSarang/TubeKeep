@@ -563,6 +563,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if let existingStore = playerStore, let window = playerWindow, window.isVisible {
             existingStore.send(.loadVideo(playerItem))
+            if let queue = notification.userInfo?["queue"] as? [PlayerItem] {
+                existingStore.send(.setQueue(queue, startIndex: 0))
+            }
             window.title = playerItem.title
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -573,6 +576,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PlayerReducer()
         }
         playerStore = newStore
+        if let queue = notification.userInfo?["queue"] as? [PlayerItem] {
+            newStore.send(.setQueue(queue, startIndex: 0))
+        }
         if playerItem.fileURL == nil, playerItem.videoId != nil {
             newStore.send(.loadVideo(playerItem))
         }

@@ -16,6 +16,20 @@
 - `./build_and_run.sh debug macos --no-launch` ✅ (12.73s)
 - `swift test` ✅ 76/76 (0 failures)
 
+### Phase B — 플레이어 고도화
+- **T-1010**: `MPVClient` 재생 속도(`speed`) + A-B 반복(`ab-loop-a/b/off`) 명령 추가
+- **T-1011**: `PlayerReducer` 재생 속도(0.75/1.0/1.25/1.5/2.0x)·A-B 구간·재생 목록(큐) State/Action 추가
+  - `setQueue`/`playNext`/`playPrevious` — 보관함 필터 목록 기준 현재 영상부터 연속 재생
+  - `loadVideo` 시 A-B 마커 리셋 (속도는 유지)
+- **T-1012**: `PlayerView` 컨트롤바 확장
+  - 속도 메뉴 버튼, A→B→해제 3단계 토글 버튼(활성 시 accent 표시), 이전/다음 버튼(비활성 상태 반영)
+  - `onChange(playbackRate/aLoop/bLoop)` → mpv 실시간 반영
+- **보관함 연동**: `openFile` 시 `filteredItems` 기준 현재 영상부터의 재생 목록을 `userInfo["queue"]`로 전달, `AppDelegate.openPlayerWindow`가 큐 설정
+
+### Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (14.17s)
+- `swift test` ✅ 76/76 (0 failures)
+
 ## v2.9.1 (2026-08-05) — 타임스탬프/챕터 플레이어 연동 (macOS) ✅
 
 > R4 서브리듀서 분리 회귀 확인 중 발견된 UX 픽스. 플레이어가 닫힌 상태에서 챕터·Q&A 타임스탬프 클릭 시 무동작이던 것을 개선.

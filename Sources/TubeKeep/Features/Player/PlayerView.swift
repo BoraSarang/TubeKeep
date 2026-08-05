@@ -52,6 +52,13 @@ struct PlayerView: View {
             if newDur > 0 { store.send(.durationUpdated(newDur)) }
         }
         .onChange(of: mpv.isPlaying) { _, newVal in store.send(.playingChanged(newVal)) }
+        .onChange(of: store.playbackRate) { _, newVal in mpv.setPlaybackRate(newVal) }
+        .onChange(of: store.aLoop) { _, newVal in
+            if let a = newVal { mpv.setALoop(at: a) } else { mpv.clearABLoop() }
+        }
+        .onChange(of: store.bLoop) { _, newVal in
+            if let b = newVal { mpv.setBLoop(at: b) }
+        }
         .onChange(of: mpv.isFinished) { _, newVal in if newVal { store.send(.videoDidEnd) } }
         .onChange(of: mpv.error) { _, newVal in if newVal != nil { mpv.stop() } }
         .background(WindowAccessor { win in DispatchQueue.main.async { window = win } })
@@ -244,9 +251,32 @@ struct PlayerView: View {
         let dur = mpv.duration > 0 ? mpv.duration : store.duration
         let progress = dur > 0 ? min(max(current / dur, 0), 1) : 0
         return HStack(spacing: 8) {
+            Button { store.send(.playPrevious) } label: {
+                Image(systemName: "backward.end.fill").frame(width: 16).foregroundColor(.white)
+            }.buttonStyle(.plain).help("이전 영상").disabled(store.queue.isEmpty || store.queueIndex <= 0)
             Button { mpv.togglePlayPause() } label: {
                 Image(systemName: mpv.isPlaying ? "pause.fill" : "play.fill").frame(width: 16).foregroundColor(.white)
             }.buttonStyle(.plain).help(mpv.isPlaying ? "일시 정지" : "재생")
+            Button { store.send(.playNext) } label: {
+                Image(systemName: "forward.end.fill").frame(width: 16).foregroundColor(.white)
+            }.buttonStyle(.plain).help("다음 영상").disabled(store.queue.isEmpty || store.queueIndex >= store.queue.count - 1)
+            Menu {
+                ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
+                    Button("\(String(format: "%.2g", rate))x") { store.send(.setPlaybackRate(rate)) }
+                }
+            } label: {
+                Text("\(String(format: "%.2g", store.playbackRate))x").font(.system(size: 12, weight: .medium)).foregroundColor(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.15)))
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("재생 속도")
+            Button {
+                if store.aLoop == nil { store.send(.setALoop(mpv.currentTime)) }
+                else if store.bLoop == nil { store.send(.setBLoop(mpv.currentTime)) }
+                else { store.send(.clearABLoop) }
+            } label: {
+                Text(store.aLoop == nil ? "A" : (store.bLoop == nil ? "A-B" : "A-B·✕"))
+                    .font(.system(size: 11, weight: .semibold)).foregroundColor(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.aLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
+            }.buttonStyle(.plain).help(store.aLoop == nil ? "반복 시작점(A) 설정" : (store.bLoop == nil ? "반복 끝점(B) 설정" : "구간 반복 해제"))
             Text(timeString(current)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .trailing)
             Slider(value: Binding(get: { progress }, set: { isSeeking = true; seekTime = $0 * dur }), in: 0...1, onEditingChanged: { editing in
                 if !editing { mpv.seek(to: seekTime); isSeeking = false }

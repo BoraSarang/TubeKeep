@@ -8,9 +8,9 @@
 | T-1001 | **DB 콘텐츠 검색 (searchContent)** | high | done | 기존 video_fts(FTS5)+searchFTS로 이미 구현 확인 |
 | T-1002 | **LibraryReducer 검색 모드 + 사이드바 검색 UI** | high | done | 기존 setSearchText→SearchService→searchResults로 이미 구현 |
 | T-1003 | **검색 결과 보강: 스니펫 하이라이트 + 클릭 시 해당 시간 재생** | medium | done | SnippetTextView + SearchService.locateMatch(자막/transcript 위치→시간) + playSearchMatch |
-| T-1010 | **MPVClient 속도/A-B 반복 명령** | high | pending | speed + ab-loop-a/b |
-| T-1011 | **PlayerReducer 재생 속도·A-B·재생 목록 State** | high | pending | queue/queueIndex |
-| T-1012 | **PlayerView 컨트롤바 확장** | medium | pending | 속도/A-B/이전·다음/자막 스타일 |
+| T-1010 | **MPVClient 속도/A-B 반복 명령** | high | done | speed + ab-loop-a/b/off |
+| T-1011 | **PlayerReducer 재생 속도·A-B·재생 목록 State** | high | done | queue/queueIndex, setQueue/playNext/playPrevious |
+| T-1012 | **PlayerView 컨트롤바 확장** | medium | done | 속도(0.75~2.0x)/A-B(3단계)/이전·다음 + onChange→mpv 반영 |
 | T-1020 | **WidgetKit 타깃 + App Group 상태 공유** | high | pending | build_and_run.sh 번들 포함 |
 | T-1021 | **위젯 뷰 (진행률/대기/최근 완료)** | medium | pending | |
 | T-1030 | **tubekeep:// scheme 확장 (add/open)** | medium | pending | 브라우저 원클릭 전송 |

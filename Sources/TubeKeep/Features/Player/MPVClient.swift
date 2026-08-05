@@ -302,6 +302,27 @@ final class MPVClient: ObservableObject {
         mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &v)
     }
 
+    func setPlaybackRate(_ rate: Double) {
+        guard let mpv else { return }
+        var r = max(0.25, min(4.0, rate))
+        mpv_set_property(mpv, "speed", MPV_FORMAT_DOUBLE, &r)
+    }
+
+    func setALoop(at time: Double) {
+        guard let mpv else { return }
+        mpvCommand(mpv, args: ["ab-loop-a", String(format: "%.3f", time)])
+    }
+
+    func setBLoop(at time: Double) {
+        guard let mpv else { return }
+        mpvCommand(mpv, args: ["ab-loop-b", String(format: "%.3f", time)])
+    }
+
+    func clearABLoop() {
+        guard let mpv else { return }
+        mpvCommand(mpv, args: ["ab-loop-off"])
+    }
+
     func stop() {
         guard let mpv else { return }
         mpvCommand(mpv, args: ["stop"])

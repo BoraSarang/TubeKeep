@@ -437,7 +437,10 @@ struct LibraryReducer {
                         videoId: item.id,
                         duration: Double(item.duration ?? 0)
                     )
-                    NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
+                    let queue = state.filteredItems
+                        .drop { $0.id != id }
+                        .map { PlayerItem(fileURL: URL(fileURLWithPath: $0.filePath), title: $0.title, videoId: $0.id, duration: Double($0.duration ?? 0)) }
+                    NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem, userInfo: ["queue": queue])
                 }
                 return .none
 
