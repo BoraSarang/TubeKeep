@@ -8,6 +8,7 @@
 | T-901 | **R1 yt-dlp 경로 단일화** | high | done | YouTubeDLService 죽은 다운로드 경로 제거 |
 | T-902 | **R2 AppReducer 중복 제거** | high | done | syncStatusBar + addToQueue 헬퍼 |
 | T-903 | **R3 죽은 코드+버그** | medium | done | errorCode/checkInstallationStatic/빈#ifDEBUG/parseFormats |
+| T-904 | **R4 LibraryReducer 서브리듀서 분리** | medium | in-progress | Report·Mindmap 독립 @Reducer 완료, QnA·Podcast 결합으로 다음 단계 |
 | T-905 | **R5 뷰 분해** | medium | done | SettingsView 1098줄, MainView 901줄 |
 | T-906 | **T1 테스트 정리 + swift test 76/76** | medium | done | AAC vs MP3 정정 |
 

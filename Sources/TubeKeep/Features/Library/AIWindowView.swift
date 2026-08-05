@@ -439,9 +439,9 @@ struct AIWindowView: View {
                 Text("마인드맵")
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
-                if store.library.mindmapNode == nil, !store.library.mindmapLoading {
+                if store.library.mindmap.node == nil, !store.library.mindmap.loading {
                     Button {
-                        store.send(.library(.generateMindmap(videoId)))
+                        store.send(.library(.mindmap(.generateMindmap(videoId))))
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "brain.head.profile")
@@ -455,7 +455,7 @@ struct AIWindowView: View {
                 }
             }
 
-            if store.library.mindmapNode == nil, !store.library.mindmapLoading {
+            if store.library.mindmap.node == nil, !store.library.mindmap.loading {
                 Text("마인드맵 생성 버튼을 눌러 생성하세요")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -463,7 +463,7 @@ struct AIWindowView: View {
                     .padding(.vertical, 6)
             }
 
-            if store.library.mindmapLoading {
+            if store.library.mindmap.loading {
                 HStack(spacing: 6) {
                     ProgressView()
                         .scaleEffect(0.7)
@@ -474,7 +474,7 @@ struct AIWindowView: View {
                 .frame(maxWidth: .infinity)
             }
 
-            if let node = store.library.mindmapNode {
+            if let node = store.library.mindmap.node {
                 ScrollView {
                     MindmapTreeView(node: node, store: store)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -484,7 +484,7 @@ struct AIWindowView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
-            if let error = store.library.mindmapError {
+            if let error = store.library.mindmap.error {
                 Text(error)
                     .font(.system(size: 9))
                     .foregroundStyle(.red)

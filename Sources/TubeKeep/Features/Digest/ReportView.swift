@@ -10,7 +10,7 @@ struct ReportView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if store.reportLoading {
+            if store.report.loading {
                 Spacer()
                 ProgressView()
                     .scaleEffect(1.2)
@@ -19,7 +19,7 @@ struct ReportView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
                 Spacer()
-            } else if let stats = store.reportStats {
+            } else if let stats = store.report.stats {
                 ScrollView {
                     VStack(spacing: 16) {
                         summaryCards(stats)
@@ -43,10 +43,10 @@ struct ReportView: View {
         }
         .background(Color(.windowBackgroundColor))
         .onChange(of: period) { _, newPeriod in
-            store.send(.generateReport(newPeriod))
+            store.send(.report(.generateReport(newPeriod)))
         }
         .onAppear {
-            store.send(.generateReport(period))
+            store.send(.report(.generateReport(period)))
         }
     }
 
@@ -69,7 +69,7 @@ struct ReportView: View {
             .frame(width: 240)
 
             Button {
-                store.send(.generateReport(period))
+                store.send(.report(.generateReport(period)))
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12))

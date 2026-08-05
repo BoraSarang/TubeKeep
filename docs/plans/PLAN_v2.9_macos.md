@@ -20,7 +20,7 @@
 | T-901 | R1 yt-dlp 경로 단일화 | 완료 |
 | T-902 | R2 AppReducer 중복 제거 | 완료 |
 | T-903 | R3 죽은 코드+버그 | 완료 |
-| T-904 | R4 LibraryReducer 분리 | 보류 (파급 큼→특별 세션) |
+| T-904 | R4 LibraryReducer 분리 | 진행 중 (Report·Mindmap 독립 @Reducer 완료 / QnA·Podcast 결합으로 다음 단계) |
 | T-905 | R5 뷰 분해 | 완료 |
 | T-906 | T1 테스트 정리 + swift test 76/76 | 완료 |
 

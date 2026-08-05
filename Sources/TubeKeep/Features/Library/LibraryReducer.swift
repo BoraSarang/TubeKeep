@@ -54,8 +54,7 @@ struct LibraryReducer {
         var showDigest = false
 
         // Report
-        var reportStats: DigestStats?
-        var reportLoading = false
+        var report = ReportReducer.State()
 
         // Profile Recommendations
         var isShowingProfileRecommendations = false
@@ -89,10 +88,7 @@ struct LibraryReducer {
         var qnaShowSheet = false
 
         // Mindmap (v2.5.4)
-        var mindmapNode: MindmapNode?
-        var mindmapLoading = false
-        var mindmapError: String?
-        var mindmapShow = false
+        var mindmap = MindmapReducer.State()
 
         // Gemini API Key Alert
         var showGeminiKeyAlert = false
@@ -255,14 +251,10 @@ struct LibraryReducer {
         case seekToTimestamp(Double)
 
         // Mindmap (v2.5.4)
-        case generateMindmap(String)
-        case mindmapResult(MindmapNode)
-        case mindmapFailed(String)
-        case toggleMindmap
+        case mindmap(MindmapReducer.Action)
 
         // Report
-        case generateReport(ReportPeriod)
-        case reportLoaded(DigestStats)
+        case report(ReportReducer.Action)
     }
 
     static func hasSubtitles(for videoId: String) -> Bool {
@@ -278,6 +270,8 @@ struct LibraryReducer {
     }
 
     var body: some ReducerOf<Self> {
+        Scope(state: \.report, action: \.report) { ReportReducer() }
+        Scope(state: \.mindmap, action: \.mindmap) { MindmapReducer() }
         Reduce { state, action in
             switch action {
             case .loadFromDisk:
@@ -604,9 +598,9 @@ struct LibraryReducer {
                 state.showDigest = false
                 return .none
 
-            // Report
-            case .generateReport, .reportLoaded:
-                return Self.handleReportAction(state: &state, action: action)
+            // Report (reducer-scoped)
+            case .report:
+                return .none
 
             // Navigation
             case let .setSidebarMode(mode):
@@ -773,34 +767,28 @@ struct LibraryReducer {
                 }
                 state.librarySummaryVideoId = videoId
                 state.qnaSelectedVideoId = videoId
-                state.mindmapNode = nil
-                state.mindmapError = nil
-                state.mindmapLoading = false
-                state.mindmapShow = false
-                // 기존 마인드맵이 있으면 로드
-                if let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
-                   let mindmapData = data.mindmap,
-                   let existing = try? JSONDecoder().decode(MindmapNode.self, from: mindmapData) {
-                    state.mindmapNode = existing
-                    state.mindmapShow = true
-                }
                 // 기존 요약이 있으면 API 호출 없이 표시
                 if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
                     state.librarySummaryText = existing
                     state.librarySummaryLoading = false
-                    return .run { _ in
-                        await MainActor.run {
-                            NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                    return .merge(
+                        .send(.mindmap(.resetForVideo(videoId))),
+                        .run { _ in
+                            await MainActor.run {
+                                NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                            }
                         }
-                    }
+                    )
                 }
                 state.librarySummaryLoading = true
                 state.summaryProgressMessage = "자막 확인 중..."
                 state.librarySummaryText = nil
                 let summaryTitle = item.title
                 let summaryChannel = item.channelName
-                return .run { send in
-                    await MainActor.run {
+                return .merge(
+                    .send(.mindmap(.resetForVideo(videoId))),
+                    .run { send in
+                        await MainActor.run {
                         NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
                     }
                     let progress: @Sendable (String) -> Void = { message in
@@ -820,6 +808,7 @@ struct LibraryReducer {
                         await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
                     }
                 }
+                )
 
             case let .resummarize(videoId):
                 guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
@@ -936,9 +925,9 @@ struct LibraryReducer {
             case .openQnA, .closeQnA, .askQuestion, .qnaResponseReceived, .qnaFailed, .loadQnAHistory, .qnaHistoryLoaded, .deleteQnAHistoryItem, .deleteAllQnAHistory, .seekToTimestamp:
                 return Self.handleQnAAction(state: &state, action: action)
 
-            // Mindmap (v2.5.4)
-            case .generateMindmap, .mindmapResult, .mindmapFailed, .toggleMindmap:
-                return Self.handleMindmapAction(state: &state, action: action)
+            // Mindmap (reducer-scoped)
+            case .mindmap:
+                return .none
             }
         }
     }
