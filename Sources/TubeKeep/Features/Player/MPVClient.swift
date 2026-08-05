@@ -27,6 +27,8 @@ final class MPVClient: ObservableObject {
     private var playbackStart: Date?
     private var firstFrameLogged = false
     private var pendingSeekTime: Double?
+    private var loopA: Double?
+    private var loopB: Double?
 
     init() { setupMPV() }
 
@@ -216,7 +218,10 @@ final class MPVClient: ObservableObject {
             case "time-pos":
                 if prop.format == MPV_FORMAT_DOUBLE {
                     let val = prop.data?.assumingMemoryBound(to: Double.self).pointee ?? 0
-                    runOnMain { self.currentTime = val }
+                    runOnMain { [self] in
+                        self.currentTime = val
+                        checkABLoop(at: val)
+                    }
                 }
             case "duration":
                 if prop.format == MPV_FORMAT_DOUBLE {
@@ -309,18 +314,18 @@ final class MPVClient: ObservableObject {
     }
 
     func setALoop(at time: Double) {
-        guard let mpv else { return }
-        mpvCommand(mpv, args: ["ab-loop-a", String(format: "%.3f", time)])
+        loopA = time
+        if let b = loopB, b <= time { loopB = nil }
     }
 
     func setBLoop(at time: Double) {
-        guard let mpv else { return }
-        mpvCommand(mpv, args: ["ab-loop-b", String(format: "%.3f", time)])
+        guard loopA != nil else { return }
+        loopB = time
     }
 
     func clearABLoop() {
-        guard let mpv else { return }
-        mpvCommand(mpv, args: ["ab-loop-off"])
+        loopA = nil
+        loopB = nil
     }
 
     func stop() {
@@ -340,6 +345,13 @@ final class MPVClient: ObservableObject {
         currentTime = 0
         duration = 0
         pendingSeekTime = nil
+        loopA = nil
+        loopB = nil
+    }
+
+    private func checkABLoop(at time: Double) {
+        guard let a = loopA, let b = loopB, b > a else { return }
+        if time >= b { seek(to: a) }
     }
 
     private func runOnMain(_ block: @escaping () -> Void) {
