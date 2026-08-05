@@ -244,11 +244,8 @@ actor SummarizationService {
                 "--skip-download",
                 "--no-warnings",
                 "-o", outputTemplate,
-            ] + LanguageService.cookiesArgs + [videoURL]
+            ] + [videoURL]
         )
-        #if DEBUG
-        if !LanguageService.cookiesArgs.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[Subtitle] 쿠키 적용: \(LanguageService.cookiesArgs.joined(separator: " "))") } }
-        #endif
         log("[Subtitle] yt-dlp 종료 코드: \(exitCode)")
 
         let files = (try? fm.contentsOfDirectory(atPath: tmpDir.path)) ?? []
@@ -337,7 +334,7 @@ actor SummarizationService {
             "-x", "--audio-format", "wav",
             "--no-warnings",
             "-o", outputURL.path,
-        ] + LanguageService.cookiesArgs + [videoURL])
+        ] + [videoURL])
 
         guard exitCode == 0, FileManager.default.fileExists(atPath: outputURL.path) else {
             throw SummaryError.transcriptionFailed("오디오 다운로드 실패 (exit: \(exitCode))")

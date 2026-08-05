@@ -279,11 +279,6 @@ final class DownloadManager: @unchecked Sendable {
             args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
         }
 
-        let cookies = LanguageService.cookiesArgs
-        if !cookies.isEmpty { args += cookies }
-        #if DEBUG
-        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[DownloadManager] 쿠키 적용: \(cookies.joined(separator: " "))") } }
-        #endif
         args.append(item.videoInfo.webpageURL)
         return args
     }

@@ -110,9 +110,6 @@ struct AppReducer {
                         if !settings.subtitleLanguageOverride.isEmpty {
                             await send(.settings(.setSubtitleLanguageOverride(settings.subtitleLanguageOverride)))
                         }
-                        if !settings.cookiesFromBrowser.isEmpty {
-                            await send(.settings(.setCookiesFromBrowser(settings.cookiesFromBrowser)))
-                        }
                         if settings.enableWhisperTranscription {
                             await send(.settings(.toggleWhisperTranscription))
                         }

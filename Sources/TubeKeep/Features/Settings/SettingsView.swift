@@ -271,27 +271,6 @@ struct SettingsView: View {
             }
 
             divider
-
-            SettingsRow(title: "브라우저 쿠키", description: "비공개/연령 제한 영상 접근 (yt-dlp)") {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { store.cookiesFromBrowser },
-                        set: { store.send(.setCookiesFromBrowser($0)) }
-                    )
-                ) {
-                    Text("사용 안 함").tag("")
-                    Text("Safari").tag("safari")
-                    Text("Chrome").tag("chrome")
-                    Text("Brave").tag("brave")
-                    Text("Edge").tag("edge")
-                    Text("Firefox").tag("firefox")
-                    Text("Whale").tag("whale")
-                }
-                .pickerStyle(.menu)
-                .font(.callout)
-                .fixedSize()
-            }
         }
     }
 

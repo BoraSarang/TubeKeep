@@ -84,7 +84,6 @@ struct Settings: Equatable, Codable {
     var playerMode: PlayerMode = .builtIn
     var showChannelBadge: Bool = true
     var subtitleLanguageOverride: String = ""
-    var cookiesFromBrowser: String = ""
     var enableWhisperTranscription: Bool = false
     var whisperModelSize: String = "base"
     var showMenuBarNotifications: Bool = true
@@ -111,7 +110,7 @@ struct Settings: Equatable, Codable {
         case defaultResolution, maxRetries, launchAtLogin, maxUploadCheck, skipIndexOnFailure
         case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, ax4APIKey, showMainWindowOnLaunch
         case sponsorBlock, embedMetadata, showThumbnailPreview, ttsEngine, playerMode, showChannelBadge
-        case subtitleLanguageOverride, cookiesFromBrowser, enableWhisperTranscription, whisperModelSize
+        case subtitleLanguageOverride, enableWhisperTranscription, whisperModelSize
         case showMenuBarNotifications, menuBarNotificationDuration, presets, activePresetId, smartMode
     }
 
@@ -140,7 +139,6 @@ struct Settings: Equatable, Codable {
         playerMode: PlayerMode = .builtIn,
         showChannelBadge: Bool = true,
         subtitleLanguageOverride: String = "",
-        cookiesFromBrowser: String = "",
         enableWhisperTranscription: Bool = false,
         whisperModelSize: String = "base",
         showMenuBarNotifications: Bool = true,
@@ -173,7 +171,6 @@ struct Settings: Equatable, Codable {
         self.playerMode = playerMode
         self.showChannelBadge = showChannelBadge
         self.subtitleLanguageOverride = subtitleLanguageOverride
-        self.cookiesFromBrowser = cookiesFromBrowser
         self.enableWhisperTranscription = enableWhisperTranscription
         self.whisperModelSize = whisperModelSize
         self.showMenuBarNotifications = showMenuBarNotifications
@@ -209,7 +206,6 @@ struct Settings: Equatable, Codable {
         playerMode = try c.decode(PlayerMode.self, forKey: .playerMode)
         showChannelBadge = try c.decode(Bool.self, forKey: .showChannelBadge)
         subtitleLanguageOverride = try c.decode(String.self, forKey: .subtitleLanguageOverride)
-        cookiesFromBrowser = try c.decode(String.self, forKey: .cookiesFromBrowser)
         enableWhisperTranscription = try c.decode(Bool.self, forKey: .enableWhisperTranscription)
         whisperModelSize = try c.decode(String.self, forKey: .whisperModelSize)
         showMenuBarNotifications = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarNotifications) ?? true
@@ -245,7 +241,6 @@ struct Settings: Equatable, Codable {
         try c.encode(playerMode, forKey: .playerMode)
         try c.encode(showChannelBadge, forKey: .showChannelBadge)
         try c.encode(subtitleLanguageOverride, forKey: .subtitleLanguageOverride)
-        try c.encode(cookiesFromBrowser, forKey: .cookiesFromBrowser)
         try c.encode(enableWhisperTranscription, forKey: .enableWhisperTranscription)
         try c.encode(whisperModelSize, forKey: .whisperModelSize)
         try c.encode(showMenuBarNotifications, forKey: .showMenuBarNotifications)

@@ -14,6 +14,9 @@
 - **scripts/a11y-dump.sh (macOS 적응) 추가** — `.a11y.txt` + `.storage.json` + `.perf.json` → `docs/screenshots/macos/`
 - **AGENTS.local.md 갱신** — 버전 정보 통합(장 8 제거 → 장 19), DebugPanel 레벨 표, AI 모델/에러코드/세션로그 규칙 추가
 
+### Removed Features
+- **브라우저 쿠키 기능 제거** — 비공개/연령 제한 영상 접근(`--cookies-from-browser`) 미사용으로 코드에서 전면 삭제 (`SettingsView` 피커, `Settings.cookiesFromBrowser`, `SettingsReducer.setCookiesFromBrowser`, `LanguageService.cookiesArgs`, 모든 yt-dlp args 삽입부). bd `TubeKeep-6mg` 닫음. bd `TubeKeep-5y6`(mpv/MoltenVK) 테스트 완료로 닫음
+
 ### Documentation / 前 세션 이관
 - `docs/plans/PLAN_v2.8.1_macos.md` + `docs/TODO.md` T-875~T-882
 - 채널 다운로더 예상 소요시간(추정식) UI — **경과시간 실시간 갱신 픽스**: `loadTick`/`Timer` 제거 → `TimelineView(.periodic)` + `loadStart` 전달 (bd `TubeKeep-vyy` 닫음)

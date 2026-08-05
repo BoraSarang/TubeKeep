@@ -535,7 +535,7 @@ extension YouTubeDLService {
             "--skip-download",
             "--list-subs",
             url,
-        ] + LanguageService.cookiesArgs
+        ]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -581,10 +581,7 @@ extension YouTubeDLService {
             "--sub-langs", subLangs,
             "--convert-subs", "srt",
             "-o", tmpDir.appendingPathComponent("%(id)s.%(ext)s").path,
-        ] + LanguageService.cookiesArgs + [url]
-        #if DEBUG
-        if !LanguageService.cookiesArgs.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[Player] 쿠키 적용: \(LanguageService.cookiesArgs.joined(separator: " "))") } }
-        #endif
+        ] + [url]
         let tmpLog = fm.temporaryDirectory.appendingPathComponent("ytdlp_subs_\(UUID().uuidString).log")
         fm.createFile(atPath: tmpLog.path, contents: nil)
         defer { try? fm.removeItem(at: tmpLog) }

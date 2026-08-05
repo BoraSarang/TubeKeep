@@ -470,11 +470,6 @@ struct LibraryReducer {
                             "--no-warnings",
                             "-o", outputTemplate,
                         ]
-                        let cookies = LanguageService.cookiesArgs
-                        if !cookies.isEmpty { args += cookies }
-                        #if DEBUG
-                        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[Library] 쿠키 적용: \(cookies.joined(separator: " "))") } }
-                        #endif
                         args.append(videoURL)
                         if Constants.ytDlpPath.hasPrefix("/") {
                             process.executableURL = URL(fileURLWithPath: Constants.ytDlpPath)

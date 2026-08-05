@@ -110,17 +110,6 @@ enum LanguageService {
     }
 }
 
-extension LanguageService {
-    /// 브라우저 쿠키 args (설정에서 활성화된 경우)
-    static var cookiesArgs: [String] {
-        let settings = Settings.loadSettings()
-        guard !settings.cookiesFromBrowser.isEmpty else { return [] }
-        let result = ["--cookies-from-browser", settings.cookiesFromBrowser]
-        log("cookiesArgs → \(result.joined(separator: " "))")
-        return result
-    }
-}
-
 extension TTSEngine {
     enum Gender { case male, female }
 }

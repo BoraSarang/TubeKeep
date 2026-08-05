@@ -59,28 +59,11 @@ actor YouTubeDLService {
         url: String,
         progressHandler: (@Sendable (String) -> Void)? = nil
     ) async throws -> (VideoInfo, [Format]) {
-        let cookies = LanguageService.cookiesArgs
-        do {
-            return try await _runInfoFetch(url: url, cookies: cookies, progressHandler: progressHandler)
-        } catch let error as YTDLPError {
-            if case let .infoFetchFailed(stderr) = error, !cookies.isEmpty {
-                let lower = stderr.lowercased()
-                if lower.contains("cookie") || lower.contains("could not find") || lower.contains("keyring") || lower.contains("browser") {
-                    #if DEBUG
-                    Task { @MainActor in
-                        DebugLogManager.shared?.append("[YouTubeDL] 쿠키 추출 실패, 쿠키 없이 재시도")
-                    }
-                    #endif
-                    return try await _runInfoFetch(url: url, cookies: [], progressHandler: progressHandler)
-                }
-            }
-            throw error
-        }
+        try await _runInfoFetch(url: url, progressHandler: progressHandler)
     }
 
     private func _runInfoFetch(
         url: String,
-        cookies: [String],
         progressHandler: (@Sendable (String) -> Void)?
     ) async throws -> (VideoInfo, [Format]) {
         guard checkInstallation() else {
@@ -108,10 +91,6 @@ actor YouTubeDLService {
         ProcessRegistry.register(process)
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         var args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download", "--extractor-args", Constants.youtubeExtractorArgs, url]
-        if !cookies.isEmpty { args += cookies }
-        #if DEBUG
-        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 쿠키 적용: \(cookies.joined(separator: " "))") } }
-        #endif
         process.arguments = args
 
         process.standardOutput = stdoutFile
@@ -220,11 +199,6 @@ actor YouTubeDLService {
             "--get-url",
             "--no-warnings",
         ]
-        let cookies = LanguageService.cookiesArgs
-        if !cookies.isEmpty { args += cookies }
-        #if DEBUG
-        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 스트리밍 쿠키 적용: \(cookies.joined(separator: " "))") } }
-        #endif
         args.append(url)
         let output = try await runner.runSync(executable: "env", arguments: args)
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -357,11 +331,6 @@ actor YouTubeDLService {
             args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
         }
 
-        let cookies = LanguageService.cookiesArgs
-        if !cookies.isEmpty { args += cookies }
-        #if DEBUG
-        if !cookies.isEmpty { Task { @MainActor in DebugLogManager.shared?.append("[YouTubeDL] 다운로드 쿠키 적용: \(cookies.joined(separator: " "))") } }
-        #endif
         args.append(item.videoInfo.webpageURL)
         return args
     }

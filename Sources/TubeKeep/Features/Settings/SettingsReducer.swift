@@ -28,7 +28,6 @@ struct SettingsReducer {
         var playerMode: PlayerMode = .builtIn
         var showChannelBadge: Bool = true
         var subtitleLanguageOverride: String = ""
-        var cookiesFromBrowser: String = ""
         var enableWhisperTranscription: Bool = false
         var whisperModelSize: String = "base"
         var whisperModelStatus: WhisperModelStatus = .unknown
@@ -77,7 +76,6 @@ struct SettingsReducer {
                 playerMode: playerMode,
                 showChannelBadge: showChannelBadge,
                 subtitleLanguageOverride: subtitleLanguageOverride,
-                cookiesFromBrowser: cookiesFromBrowser,
                 enableWhisperTranscription: enableWhisperTranscription,
                 whisperModelSize: whisperModelSize,
                 showMenuBarNotifications: showMenuBarNotifications,
@@ -111,7 +109,6 @@ struct SettingsReducer {
         case setPlayerMode(PlayerMode)
         case toggleShowChannelBadge
         case setSubtitleLanguageOverride(String)
-        case setCookiesFromBrowser(String)
         case toggleWhisperTranscription
         case setWhisperModelSize(String)
         case checkWhisperModelStatus
@@ -255,10 +252,6 @@ struct SettingsReducer {
 
             case let .setSubtitleLanguageOverride(value):
                 state.subtitleLanguageOverride = value
-                return .send(.saveSettings)
-
-            case let .setCookiesFromBrowser(value):
-                state.cookiesFromBrowser = value
                 return .send(.saveSettings)
 
             case .toggleWhisperTranscription:
