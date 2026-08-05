@@ -59,6 +59,7 @@ actor SummarizationService {
         if let cached = DatabaseManager.shared.loadVideoAIData(videoId: videoId),
            let summary = cached.summary, !summary.isEmpty {
             log("[AI Fallback] ✅ DB 캐시 히트 — videoId: \(videoId)")
+            DebugLogManager.shared?.push(.CACHE, category: "AI", message: "요약 DB 캐시 히트", meta: ["videoId": videoId, "cost_saved": true])
             let chapters: [ChapterInfo] = {
                 guard let data = cached.chapters else { return [] }
                 return (try? JSONDecoder().decode([ChapterInfo].self, from: data)) ?? []
@@ -289,7 +290,7 @@ actor SummarizationService {
         log("[Subtitle] ❌ 유효한 자막 없음 — videoId: \(videoId)")
 
         // Whisper fallback: yt-dlp 자막 실패 시 음성 인식
-        let settings = Self.loadSettings()
+        let settings = Settings.loadSettings()
         if settings.enableWhisperTranscription {
             log("[Subtitle] Whisper fallback 시도 — videoId: \(videoId)")
             progress?("Whisper 자막 생성 중...")
@@ -324,14 +325,6 @@ actor SummarizationService {
         }
 
         throw SummaryError.noSubtitle
-    }
-
-    private static func loadSettings() -> Settings {
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data)
-        else { return Settings() }
-        return settings
     }
 
     private func downloadAudio(videoId: String) async throws -> URL {
@@ -416,65 +409,31 @@ actor SummarizationService {
         챕터는 영상의 주요 내용 구간을 2~5개로 나누어 시간대와 함께 작성하세요.
         """
 
-        let response = try await queryGemini(prompt: prompt, apiKey: apiKey)
+        let response: String
+        do {
+            response = try await GeminiService().query(prompt: prompt, apiKey: apiKey)
+        } catch let geminiError as GeminiError {
+            throw Self.mapGeminiError(geminiError)
+        } catch {
+            throw SummaryError.apiUnavailable(error.localizedDescription)
+        }
         return parseSummaryResponse(response)
     }
 
-    private func queryGemini(prompt: String, apiKey: String) async throws -> String {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=\(apiKey)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
-
-        let body: [String: Any] = [
-            "contents": [["parts": [["text": prompt]]]]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        var lastDetail: String?
-        for attempt in 0..<4 {
-            if attempt > 0 {
-                let delay = Double(min(attempt, 4)) * 2.0
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    private static func mapGeminiError(_ error: GeminiError) -> SummaryError {
+        switch error {
+        case .quotaExceeded(let detail):
+            return .summaryFailed("요청 한도 초과: \(detail ?? "50회 한도 초과")")
+        case .apiError(let code, let detail):
+            switch code {
+            case 400: return .summaryFailed(detail ?? "API 키가 올바르지 않습니다. 설정에서 API 키를 확인해 주세요.")
+            case 403: return .summaryFailed(detail ?? "API 키에 권한이 없습니다. 설정에서 API 키를 확인해 주세요.")
+            default: return .summaryFailed(detail ?? "Gemini API 오류 (HTTP \(code))")
             }
-            do {
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw SummaryError.apiUnavailable("Gemini API에 연결할 수 없습니다.")
-                }
-                guard httpResponse.statusCode == 200 else {
-                    let detail = Self.parseAPIError(data: data)
-                    if httpResponse.statusCode == 429 {
-                        lastDetail = detail
-                        continue
-                    }
-                    switch httpResponse.statusCode {
-                    case 400:
-                        throw SummaryError.summaryFailed(detail ?? "API 키가 올바르지 않습니다. 설정에서 API 키를 확인해 주세요.")
-                    case 403:
-                        throw SummaryError.summaryFailed(detail ?? "API 키에 권한이 없습니다. 설정에서 API 키를 확인해 주세요.")
-                    default:
-                        throw SummaryError.summaryFailed(detail ?? "Gemini API 오류 (HTTP \(httpResponse.statusCode))")
-                    }
-                }
-                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let candidates = json["candidates"] as? [[String: Any]],
-                      let first = candidates.first,
-                      let content = first["content"] as? [String: Any],
-                      let parts = content["parts"] as? [[String: Any]],
-                      let firstPart = parts.first,
-                      let result = firstPart["text"] as? String
-                else {
-                    throw SummaryError.summaryFailed("Gemini API 응답 파싱 실패")
-                }
-                return result
-            }
+        case .parsingFailed: return .summaryFailed("Gemini API 응답 파악 실패")
+        case .connectionFailed: return .apiUnavailable("Gemini API에 연결할 수 없습니다.")
+        case .invalidResponse: return .apiUnavailable("Gemini API 응답이 없습니다")
         }
-        if let detail = lastDetail {
-            throw SummaryError.summaryFailed("요청 한도 초과: \(detail)")
-        }
-        throw SummaryError.apiUnavailable("Gemini API 요청 실패")
     }
 
     private static func parseAPIError(data: Data) -> String? {

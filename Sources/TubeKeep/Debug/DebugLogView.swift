@@ -110,6 +110,8 @@ struct DebugLogView: View {
         case .SYSTEM: return Color(red: 0.80, green: 0.37, blue: 0.91)
         case .ACTION: return .white
         case .INFO: return .gray
+        case .PERF: return Color(red: 0.55, green: 0.75, blue: 0.45)
+        case .CACHE: return Color(red: 0.85, green: 0.69, blue: 0.22)
         }
     }
 }

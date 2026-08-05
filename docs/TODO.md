@@ -1,5 +1,20 @@
 # TODO — 작업 추적 목록
 
+## v2.8.1 — 에이전트 규칙(v2.1) 적용 + 개발 표준화 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-875 | **PLAN_v2.8.1 + TODO 등록** | high | done | docs/plans/PLAN_v2.8.1_macos.md |
+| T-876 | **docs/AI_MODELS.json 생성** | high | done | AI 모델/프롬프트/캐시정책 고정 |
+| T-877 | **DebugLogger PERF/CACHE 레벨 추가 + 플레이어/요약 로깅** | high | done | DebugLogManager.swift, MPVClient.swift, SummarizationService.swift |
+| T-878 | **scripts/env-expiry-check.sh 생성** | medium | done | 시크릿 만료 체크 |
+| T-879 | **scripts/a11y-dump.sh (macOS 적응) 생성** | medium | done | 텍스트 모델 검증 3종 덤프 |
+| T-880 | **error_message_ko.json E-MAC- 정리** | medium | done | 8.5 규격 |
+| T-881 | **AGENTS.local.md 갱신** | high | done | 버전 v2.8.x, 플레이어 libmpv, 세션로그/에러코드 규칙 |
+| T-882 | **세션 로그 + CHANGELOG + 빌드 검증** | medium | done | /agent/session-*.md |
+
+---
+
 ## v1.1.0 — 라이브러리 편의성 + 핵심 기능 확장
 
 | ID | 작업 | 우선순위 | 상태 | 테스트 |

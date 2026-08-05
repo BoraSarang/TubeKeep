@@ -8,6 +8,8 @@ enum DebugLogLevel: String, CaseIterable {
     case API_REQ = "API→"
     case API_RES = "API←"
     case INFO = "INFO"
+    case PERF = "PERF"
+    case CACHE = "CACHE"
     case WARN = "WARN"
     case ERROR = "ERROR"
     case SYSTEM = "SYSTEM"

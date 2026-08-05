@@ -10,6 +10,28 @@
 
 ---
 
+## 0. 개인 프로젝트 원칙 — 1인 전용
+
+> **이 프로젝트는 오직 나(제작자) 혼자만을 위해 만든 개인 프로그램이다.**
+> 모든 결정, 설계, 구현의 최우선 기준은 **내 편의성과 내 취향**이다.
+
+### 0.1 사고방식
+- "일반 사용자", "초보자", "대중"이라는 개념은 존재하지 않음
+- UI/UX: **내가 편한 대로**. 남들 헷갈리든 말든 상관없음
+- 기능 추가: **내가 필요한 것만**. "혹시 다른 사람이..."라는 고려 안 함
+- 코드 품질: 유지보수 가능한 선에서 타협 가능. 깔끔한 것보다 빠른 게 우선
+- 검증: **내가 쓰는데 문제 없으면 OK**. 엣지 케이스 100% 커버 불필요
+- 디자인: **내 취향 1순위**. macOS HIG 가이드라인은 참고만
+- 설정/단축키: 내 손에 익은 대로
+
+### 0.2 적용 예
+- 사이드바 채널 정보 표시, 리포트 UI 등은 전적으로 내 취향대로
+- 기능 제안 시 "보통 사용자는..." 대신 "네가 쓰기에 편리한가?"가 기준
+- 테스트는 내가 실제 쓰는 시나리오만 커버
+- 버그여도 내가 겪지 않는 건 우선순위 낮음
+
+---
+
 ## 1. 프로젝트 문서 구조
 
 ### 핵심 문서 (docs/)
@@ -163,11 +185,6 @@ keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
 
 ---
 
-## 8. 버전 정보
-
-- **현재 버전**: v2.7.7 (build 18)
-- **CFBundleShortVersionString**: 2.7.7
-
 ## 9. 버그 관리
 
 - 작업 전 항상 `bd list`로 열린 버그 확인
@@ -289,6 +306,8 @@ Debug 메뉴 (메뉴바에 표시 안 됨, 단축키만 동작):
 | `API→` | #74C0FC (blue) |
 | `API←` | #8CE99A (green) |
 | `INFO` | gray |
+| `PERF` | #8CBF73 (green) — 성능 로그 (예: 플레이어 첫 프레임) |
+| `CACHE` | #D9B038 (gold) — AI 캐시 히트 (cost_saved 포함) |
 | `WARN` | #FFD43B (yellow) |
 | `ERROR` | #FF6B6B (red) |
 | `SYSTEM` | #CC5DE8 (purple) |
@@ -297,7 +316,7 @@ Debug 메뉴 (메뉴바에 표시 안 됨, 단축키만 동작):
 
 | 기능 | 사양 | 코드 위치 |
 |------|------|-----------|
-| 로그 레벨 | 7종 고정 | `DebugLogLevel` enum |
+| 로그 레벨 | 9종 고정 (ACTION/API→/API←/INFO/PERF/CACHE/WARN/ERROR/SYSTEM) | `DebugLogLevel` enum |
 | 최대 로그 수 | 5000, FIFO | `DebugLogger.maxLogs` |
 | release 차단 | `#if DEBUG` + `.define("DEBUG", .when(configuration: .debug))` | `Package.swift` |
 | 포맷 | `[HH:mm:ss.SSS] [LEVEL] [PLATFORM] [CATEGORY] msg \| meta={json}` | `push()` |
@@ -351,3 +370,29 @@ win.isReleasedWhenClosed = false
 win.isMovableByWindowBackground = true
 win.title = "🐛 Debug Logs"
 ```
+
+## 16. AI 모델 정책 (docs/AI_MODELS.json)
+
+- **유일 권위**: `docs/AI_MODELS.json` — 기본 체인 `openrouter/free → yTeaser/ax4 → gemini`
+- 캐시: SQLite `video_ai_data` (요약/자막/태그), `summary_v2.5` 이상
+- 히트 시 `[CACHE]` 로그 + `meta.cost_saved`
+
+## 17. 에러코드 체계 (E-MAC-)
+
+- 형식: `E-MAC-{CATEGORY}-{NUM4}` (개인 macOS 전용, `COM` 미사용)
+- 범례: `error_message_ko.json`에 한국어 메시지 매핑 (참조 스펙 — 런타임 코드는 `n-XXXX` throw 유지)
+- 카테고리: `API`, `NET` 등 (공통 권장 카테고리에 `API` 포함 사용)
+
+## 18. v2.8.1 개인 규칙 적용 (v2.1 공통 규칙 macOS 적용분)
+
+- **문서 우선**: 코딩 전 `docs/plans/PLAN_v{version}_macos.md` → `docs/TODO.md`(T-번호) 순서
+- **세션 로그**: 작업 종료 시 `/.agent/session-YYYY-MM-DD-macos.md` 8줄 요약 저장 (15분마다 중간 저장)
+- **시크릿**: `scripts/env-expiry-check.sh` — `.env` 등 `# expires:` 파싱, 30일 전 WARN/만료 시 ERROR
+- **텍스트 검증**: `scripts/a11y-dump.sh [VERSION]` → `docs/screenshots/macos/` .a11y.txt + .storage.json + .perf.json
+- **PERF/CACHE**: DebugLogger 9종 레벨, 플레이어 첫 프레임은 `.PERF`, 요약 캐시 히트는 `.CACHE`
+- **개인 편의 최우선**: 위 공통 규칙도 개인 프로젝트 원칙(장 0)을 우선으로 해석
+
+## 19. 버전 정보
+
+- **현재 버전**: v2.8.1 (working) — 그 외 릴리즈: v2.7.7 (build 18)
+- **CFBundleShortVersionString**: 2.7.7

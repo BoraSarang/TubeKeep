@@ -1,0 +1,57 @@
+{
+  "version": "2.1.0-macos",
+  "language_lock": {
+    "response": "ko",
+    "reasoning": "ko",
+    "enforced": true,
+    "system_prompt_prefix": "[SYSTEM LANGUAGE LOCK] 응답은 모두 한국어로 해 주세요. 추론 내용도 모두 한국어로 출력해 주세요."
+  },
+  "doc_first": {
+    "enabled": true,
+    "required_files": ["docs/plans/PLAN_v{version}_{platform}.md", "docs/TODO.md"],
+    "session_auto_save_minutes": 15
+  },
+  "default_chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+  "models": {
+    "summary": {
+      "chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+      "temperature": 0.2,
+      "max_tokens": 4096,
+      "prompt_version": "summary_v2.5",
+      "vision_support": false,
+      "cache": "SQLite video_ai_data (summary + chapters)"
+    },
+    "tagging": {
+      "chain": ["openrouter/free", "yTeaser/ax4", "gemini", "autoClassify"],
+      "temperature": 0.1,
+      "prompt_version": "tagging_v2.4",
+      "vision_support": false,
+      "cache": "SQLite video_ai_data (tags)"
+    },
+    "qna": {
+      "model": "yTeaser/ax4",
+      "temperature": 0.2,
+      "prompt_version": "qna_v2.5",
+      "vision_support": false
+    },
+    "podcast": {
+      "chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+      "prompt_version": "podcast_v2.5",
+      "vision_support": false
+    }
+  },
+  "platforms": {
+    "macos": {
+      "model": "summary",
+      "perf_budget": { "cold_start_ms": 1500, "memory_mb": 300, "fps": 60 }
+    }
+  },
+  "cache_policy": {
+    "enabled": true,
+    "storage": "SQLite (DatabaseManager.video_ai_data) — SwiftData는 다운로드 메타 전용",
+    "hit_rate_target": 0.7,
+    "logging": "[CACHE] level on hit"
+  },
+  "cost_guard": { "max_cost_per_task_usd": 1.0, "alert_at_usd": 0.5 },
+  "e2e": { "platform": "macos-only", "build": "./build_and_run.sh debug macos" }
+}

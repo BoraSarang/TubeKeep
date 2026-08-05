@@ -1,5 +1,64 @@
 # CHANGELOG
 
+## v2.8.1 (2026-08-05) — v2.1 공통 규칙 적용 (macOS) 🔶 진행 중
+
+> 개인 프로젝트 원칙(AGENTS.local.md 장 0)을 전제로 공통 `AGENTS.md` v2.1의 macOS 적용분을 도입. 코드 행동 변경은 없고 로깅/검증/문서 인프라 중심.
+
+### Rules (macOS 적용)
+- **docs/AI_MODELS.json 추가** — AI 모델 체인(openrouter/free → yTeaser/ax4 → gemini), 캐시 정책(SQLite), macOS perf budget 기록
+- **에러코드 E-MAC-** 정렬 — `error_message_ko.json`을 `E-MAC-API-*` / `E-MAC-NET-*` 규격으로 갱신 (참조 스펙, 런타임 `n-XXXX` throw는 유지)
+- **DebugLogger 9종 레벨** — `PERF`(성능) + `CACHE`(캐시 히트) 추가 (`DebugLogManager.swift`), `DebugLogView` 색상 추가
+  - 플레이어 첫 프레임 → `.PERF` 로그 (`MPVClient.swift` renderFrame)
+  - 요약 DB 캐시 히트 → `.CACHE` 로그 + `cost_saved` (`SummarizationService.swift`)
+- **scripts/env-expiry-check.sh 추가** — `# expires:` 파싱, 30일 전 WARN/만료 시 ERROR + bd 생성
+- **scripts/a11y-dump.sh (macOS 적응) 추가** — `.a11y.txt` + `.storage.json` + `.perf.json` → `docs/screenshots/macos/`
+- **AGENTS.local.md 갱신** — 버전 정보 통합(장 8 제거 → 장 19), DebugPanel 레벨 표, AI 모델/에러코드/세션로그 규칙 추가
+
+### Documentation / 前 세션 이관
+- `docs/plans/PLAN_v2.8.1_macos.md` + `docs/TODO.md` T-875~T-882
+- 채널 다운로더 예상 소요시간(추정식) UI — **경과시간 미갱신 버그는 `bd TubeKeep-vyy`(P2)로 등록** (TimelineView 대기)
+- 플레이어 전체화면/확대 오류 픽스 이관 — `MPVOpenGLView`(NSOpenGLView 서브클래스, reshape→`openGLContext.update()`) + `MPVClient.attachView(MPVOpenGLView)`
+
+## v2.8.0 (2026-08-02) — 코드 정리 리팩터링 ✅
+
+### Refactoring
+- **GeminiService.swift** 생성 — `TaggingService`와 `SummarizationService` 사이의 중복 `queryGemini` 함수를 통합. 4회 재시도 로직 + `GeminiError` enum (요청 한도 초과, API 오류, 응답 없음, 연결 실패, 파싱 실패) 포함
+- **Settings.APIKeys** 구조체 추가 + `Settings.loadAPIKeys()` 정적 메서드 — 8곳의 직접 `UserDefaults.standard.string(forKey:)` API 키 읽기 제거 (`LibraryReducer.swift` 7곳, `HomeReducer.swift` 1곳)
+- **Settings.loadSettings()** 단일화 — 4개의 중복 `loadSettings()` 정의 제거 (`LibraryReducer.swift`, `SummarizationService.swift`, `PlayerReducer.swift`, `DownloadQueueReducer.swift`에서 각각 복제됨). 5곳의 호출처를 `Settings.loadSettings()`로 통일. 추가로 `YouTubeDLService.swift`, `PodcastService.swift`, `UploadOrderService.swift`, `LanguageService.swift` (2곳), `DownloadItem.swift` (2곳), `AppReducer.swift`, `AppDelegate.swift`, `DownloadQueueView.swift`, `PlayerReducer.swift`에서 인라인 UserDefaults/JSONDecode 패턴 제거
+- **DebugLogManager 강제 사용화** — `AppDelegate.swift` (7곳), `WhisperService.swift`, `ChannelUpdateService.swift`, `MPVClient.swift` (4곳), `SettingsReducer.swift` (2곳), `LibraryReducer.swift` (1곳) 총 18개의 `print()` 호출 제거. AGENTS.md Rule 8 준수
+- **DatabaseManager 정리** — 죽은 코드 제거 (`QnAEntry` struct + 3개 미사용 메서드). `saveQAHistory`에서 `defer` 패턴 + 일관된 로깅 사용
+- **LibraryReducer 분해** — 4개 기능 섹션을 별도 파일로 추출:
+  - `LibraryReducer+Report.swift` (28줄) — Report/Digest 액션 처리
+  - `LibraryReducer+Mindmap.swift` (63줄) — Mindmap 액션 처리
+  - `LibraryReducer+QnA.swift` (88줄) — Q&A 액션 처리
+  - `LibraryReducer+Podcast.swift` (110줄) — Podcast 액션 처리
+  - 메인 파일: 1226 → 989줄 (`Self.handleXxxAction(state: &state, action: action)` 디스패치 패턴)
+
+### Error Code System (AGENTS v1.9)
+- `GeminiError`에 `errorCode` 프로퍼티 추가 (`E-COM-API-1001`, `E-COM-NET-1006`, 등 8가지 코드)
+- `error_message_ko.json` 생성 — GeminiError 코드별 사용자 메시지 매핑
+
+### Bug Fixes
+- **AI 요약 정보 갱신 안 됨**: Home 화면에서 새 URL 입력 시 `summaryText`가 초기화되지 않아 `toggleSummaryPopover`가 이전 영상 요약을 그대로 표시하던 문제 수정
+  - `HomeReducer.swift`: `.infoResponse`, `.infoFailed`, `startFetch()`, `.resetInfo` 모두에서 `summaryText`, `summaryProvider`, `showSummaryPopover`, `summaryLoading` 초기화 추가
+- **AI 창에 이전 영상 정보 표시 (레이스컨디션)**: 늦게 도착한 이전 영상의 API 응답이 현재 영상 요약을 덮어쓰던 문제 수정
+  - `LibraryReducer.swift`: `.summaryResult`/`.summaryFailed`/`.summaryProgressUpdate`에 `videoId == state.librarySummaryVideoId` 가드 추가
+  - `HomeReducer.swift`: `summaryLoaded(videoId:text:provider:)`, `summaryFailed(videoId:error:)` 시그니처로 videoId 전달 + `videoId == state.videoInfo?.id` 가드
+  - `LibraryReducer.swift` Discover: `discoverSummaryLoaded(videoId:text:provider:)`, `discoverSummaryFailed(videoId:error:)` + `videoId == state.discoverSummaryVideoId` 가드
+- **AI 창 썸네일/아바타가 영상 전환 시 갱신 안 됨**: `CachedThumbnailView`/`CachedAvatarView`의 `@State image`가 뷰 재사용 시 초기화되지 않아 이전 영상 이미지가 남던 문제 수정
+  - `Views/CachedImageViews.swift`: `.id()` 대신 `.onChange(of: videoId/channelId) { image = nil; Task { reload } }` + `.task`로 교체
+- **채널 다운로더 창 지연**: 미구독 채널에서 창을 열기 전 `fetchChannelInfo`(네트워크)를 기다려 창이 늦게 뜨던 문제 수정
+  - `LibraryReducer.swift` `.openChannelDownload`: 창을 즉시 열고, 채널 정보 조회는 `ChannelDownloaderView`가 백그라운드에서 처리
+- **채널 다운로더 다중 창**: 창을 로컬 변수로만 생성해 속성에 저장하지 않아 닫은 후 새 창이 반복 생성되던 문제 수정
+  - `AppDelegate.swift`: `channelDownloaderWindow` 속성으로 창을 보관·재사용
+
+### Infrastructure
+
+### Testing
+- 74/76 테스트 통과 (2개 사전 존재 실패: `DownloadItemTests` — `optionsLabel`이 "AAC"를 반환하지만 테스트는 "MP3" 기대 — 리팩터링과 무관)
+
+---
+
 ## v2.7.7 (2026-07-28) — 오디오 누락 버그 수정 + DebugPanel v1.7 ✅
 
 ### Bug Fixes
