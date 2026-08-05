@@ -16,7 +16,12 @@ struct LibraryListView: View {
                 Divider()
             }
 
-            Divider()
+            if let channelId = store.library.selectedChannel,
+               store.library.filterMode == .all,
+               let first = store.library.items.first(where: { $0.channelId == channelId }) {
+                ChannelHeaderView(channelId: channelId, channelName: first.channelName, items: store.library.items, store: store)
+                Divider()
+            }
 
             if store.library.items.isEmpty {
                 emptyState
@@ -182,10 +187,14 @@ struct LibraryListView: View {
     private var listContent: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
+                let snippetMap = Dictionary(uniqueKeysWithValues: store.library.searchResults.compactMap { result in
+                    result.snippet.map { (result.item.id, $0) }
+                })
                 ForEach(store.library.filteredItems) { item in
                     LibraryListRow(
                         item: item,
                         thumbnail: thumbnailImages[item.id],
+                        snippet: snippetMap[item.id],
                         isSelected: store.library.selectedIds.contains(item.id),
                         hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
                         hasPodcast: store.library.podcastAvailableIds.contains(item.id),
@@ -229,6 +238,7 @@ struct LibraryListView: View {
 private struct LibraryListRow: View {
     let item: LibraryItem
     let thumbnail: NSImage?
+    let snippet: String?
     let isSelected: Bool
     let hasSubtitles: Bool
     let hasPodcast: Bool
@@ -284,6 +294,14 @@ private struct LibraryListRow: View {
                             .font(.system(size: 9))
                             .foregroundStyle(.green)
                     }
+                }
+
+                if let snippet = snippet {
+                    Text(snippet)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.top, 2)
                 }
             }
 

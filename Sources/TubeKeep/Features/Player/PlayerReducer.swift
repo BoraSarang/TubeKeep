@@ -295,7 +295,7 @@ struct PlayerReducer {
                 state.transcribeError = nil
                 state.whisperProgressMessage = nil
                 state.subtitles = []
-                let modelSize = Self.loadSettings().whisperModelSize
+                let modelSize = Settings.loadSettings().whisperModelSize
                 #if DEBUG
                 DebugLogManager.shared?.append("[Player] whisper model size: \(modelSize)")
                 #endif
@@ -402,19 +402,7 @@ struct PlayerReducer {
     }
 
     static func readResolution() -> Int {
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data)
-        else { return Constants.defaultResolution }
-        return settings.defaultResolution
-    }
-
-    private static func loadSettings() -> Settings {
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data)
-        else { return Settings() }
-        return settings
+        Settings.loadSettings().defaultResolution
     }
 
     private func estimateSubtitles(from transcript: String, duration: Double) -> [SubtitleCue] {

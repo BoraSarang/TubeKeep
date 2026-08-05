@@ -7,9 +7,7 @@ actor UploadOrderService {
         channelId: String,
         targetVideoId: String
     ) async throws -> Int {
-        let maxCheck = UserDefaults.standard.string(forKey: Constants.settingsSaveKey)
-            .flatMap { try? JSONDecoder().decode(Settings.self, from: Data($0.utf8)) }
-            .map { $0.maxUploadCheck } ?? Constants.defaultMaxUploadCheck
+        let maxCheck = Settings.loadSettings().maxUploadCheck
 
         let args = [
             Constants.ytDlpPath,

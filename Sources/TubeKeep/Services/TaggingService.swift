@@ -54,7 +54,7 @@ actor TaggingService {
 
             Return ONLY the category name, nothing else.
             """
-            if let tag = try? await queryGemini(prompt: prompt, apiKey: geminiAPIKey),
+            if let tag = try? await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey),
                predefinedTags.contains(tag) {
                 log("[AI Fallback] Gemini 태깅 성공: \(tag) — \(title)")
                 return tag
@@ -118,45 +118,5 @@ actor TaggingService {
         }
 
         return "기타"
-    }
-
-    private func queryGemini(prompt: String, apiKey: String) async throws -> String {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=\(apiKey)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30
-
-        let body: [String: Any] = [
-            "contents": [["parts": [["text": prompt]]]]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        var lastDetail: String?
-        for attempt in 0..<4 {
-            if attempt > 0 {
-                let delay = Double(min(attempt, 4)) * 2.0
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            }
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else { continue }
-            if httpResponse.statusCode == 200 {
-                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let candidates = json["candidates"] as? [[String: Any]],
-                      let first = candidates.first,
-                      let content = first["content"] as? [String: Any],
-                      let parts = content["parts"] as? [[String: Any]],
-                      let firstPart = parts.first,
-                      let result = firstPart["text"] as? String
-                else { throw SummarizationService.SummaryError.summaryFailed("Gemini API 응답 파싱 실패") }
-                return result
-            }
-            if httpResponse.statusCode == 429 {
-                lastDetail = "요청 한도 초과"
-                continue
-            }
-            throw SummarizationService.SummaryError.apiUnavailable("Gemini API 오류 (HTTP \(httpResponse.statusCode))")
-        }
-        throw SummarizationService.SummaryError.apiUnavailable(lastDetail ?? "Gemini API 요청 실패")
     }
 }

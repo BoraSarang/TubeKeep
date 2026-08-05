@@ -96,10 +96,22 @@ final class DatabaseManager {
         );
         """
 
+        let createVideoFTS = """
+        CREATE VIRTUAL TABLE IF NOT EXISTS video_fts USING fts5(
+            video_id UNINDEXED,
+            title,
+            channel_name,
+            transcript,
+            summary,
+            tokenize='porter unicode61'
+        );
+        """
+
         execute(createVideoAIData)
         execute("ALTER TABLE video_ai_data ADD COLUMN subtitles_json TEXT;")
         execute(createQnAHistory)
         execute(createDownloadHistory)
+        execute(createVideoFTS)
         log("[DB] 테이블 생성 완료")
     }
 
@@ -365,87 +377,6 @@ final class DatabaseManager {
         }
     }
 
-    // MARK: - Q&A History CRUD
-
-    func saveQnAEntry(_ entry: QnAEntry) {
-        sync {
-            let sql = """
-            INSERT INTO qna_history (video_id, question, answer, timestamps)
-            VALUES (?, ?, ?, ?);
-            """
-
-            guard let db = _db else { return }
-            var stmt: OpaquePointer?
-
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                log("[DB] saveQnAEntry prepare 실패")
-                return
-            }
-            defer { sqlite3_finalize(stmt) }
-
-            sqlite3_bind_text(stmt, 1, entry.videoId, -1, Self.transient)
-            sqlite3_bind_text(stmt, 2, entry.question, -1, Self.transient)
-            sqlite3_bind_text(stmt, 3, entry.answer, -1, Self.transient)
-            bindOptionalData(stmt, 4, entry.timestamps)
-
-            if sqlite3_step(stmt) != SQLITE_DONE {
-                log("[DB] saveQnAEntry 실행 실패")
-            }
-        }
-    }
-
-    func loadQnAHistory(videoId: String) -> [QnAEntry] {
-        sync {
-            let sql = "SELECT * FROM qna_history WHERE video_id = ? ORDER BY created_at DESC;"
-
-            guard let db = _db else { return [] }
-            var stmt: OpaquePointer?
-            var results: [QnAEntry] = []
-
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                log("[DB] loadQnAHistory prepare 실패")
-                return []
-            }
-            defer { sqlite3_finalize(stmt) }
-
-            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
-
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                let entry = QnAEntry(
-                    id: sqlite3_column_int(stmt, 0),
-                    videoId: columnText(stmt, 1) ?? videoId,
-                    question: columnText(stmt, 2) ?? "",
-                    answer: columnText(stmt, 3) ?? "",
-                    timestamps: columnData(stmt, 4)
-                )
-                results.append(entry)
-            }
-
-            return results
-        }
-    }
-
-    func deleteQnAEntry(id: Int32) {
-        sync {
-            let sql = "DELETE FROM qna_history WHERE id = ?;"
-
-            guard let db = _db else { return }
-            var stmt: OpaquePointer?
-
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                log("[DB] deleteQnAEntry prepare 실패")
-                return
-            }
-            defer { sqlite3_finalize(stmt) }
-
-            sqlite3_bind_int(stmt, 1, id)
-
-            if sqlite3_step(stmt) != SQLITE_DONE {
-                log("[DB] deleteQnAEntry 실행 실패")
-            }
-        }
-    }
-
     // MARK: - Helpers
 
     private func bindOptionalText(_ stmt: OpaquePointer?, _ index: Int32, _ value: String?) {
@@ -486,13 +417,21 @@ final class DatabaseManager {
             let json = (try? JSONEncoder().encode(timestamps)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
             var stmt: OpaquePointer?
             let sql = "INSERT INTO qna_history (video_id, question, answer, timestamps) VALUES (?, ?, ?, ?);"
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return -1 }
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                log("[DB] saveQAHistory prepare 실패")
+                return -1
+            }
+            defer { sqlite3_finalize(stmt) }
             sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
             sqlite3_bind_text(stmt, 2, question, -1, Self.transient)
             sqlite3_bind_text(stmt, 3, answer, -1, Self.transient)
             sqlite3_bind_text(stmt, 4, json, -1, Self.transient)
-            let result = sqlite3_step(stmt) == SQLITE_DONE ? sqlite3_last_insert_rowid(db) : -1
-            sqlite3_finalize(stmt)
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                log("[DB] saveQAHistory 실행 실패")
+                return -1
+            }
+            let result = sqlite3_last_insert_rowid(db)
+            log("[DB] saveQAHistory 성공 — videoId: \(videoId)")
             return result
         }
     }
@@ -657,6 +596,108 @@ final class DatabaseManager {
         }
     }
 
+    // MARK: - FTS5 Search
+
+    func rebuildFTSIndex(items: [LibraryItem]) {
+        sync {
+            guard let db = _db else { return }
+            var stmt: OpaquePointer?
+            _ = sqlite3_prepare_v2(db, "DELETE FROM video_fts;", -1, &stmt, nil)
+            stmt.map { sqlite3_step($0); sqlite3_finalize($0) }
+
+            let insertSql = "INSERT OR REPLACE INTO video_fts(video_id, title, channel_name, transcript, summary) VALUES (?, ?, ?, ?, ?);"
+            var insertStmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, insertSql, -1, &insertStmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(insertStmt) }
+
+            let selectSql = "SELECT transcript, summary FROM video_ai_data WHERE video_id = ?;"
+            var selectStmt: OpaquePointer?
+            _ = sqlite3_prepare_v2(db, selectSql, -1, &selectStmt, nil)
+
+            for item in items {
+                var transcript: String? = item.transcript
+                var summary: String? = item.summary
+                if let ss = selectStmt {
+                    sqlite3_bind_text(ss, 1, item.id, -1, Self.transient)
+                    if sqlite3_step(ss) == SQLITE_ROW {
+                        if transcript == nil { transcript = columnText(ss, 0) }
+                        if summary == nil { summary = columnText(ss, 1) }
+                    }
+                    sqlite3_reset(ss)
+                    sqlite3_clear_bindings(ss)
+                }
+                sqlite3_bind_text(insertStmt, 1, item.id, -1, Self.transient)
+                sqlite3_bind_text(insertStmt, 2, item.title, -1, Self.transient)
+                sqlite3_bind_text(insertStmt, 3, item.channelName, -1, Self.transient)
+                bindOptionalText(insertStmt, 4, transcript)
+                bindOptionalText(insertStmt, 5, summary)
+                sqlite3_step(insertStmt)
+                sqlite3_reset(insertStmt)
+                sqlite3_clear_bindings(insertStmt)
+            }
+            selectStmt.map { sqlite3_finalize($0) }
+            log("[DB] FTS 인덱스 재구축 완료: \(items.count)개")
+        }
+    }
+
+    func searchFTS(query: String) -> [(videoId: String, snippet: String)] {
+        sync {
+            guard let db = _db else { return [] }
+            var results: [(String, String)] = []
+            let sql = """
+            SELECT video_id, snippet(video_fts, 2, '<b>', '</b>', '...', 32)
+            FROM video_fts WHERE video_fts MATCH ? ORDER BY rank;
+            """
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            defer { sqlite3_finalize(stmt) }
+
+            let matchQuery = query
+                .trimmingCharacters(in: .whitespaces)
+                .components(separatedBy: .whitespaces)
+                .filter { !$0.isEmpty }
+                .map { "\"\($0)\"" }
+                .joined(separator: " OR ")
+
+            sqlite3_bind_text(stmt, 1, matchQuery, -1, Self.transient)
+
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let videoId = columnText(stmt, 0) ?? ""
+                let snippet = columnText(stmt, 1) ?? ""
+                results.append((videoId, snippet))
+            }
+            return results
+        }
+    }
+
+    func insertFTSIndex(videoId: String, title: String, channelName: String, transcript: String?, summary: String?) {
+        sync {
+            guard let db = _db else { return }
+            let sql = "INSERT OR REPLACE INTO video_fts(video_id, title, channel_name, transcript, summary) VALUES (?, ?, ?, ?, ?);"
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
+            sqlite3_bind_text(stmt, 2, title, -1, Self.transient)
+            sqlite3_bind_text(stmt, 3, channelName, -1, Self.transient)
+            bindOptionalText(stmt, 4, transcript)
+            bindOptionalText(stmt, 5, summary)
+            sqlite3_step(stmt)
+        }
+    }
+
+    func deleteFTSIndex(videoId: String) {
+        sync {
+            guard let db = _db else { return }
+            var stmt: OpaquePointer?
+            let sql = "DELETE FROM video_fts WHERE video_id = ?;"
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
+            sqlite3_step(stmt)
+        }
+    }
+
     private func log(_ message: String) {
         #if DEBUG
         Task { @MainActor in
@@ -678,12 +719,4 @@ struct VideoAIData {
     var podcastPath: String?
     var tags: Data?
     var subtitlesData: Data?
-}
-
-struct QnAEntry {
-    let id: Int32
-    let videoId: String
-    let question: String
-    let answer: String
-    let timestamps: Data?
 }

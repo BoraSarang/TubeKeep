@@ -206,7 +206,7 @@ struct SettingsReducer {
                             try SMAppService.mainApp.unregister()
                         }
                     } catch {
-                        print("Failed to \(enabled ? "register" : "unregister") login item: \(error)")
+                        DebugLogManager.shared?.append("[Settings] Failed to \(enabled ? "register" : "unregister") login item: \(error)")
                     }
                 }
 
@@ -217,7 +217,7 @@ struct SettingsReducer {
                     do {
                         try SMAppService.mainApp.register()
                     } catch {
-                        print("Failed to register login item: \(error)")
+                        DebugLogManager.shared?.append("[Settings] Failed to register login item: \(error)")
                     }
                 }
 

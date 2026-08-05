@@ -20,12 +20,16 @@ struct CachedAvatarView: View {
             } else {
                 ProgressView()
                     .frame(width: size, height: size)
-                    .task {
-                        await loadAvatar()
-                    }
             }
         }
         .frame(width: size, height: size)
+        .onChange(of: channelId) { _, _ in
+            image = nil
+            Task { await loadAvatar() }
+        }
+        .task {
+            await loadAvatar()
+        }
     }
 
     private func loadAvatar() async {
@@ -69,10 +73,14 @@ struct CachedThumbnailView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 ProgressView()
-                    .task {
-                        await loadThumbnail()
-                    }
             }
+        }
+        .onChange(of: videoId) { _, _ in
+            image = nil
+            Task { await loadThumbnail() }
+        }
+        .task {
+            await loadThumbnail()
         }
     }
 

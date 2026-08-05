@@ -259,4 +259,26 @@ struct Settings: Equatable, Codable {
         guard limitRate > 0 else { return nil }
         return "\(limitRate)M"
     }
+
+    struct APIKeys {
+        let openRouter: String
+        let ax4: String
+        let gemini: String
+    }
+
+    static func loadAPIKeys() -> APIKeys {
+        APIKeys(
+            openRouter: UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "",
+            ax4: UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey,
+            gemini: UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+        )
+    }
+
+    static func loadSettings() -> Settings {
+        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
+              let data = json.data(using: .utf8),
+              let settings = try? JSONDecoder().decode(Settings.self, from: data)
+        else { return Settings() }
+        return settings
+    }
 }

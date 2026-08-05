@@ -11,6 +11,7 @@ struct AppReducer {
         var settings = SettingsReducer.State()
         var statusBar = StatusBarReducer.State()
         var library = LibraryReducer.State()
+        var profile = ProfileReducer.State()
         var toastNotifications: [ToastNotification] = []
     }
 
@@ -20,6 +21,7 @@ struct AppReducer {
         case settings(SettingsReducer.Action)
         case statusBar(StatusBarReducer.Action)
         case library(LibraryReducer.Action)
+        case profile(ProfileReducer.Action)
         case clipboardDetected(String)
         case appDidFinishLaunching
         case discoverAddToQueue(DownloadItem)
@@ -42,6 +44,9 @@ struct AppReducer {
         }
         Scope(state: \.library, action: \.library) {
             LibraryReducer()
+        }
+        Scope(state: \.profile, action: \.profile) {
+            ProfileReducer()
         }
 
         Reduce { state, action in
@@ -66,69 +71,66 @@ struct AppReducer {
                         }
                     },
                     .run { send in
-                        if let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-                           let data = json.data(using: .utf8),
-                           let settings = try? JSONDecoder().decode(Settings.self, from: data) {
-                            await send(.settings(.setConcurrentDownloads(settings.concurrentDownloads)))
-                            await send(.settings(.storageDirectorySelected(settings.storageDirectory)))
-                            await send(.settings(.setFilenameTemplate(settings.filenameTemplate)))
-                            await send(.settings(.setLimitRate(settings.limitRate)))
-                            if !settings.playSoundOnComplete {
-                                await send(.settings(.togglePlaySound))
-                            }
-                            if !settings.clipboardMonitoring {
-                                await send(.settings(.toggleClipboardMonitoring))
-                            }
-                            await send(.settings(.setDefaultResolution(settings.defaultResolution)))
-                            await send(.settings(.setMaxRetries(settings.maxRetries)))
-                            if settings.launchAtLogin {
-                                await send(.settings(.setLaunchAtLogin(true)))
-                            }
-                            await send(.settings(.setMaxUploadCheck(settings.maxUploadCheck)))
-                            if settings.skipIndexOnFailure {
-                                await send(.settings(.toggleSkipIndexOnFailure))
-                            }
-                            if !settings.showMainWindowOnLaunch {
-                                await send(.settings(.toggleShowMainWindowOnLaunch))
-                            }
-                            if !settings.sponsorBlock {
-                                await send(.settings(.toggleSponsorBlock))
-                            }
-                            if !settings.embedMetadata {
-                                await send(.settings(.toggleEmbedMetadata))
-                            }
-                            await send(.settings(.setTTSEngine(settings.ttsEngine)))
-                            if settings.playerMode != .builtIn {
-                                await send(.settings(.setPlayerMode(settings.playerMode)))
-                            }
-                            if !settings.showChannelBadge {
-                                await send(.settings(.toggleShowChannelBadge))
-                            }
-                            if !settings.subtitleLanguageOverride.isEmpty {
-                                await send(.settings(.setSubtitleLanguageOverride(settings.subtitleLanguageOverride)))
-                            }
-                            if !settings.cookiesFromBrowser.isEmpty {
-                                await send(.settings(.setCookiesFromBrowser(settings.cookiesFromBrowser)))
-                            }
-                            if settings.enableWhisperTranscription {
-                                await send(.settings(.toggleWhisperTranscription))
-                            }
-                            if settings.whisperModelSize != "base" {
-                                await send(.settings(.setWhisperModelSize(settings.whisperModelSize)))
-                            }
-                            if !settings.showMenuBarNotifications {
-                                await send(.settings(.toggleShowMenuBarNotifications))
-                            }
-                            if settings.menuBarNotificationDuration != 60 {
-                                await send(.settings(.setMenuBarNotificationDuration(settings.menuBarNotificationDuration)))
-                            }
-                            if settings.smartMode {
-                                await send(.settings(.toggleSmartMode))
-                            }
-                            await send(.settings(.setPresets(settings.presets)))
-                            if let activeId = settings.activePresetId {
-                                await send(.settings(.setActivePreset(activeId)))
-                            }
+                        let settings = Settings.loadSettings()
+                        await send(.settings(.setConcurrentDownloads(settings.concurrentDownloads)))
+                        await send(.settings(.storageDirectorySelected(settings.storageDirectory)))
+                        await send(.settings(.setFilenameTemplate(settings.filenameTemplate)))
+                        await send(.settings(.setLimitRate(settings.limitRate)))
+                        if !settings.playSoundOnComplete {
+                            await send(.settings(.togglePlaySound))
+                        }
+                        if !settings.clipboardMonitoring {
+                            await send(.settings(.toggleClipboardMonitoring))
+                        }
+                        await send(.settings(.setDefaultResolution(settings.defaultResolution)))
+                        await send(.settings(.setMaxRetries(settings.maxRetries)))
+                        if settings.launchAtLogin {
+                            await send(.settings(.setLaunchAtLogin(true)))
+                        }
+                        await send(.settings(.setMaxUploadCheck(settings.maxUploadCheck)))
+                        if settings.skipIndexOnFailure {
+                            await send(.settings(.toggleSkipIndexOnFailure))
+                        }
+                        if !settings.showMainWindowOnLaunch {
+                            await send(.settings(.toggleShowMainWindowOnLaunch))
+                        }
+                        if !settings.sponsorBlock {
+                            await send(.settings(.toggleSponsorBlock))
+                        }
+                        if !settings.embedMetadata {
+                            await send(.settings(.toggleEmbedMetadata))
+                        }
+                        await send(.settings(.setTTSEngine(settings.ttsEngine)))
+                        if settings.playerMode != .builtIn {
+                            await send(.settings(.setPlayerMode(settings.playerMode)))
+                        }
+                        if !settings.showChannelBadge {
+                            await send(.settings(.toggleShowChannelBadge))
+                        }
+                        if !settings.subtitleLanguageOverride.isEmpty {
+                            await send(.settings(.setSubtitleLanguageOverride(settings.subtitleLanguageOverride)))
+                        }
+                        if !settings.cookiesFromBrowser.isEmpty {
+                            await send(.settings(.setCookiesFromBrowser(settings.cookiesFromBrowser)))
+                        }
+                        if settings.enableWhisperTranscription {
+                            await send(.settings(.toggleWhisperTranscription))
+                        }
+                        if settings.whisperModelSize != "base" {
+                            await send(.settings(.setWhisperModelSize(settings.whisperModelSize)))
+                        }
+                        if !settings.showMenuBarNotifications {
+                            await send(.settings(.toggleShowMenuBarNotifications))
+                        }
+                        if settings.menuBarNotificationDuration != 60 {
+                            await send(.settings(.setMenuBarNotificationDuration(settings.menuBarNotificationDuration)))
+                        }
+                        if settings.smartMode {
+                            await send(.settings(.toggleSmartMode))
+                        }
+                        await send(.settings(.setPresets(settings.presets)))
+                        if let activeId = settings.activePresetId {
+                            await send(.settings(.setActivePreset(activeId)))
                         }
                     }
                 )

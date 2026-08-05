@@ -3,10 +3,7 @@ import AppKit
 
 final class WhisperService: @unchecked Sendable {
     private func log(_ message: String) {
-        print("[Whisper] \(message)")
-        #if DEBUG
         DebugLogManager.shared?.append("[Whisper] \(message)")
-        #endif
     }
     static let shared = WhisperService()
 

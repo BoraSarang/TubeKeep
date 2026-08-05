@@ -31,9 +31,22 @@ struct MainView: View {
             case .history:
                 HistoryView(store: store)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .profile:
+                ProfileView(store: store.scope(state: \.profile, action: \.profile))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .report:
+                ReportView(store: store.scope(state: \.library, action: \.library))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .overlay {
+            if store.library.showDigest, let stats = store.library.digestStats {
+                digestBanner(stats)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+            }
+
             if let toast = store.library.subtitleToast {
                 ToastOverlay(toast: toast, videoId: store.library.subtitleToastVideoId) {
                     store.send(.library(.dismissSubtitleToast))
@@ -110,9 +123,66 @@ struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: Constants.videoAIDidChangeNotification)) { _ in
             store.send(.library(.loadFromDisk))
         }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.libraryDataDidChangeNotification)) { _ in
+            store.send(.library(.loadFromDisk))
+        }
     }
 
 
+    private func digestBanner(_ stats: DigestStats) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.accentColor)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("📊 이번 주 TubeKeep 리포트")
+                    .font(.system(size: 12, weight: .semibold))
+
+                if let narrative = stats.aiNarrative {
+                    Text(narrative)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(4)
+                }
+
+                HStack(spacing: 12) {
+                    Label("\(stats.videosDownloaded)개 다운로드", systemImage: "arrow.down.to.line")
+                        .font(.system(size: 10))
+                    Label(formatBytes(stats.totalSizeBytes), systemImage: "externaldrive")
+                        .font(.system(size: 10))
+                    if stats.summaryCount > 0 {
+                        Label("\(stats.summaryCount)회 요약", systemImage: "text.bubble")
+                            .font(.system(size: 10))
+                    }
+                }
+                .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            Button {
+                store.send(.library(.dismissDigest))
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Color(.windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
 }
 
 struct AlwaysOnTopToggle: View {

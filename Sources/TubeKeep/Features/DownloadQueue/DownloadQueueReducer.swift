@@ -182,7 +182,7 @@ struct DownloadQueueReducer {
                 state.items[id: id]?.downloadStartTime = Date()
                 let downloadItem = item
                 return .run { send in
-                    let settings: Settings = Self.loadSettings()
+                    let settings: Settings = Settings.loadSettings()
                     DownloadManager.shared.updateSettings(settings)
                     #if DEBUG
                     await send(.debugLog("▶️ 시작: \(item.videoInfo.title)"))
@@ -336,10 +336,7 @@ struct DownloadQueueReducer {
                       item.status == .completed
                 else { return .none }
                 return .run { _ in
-                    let outputDir = UserDefaults.standard.string(
-                        forKey: Constants.settingsSaveKey
-                    ).flatMap { try? JSONDecoder().decode(Settings.self, from: Data($0.utf8)) }
-                        .map { $0.storageDirectory } ?? Constants.defaultStorageDirectory
+                    let outputDir = Settings.loadSettings().storageDirectory
 
                     let fileURL = URL(fileURLWithPath: outputDir)
                         .appendingPathComponent(item.estimatedFilename)
@@ -442,14 +439,6 @@ struct DownloadQueueReducer {
             .map { $0.id }
 
         return .merge(pendingIDs.map { .send(.startDownload($0)) })
-    }
-
-    private static func loadSettings() -> Settings {
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data)
-        else { return Settings() }
-        return settings
     }
 
 }

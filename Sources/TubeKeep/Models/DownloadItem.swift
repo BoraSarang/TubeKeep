@@ -82,10 +82,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
         if isChannelDownload {
             return "\(Constants.channelStorageDirectory)/\(folder)/\(String(format: "%03d", channelUploadIndex)) - \(videoInfo.title).\(videoInfo.id).mp4"
         }
-        let template = UserDefaults.standard.string(
-            forKey: Constants.settingsSaveKey
-        ).flatMap { try? JSONDecoder().decode(Settings.self, from: Data($0.utf8)) }
-            .map { $0.filenameTemplate } ?? Constants.defaultFilenameTemplate
+        let template = Settings.loadSettings().filenameTemplate
         return "\(Constants.channelStorageDirectory)/\(folder)/\(formatFilename(template: template))"
     }
 
@@ -119,13 +116,8 @@ struct DownloadItem: Identifiable, Equatable, Codable {
             .joined()
 
         var resolved = template
-        if channelUploadIndex == 0 {
-            if let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-               let data = json.data(using: .utf8),
-               let s = try? JSONDecoder().decode(Settings.self, from: data),
-               s.skipIndexOnFailure {
-                resolved = DownloadItem.removeIndexPlaceholder(from: resolved)
-            }
+        if channelUploadIndex == 0, Settings.loadSettings().skipIndexOnFailure {
+            resolved = DownloadItem.removeIndexPlaceholder(from: resolved)
         }
 
         var result = resolved

@@ -35,33 +35,53 @@ struct LibrarySidebarView: View {
 
             Divider()
 
-            if store.library.sidebarMode == .library {
-                searchField
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-
-                Divider()
-
-                filterSection
-                    .padding(.vertical, 4)
-
-                Divider()
-
-                channelList
-            } else if store.library.sidebarMode == .history {
-                historySidebar
-            } else {
-                discoverSearchField
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-
-                Divider()
-
-                discoverCategorySection
-                    .padding(.vertical, 4)
-
-                Divider()
+            Group {
+                if store.library.sidebarMode == .library {
+                    VStack(spacing: 0) {
+                        searchField
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                        Divider()
+                        filterSection
+                            .padding(.vertical, 4)
+                        Divider()
+                        channelList
+                    }
+                } else if store.library.sidebarMode == .history {
+                    historySidebar
+                } else if store.library.sidebarMode == .profile {
+                    VStack(spacing: 0) {
+                        discoverSearchField
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                        Divider()
+                        VStack(spacing: 0) {
+                            Text("프로필")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                            profileCategoryRow
+                                .padding(.bottom, 2)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } else if store.library.sidebarMode == .report {
+                    Color.clear
+                } else {
+                    VStack(spacing: 0) {
+                        discoverSearchField
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                        Divider()
+                        discoverCategorySection
+                            .padding(.vertical, 4)
+                        Divider()
+                    }
+                }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
 
             HStack(spacing: 0) {
                 Button {
@@ -111,6 +131,13 @@ struct LibrarySidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: Constants.downloadHistoryDidChangeNotification)) { _ in
             if store.library.sidebarMode == .history { loadHistory() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.channelInfoDidUpdateNotification)) { note in
+            if let channelId = note.userInfo?["channelId"] as? String {
+                LibraryCacheService.shared.clearAvatarCache(for: channelId)
+                avatarImages.removeValue(forKey: channelId)
+                loadAvatar(channelId: channelId)
+            }
+        }
         .onAppear {
             updateChannelNames(store.library.items)
             store.send(.library(.calculateDiskUsage))
@@ -124,6 +151,8 @@ struct LibrarySidebarView: View {
             navRow(title: "보관함", icon: "square.grid.2x2", mode: .library)
             navRow(title: "트랜드", icon: "flame", mode: .discover)
             navRow(title: "다운로드 히스토리", icon: "clock.arrow.circlepath", mode: .history)
+            navRow(title: "내 프로필", icon: "person.text.rectangle", mode: .profile)
+            navRow(title: "리포트", icon: "chart.bar.xaxis", mode: .report)
         }
     }
 
@@ -360,6 +389,9 @@ struct LibrarySidebarView: View {
 
             ScrollView {
                 LazyVStack(spacing: 2) {
+                    profileCategoryRow
+                        .padding(.bottom, 2)
+
                     ForEach(Array(categoryRows.enumerated()), id: \.element.category) { index, row in
                         categoryRow(row.category, count: row.count, index: index)
                     }
@@ -375,8 +407,38 @@ struct LibrarySidebarView: View {
         }
     }
 
+    private var profileCategoryRow: some View {
+        let isSelected = store.library.isShowingProfileRecommendations
+        return HStack(spacing: 6) {
+            Image(systemName: "heart")
+                .font(.system(size: 12))
+                .foregroundStyle(isSelected ? .white : .secondary)
+                .frame(width: 20, height: 20)
+
+            Text("내 취향")
+                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : .primary)
+
+            Spacer()
+
+            if store.library.profileRecommendationsLoading {
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .frame(width: 12, height: 12)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(isSelected ? Color.accentColor : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            store.send(.library(.selectProfileRecommendations))
+        }
+    }
+
     private func categoryRow(_ category: TrendingCategory, count: Int, index: Int) -> some View {
-        let isSelected = store.library.discoverCategory == category
+        let isSelected = !store.library.isShowingProfileRecommendations && store.library.discoverCategory == category
         let isDropTarget = dropTargetCategoryIndex == index
         return HStack(spacing: 6) {
             Image(systemName: "line.horizontal.3")

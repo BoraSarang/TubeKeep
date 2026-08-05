@@ -7,6 +7,8 @@ import UserNotifications
 final class ChannelUpdateService {
     private let store: StoreOf<AppReducer>
     private var timer: Timer?
+    private var pendingCheck: DispatchWorkItem?
+    private var updateTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private let fetchService = ChannelFetchService()
     #if DEBUG
@@ -25,22 +27,27 @@ final class ChannelUpdateService {
 
     func stop() {
         stopTimer()
+        updateTask?.cancel()
+        updateTask = nil
     }
 
     private func observeSettingChanges() {
         store.publisher
             .map(\.settings.showChannelBadge)
             .removeDuplicates()
+            .dropFirst()
             .sink { [weak self] show in
                 guard let self else { return }
                 if show {
                     self.restartTimer()
-                    Task { await self.checkForUpdates() }
+                    updateTask = Task { await self.checkForUpdates() }
                 } else {
-                    self.stopTimer()
-                    self.store.send(.statusBar(.setBadgeCount(0)))
-                    self.store.send(.statusBar(.updateStatusText("")))
-                    self.store.send(.statusBar(.updateStatusDetail("")))
+                    stopTimer()
+                    updateTask?.cancel()
+                    updateTask = nil
+                    store.send(.statusBar(.setBadgeCount(0)))
+                    store.send(.statusBar(.updateStatusText("")))
+                    store.send(.statusBar(.updateStatusDetail("")))
                 }
             }
             .store(in: &cancellables)
@@ -51,15 +58,19 @@ final class ChannelUpdateService {
             guard let self else { return }
             Task { await self.checkForUpdates() }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+        let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
             Task { await self.checkForUpdates() }
         }
+        pendingCheck = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: item)
     }
 
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+        pendingCheck?.cancel()
+        pendingCheck = nil
     }
 
     private func restartTimer() {
@@ -74,6 +85,7 @@ final class ChannelUpdateService {
     #endif
 
     func checkForUpdates() async {
+        guard store.state.settings.showChannelBadge else { return }
         let channels = SubscribedChannel.loadAll()
         guard !channels.isEmpty else {
             #if DEBUG
@@ -94,6 +106,7 @@ final class ChannelUpdateService {
         var newVideosByChannel: [(channelId: String, channelName: String, count: Int, videoIds: [String])] = []
 
         for (i, channel) in channels.enumerated() {
+            if Task.isCancelled { return }
             let detail = "[\(i+1)/\(channels.count)]"
             _ = await MainActor.run { [detail] in
                 self.store.send(.statusBar(.updateStatusDetail(detail)))
@@ -175,7 +188,7 @@ final class ChannelUpdateService {
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("알림 전송 실패: \(error)")
+                DebugLogManager.shared?.append("[ChannelUpdate] 알림 전송 실패: \(error)")
             }
         }
     }

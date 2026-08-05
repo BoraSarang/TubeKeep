@@ -68,14 +68,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         let tempDir = (outputDir as NSString).appendingPathComponent("temp")
         try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
 
-        let ttsEngine: TTSEngine = {
-            guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-                  let data = json.data(using: .utf8),
-                  let settings = try? JSONDecoder().decode(Settings.self, from: data) else {
-                return .edgeTTS
-            }
-            return settings.ttsEngine
-        }()
+        let ttsEngine = Settings.loadSettings().ttsEngine
 
         progress?("음성 변환 중... (\(script.segments.count)개 세그먼트)")
         log("[Podcast] 병렬 TTS 시작 — 세그먼트: \(script.segments.count)개, 엔진: \(ttsEngine.displayName)")

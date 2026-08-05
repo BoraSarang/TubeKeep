@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var libraryWindowController: FixedWidthWindowController?
     private var settingsWindow: NSWindow?
     private var aiWindow: NSWindow?
+    private var channelDownloaderWindow: NSWindow?
     private var playerWindow: NSWindow?
     private var playerStore: Store<PlayerReducer.State, PlayerReducer.Action>?
     private var pendingChannelId: String?
@@ -43,15 +44,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func terminateCleanup() {
-        print("[App] terminateCleanup 시작 PID=\(ProcessInfo.processInfo.processIdentifier)")
-        print("[App] ProcessRegistry.killAll: \(ProcessRegistry.killAll())개")
-        print("[App] DownloadManager.cancelAll: \(DownloadManager.shared.cancelAll())개")
-        print("[App] 1차 killAllChildProcesses")
+        DebugLogManager.shared?.append("[App] terminateCleanup 시작 PID=\(ProcessInfo.processInfo.processIdentifier)")
+        DebugLogManager.shared?.append("[App] ProcessRegistry.killAll: \(ProcessRegistry.killAll())개")
+        DebugLogManager.shared?.append("[App] DownloadManager.cancelAll: \(DownloadManager.shared.cancelAll())개")
+        DebugLogManager.shared?.append("[App] 1차 killAllChildProcesses")
         killAllChildProcesses()
         usleep(500_000)
-        print("[App] 2차 killAllChildProcesses")
+        DebugLogManager.shared?.append("[App] 2차 killAllChildProcesses")
         killAllChildProcesses()
-        print("[App] terminateCleanup 완료")
+        DebugLogManager.shared?.append("[App] terminateCleanup 완료")
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -59,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.send(.appDidFinishLaunching)
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error { print("알림 권한 요청 실패: \(error)") }
+            if let error = error { DebugLogManager.shared?.append("[App] 알림 권한 요청 실패: \(error)") }
         }
 
         #if DEBUG
@@ -199,10 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             BookmarkManager.ensureAccess()
             SwiftDataMigration.migrateIfNeeded(context: PersistenceController.shared.context)
 
-            if let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-               let data = json.data(using: .utf8),
-               let settings = try? JSONDecoder().decode(Settings.self, from: data),
-               !settings.showMainWindowOnLaunch {
+            if !Settings.loadSettings().showMainWindowOnLaunch {
             } else {
                 self.openMainWindow()
             }
@@ -422,9 +420,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Channel Downloader Window
 
     @objc func openChannelDownloaderWindow() {
-        if let window = NSApp.windows.first(where: {
-            $0.identifier?.rawValue == "channel"
-        }) {
+        if let window = channelDownloaderWindow {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
             if let data = pendingChannelData {
@@ -463,6 +459,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        channelDownloaderWindow = window
     }
 
     @objc private func openChannelDownloaderFromNotification(_ notification: Notification) {
@@ -701,21 +698,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             try bash.run()
             bash.waitUntilExit()
         } catch {
-            print("[App] killAllChildProcesses: bash fail \(error)")
+            DebugLogManager.shared?.append("[App] killAllChildProcesses: bash fail \(error)")
         }
         // 2. 남은 자식 확인
         let remain = childPIDs(pid)
         if remain.isEmpty {
-            print("[App] killAllChildProcesses: 자식 없음")
+            DebugLogManager.shared?.append("[App] killAllChildProcesses: 자식 없음")
         } else {
-            print("[App] killAllChildProcesses: \(remain.count)개 남음 PIDs=\(remain)")
+            DebugLogManager.shared?.append("[App] killAllChildProcesses: \(remain.count)개 남음 PIDs=\(remain)")
             for leftover in remain {
                 kill(leftover, SIGKILL)
-                print("[App] 직접 SIGKILL: PID=\(leftover)")
+                DebugLogManager.shared?.append("[App] 직접 SIGKILL: PID=\(leftover)")
             }
             usleep(200_000)
             let remain2 = childPIDs(pid)
-            print("[App] 재시도 후: \(remain2.count)개 남음")
+            DebugLogManager.shared?.append("[App] 재시도 후: \(remain2.count)개 남음")
         }
     }
 

@@ -65,14 +65,29 @@ struct DiscoverView: View {
     }
 
     private var contentView: some View {
+        let isProfile = store.library.isShowingProfileRecommendations
         let isSearching = !store.library.discoverSearchText.isEmpty
-        let videos = isSearching
-            ? store.library.discoverSearchResults
-            : (store.library.discoverVideos[store.library.discoverCategory] ?? [])
+        let videos: [TrendingVideo]
+        if isProfile {
+            videos = store.library.profileRecommendations
+        } else if isSearching {
+            videos = store.library.discoverSearchResults
+        } else {
+            videos = store.library.discoverVideos[store.library.discoverCategory] ?? []
+        }
         let downloadedIds = Set(store.library.items.map(\.id))
         let libraryItems = Dictionary(uniqueKeysWithValues: store.library.items.map { ($0.id, $0) })
         return Group {
-            if isSearching && videos.isEmpty && !store.library.discoverSearching {
+            if isProfile && store.library.profileRecommendationsLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("취향 분석 중...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if isSearching && videos.isEmpty && !store.library.discoverSearching {
                 VStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 24))
@@ -82,13 +97,28 @@ struct DiscoverView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if videos.isEmpty {
+            } else if videos.isEmpty && !isProfile {
                 VStack(spacing: 8) {
                     Text("영상을 불러오는 중...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     ProgressView()
                         .scaleEffect(0.8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if videos.isEmpty && isProfile {
+                VStack(spacing: 12) {
+                    Image(systemName: "heart.slash")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.tertiary)
+                    Text("아직 추천할 데이터가 부족해요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("영상을 다운로드하고 태그가 추가되면 맞춤 추천을 제공합니다")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -102,21 +132,10 @@ struct DiscoverView: View {
                             DiscoverCard(
                                 video: video,
                                 thumbnail: thumbnailImages[video.id],
-                                showSummary: store.library.discoverSummaryVideoId == video.id,
-                                summaryText: store.library.discoverSummaryText,
-                                summaryProvider: store.library.discoverSummaryProvider,
-                                summaryLoading: store.library.discoverSummaryLoading,
                                 isDownloaded: isDownloaded,
                                 localFilePath: localItem?.filePath,
-                                onOpenInBrowser: { openInBrowser(video, localItem: localItem) },
-                                onAddToQueue: { addToQueue(video) },
-                                onPreview: { previewVideo(video) },
-                                onShowSummary: {
-                                    store.send(.library(.discoverRequestSummary(videoId: video.id, title: video.title, channel: video.channel)))
-                                },
-                                onHideSummary: {
-                                    store.send(.library(.discoverDismissSummary))
-                                }
+                                onOpen: { openVideo(video, localItem: localItem) },
+                                onAddToQueue: { addToQueue(video) }
                             )
                             .onAppear { loadThumbnail(for: video) }
                         }
@@ -127,31 +146,13 @@ struct DiscoverView: View {
         }
     }
 
-    private func openInBrowser(_ video: TrendingVideo, localItem: LibraryItem? = nil) {
-        if let item = localItem {
-            let url = URL(fileURLWithPath: item.filePath)
-            NSWorkspace.shared.open(url)
-        } else {
-            guard let url = URL(string: video.webpageURL) else { return }
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func previewVideo(_ video: TrendingVideo) {
-        Task {
-            do {
-                let service = YouTubeDLService()
-                let url = try await service.fetchStreamingURL(url: video.webpageURL)
-                let playerItem = PlayerItem(
-                    streamURL: url,
-                    title: video.title,
-                    videoId: video.id
-                )
-                NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
-            } catch {
-                print("[Discover] 미리보기 실패: \(error)")
-            }
-        }
+    private func openVideo(_ video: TrendingVideo, localItem: LibraryItem? = nil) {
+        let playerItem = PlayerItem(
+            fileURL: localItem.map { URL(fileURLWithPath: $0.filePath) },
+            title: video.title,
+            videoId: video.id
+        )
+        NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
     }
 
     private func addToQueue(_ video: TrendingVideo) {
@@ -180,19 +181,11 @@ struct DiscoverView: View {
 struct DiscoverCard: View {
     let video: TrendingVideo
     let thumbnail: NSImage?
-    let showSummary: Bool
-    let summaryText: String?
-    let summaryProvider: String?
-    let summaryLoading: Bool
     let isDownloaded: Bool
     let localFilePath: String?
-    let onOpenInBrowser: () -> Void
+    let onOpen: () -> Void
     let onAddToQueue: () -> Void
-    let onPreview: () -> Void
-    let onShowSummary: () -> Void
-    let onHideSummary: () -> Void
     @State private var isHovering = false
-    @State private var showPopover = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -209,18 +202,18 @@ struct DiscoverCard: View {
                     }
                 }
                 .overlay {
-                    if isHovering || showPopover {
+                    if isHovering {
                         Color.black.opacity(0.35)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
                 .overlay(alignment: .center) {
-                    if isHovering || showPopover {
+                    if isHovering {
                         VStack(spacing: 8) {
                             Button {
-                                onOpenInBrowser()
+                                onOpen()
                             } label: {
-                                Label(isDownloaded ? "재생" : "열기", systemImage: isDownloaded ? "play" : "safari")
+                                Label(isDownloaded ? "재생" : "열기", systemImage: "play")
                                     .font(.system(size: 11, weight: .semibold))
                                     .frame(width: 110, height: 26)
                             }
@@ -241,17 +234,6 @@ struct DiscoverCard: View {
                                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                             } else {
                                 Button {
-                                    onPreview()
-                                } label: {
-                                    Label("미리보기", systemImage: "play.tv")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .frame(width: 110, height: 26)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.accentColor)
-                                .controlSize(.small)
-
-                                Button {
                                     onAddToQueue()
                                 } label: {
                                     Label("다운로드", systemImage: "arrow.down.to.line")
@@ -261,85 +243,6 @@ struct DiscoverCard: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(.accentColor)
                                 .controlSize(.small)
-                            }
-
-                            Button {
-                                if showSummary { onHideSummary() }
-                                else { onShowSummary() }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    if summaryLoading && showSummary {
-                                        ProgressView()
-                                            .scaleEffect(0.6)
-                                    }
-                                    Text(showSummary ? (summaryLoading ? "요약 중..." : "접기") : "AI 요약")
-                                }
-                                .font(.system(size: 11, weight: .semibold))
-                                .frame(width: 110, height: 26)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.accentColor)
-                            .controlSize(.small)
-                            .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-                                VStack(alignment: .leading, spacing: 16) {
-                                    HStack {
-                                        Label("AI 요약", systemImage: "text.bubble")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        if let provider = summaryProvider {
-                                            Text(provider)
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Button {
-                                            if let text = summaryText {
-                                                NSPasteboard.general.clearContents()
-                                                NSPasteboard.general.setString(text, forType: .string)
-                                            }
-                                        } label: {
-                                            Image(systemName: "doc.on.doc")
-                                                .frame(width: 14, height: 14)
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .controlSize(.small)
-                                        Button {
-                                            onHideSummary()
-                                        } label: {
-                                            Image(systemName: "xmark")
-                                                .frame(width: 14, height: 14)
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .controlSize(.small)
-                                    }
-
-                                    if summaryLoading {
-                                        VStack {
-                                            HStack(spacing: 10) {
-                                                ProgressView()
-                                                    .scaleEffect(0.9)
-                                                Text("AI 요약 중...")
-                                                    .font(.subheadline)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            Spacer()
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    } else if let text = summaryText {
-                                        VStack(spacing: 8) {
-                                            ScrollView {
-                                                Text(text)
-                                                    .font(.system(size: 12))
-                                                    .foregroundStyle(.secondary)
-                                                    .textSelection(.enabled)
-                                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                                            }
-                                        }
-                                    } else {
-                                        Spacer()
-                                    }
-                                }
-                                .padding(24)
-                                .frame(width: 380, height: 320)
                             }
                         }
                         .transition(.opacity)
@@ -378,9 +281,6 @@ struct DiscoverCard: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
-        }
-        .onChange(of: showSummary) { _, newValue in
-            showPopover = newValue
         }
     }
 

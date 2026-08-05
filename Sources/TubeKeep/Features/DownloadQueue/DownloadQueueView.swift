@@ -142,9 +142,7 @@ struct DownloadQueueView: View {
             }
 
             Button {
-                let outputDir = UserDefaults.standard.string(forKey: Constants.settingsSaveKey)
-                    .flatMap { try? JSONDecoder().decode(Settings.self, from: Data($0.utf8)) }
-                        .map { $0.storageDirectory } ?? Constants.defaultStorageDirectory
+                let outputDir = Settings.loadSettings().storageDirectory
                 NSWorkspace.shared.open(URL(fileURLWithPath: outputDir))
             } label: {
                 HStack(spacing: 3) {

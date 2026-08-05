@@ -22,7 +22,12 @@ struct LibraryGridView: View {
                 Divider()
             }
 
-            Divider()
+            if let channelId = store.library.selectedChannel,
+               store.library.filterMode == .all,
+               let first = store.library.items.first(where: { $0.channelId == channelId }) {
+                ChannelHeaderView(channelId: channelId, channelName: first.channelName, items: store.library.items, store: store)
+                Divider()
+            }
 
             if store.library.items.isEmpty && store.library.filteredItems.isEmpty {
                 emptyState
@@ -34,27 +39,40 @@ struct LibraryGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         let displayItems = Array(store.library.filteredItems.prefix(displayedCount))
+                        let snippetMap = Dictionary(uniqueKeysWithValues: store.library.searchResults.compactMap { result in
+                            result.snippet.map { (result.item.id, $0) }
+                        })
                         ForEach(displayItems) { item in
+                            let snip = snippetMap[item.id]
+                            let chCount: Int = {
+                                guard let data = item.chapters else { return 0 }
+                                return (try? JSONDecoder().decode([ChapterInfo].self, from: data))?.count ?? 0
+                            }()
+                            let sel = store.library.selectedIds.contains(item.id)
+                            let dlSub = store.library.subtitleDownloadingIds.contains(item.id)
+                            let hasSub = store.library.subtitleAvailableIds.contains(item.id)
+                            let hasSum = store.library.summaryAvailableIds.contains(item.id)
+                            let hasPod = store.library.podcastAvailableIds.contains(item.id)
+                            let prev = store.library.showThumbnailPreview
+                            let thumb = thumbnailImages[item.id]
                          LibraryGridCell(
-                             item: item,
-                             thumbnail: thumbnailImages[item.id],
-                             isSelected: store.library.selectedIds.contains(item.id),
-                             isDownloadingSubtitle: store.library.subtitleDownloadingIds.contains(item.id),
-                             hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
-                             hasSummary: store.library.summaryAvailableIds.contains(item.id),
-                             hasPodcast: store.library.podcastAvailableIds.contains(item.id),
-                             chapterCount: {
-                                 guard let data = item.chapters else { return 0 }
-                                 return (try? JSONDecoder().decode([ChapterInfo].self, from: data))?.count ?? 0
-                             }(),
-                             showThumbnailPreview: store.library.showThumbnailPreview,
-                             onOpen: { store.send(.library(.openFile(item.id))) },
-                            onReveal: { store.send(.library(.revealInFinder(item.id))) },
-                            onDelete: { store.send(.library(.removeItem(item.id))) },
-                            onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
-                             onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                             onOpenAI: { store.send(.library(.showSummary(item.id))) },
-                            onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
+                              item: item,
+                              thumbnail: thumb,
+                              snippet: snip,
+                              isSelected: sel,
+                             isDownloadingSubtitle: dlSub,
+                             hasSubtitles: hasSub,
+                             hasSummary: hasSum,
+                             hasPodcast: hasPod,
+                             chapterCount: chCount,
+                             showThumbnailPreview: prev,
+                              onOpen: { store.send(.library(.openFile(item.id))) },
+                             onReveal: { store.send(.library(.revealInFinder(item.id))) },
+                             onDelete: { store.send(.library(.removeItem(item.id))) },
+                             onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
+                              onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                              onOpenAI: { store.send(.library(.showSummary(item.id))) },
+                             onToggleSelection: { store.send(.library(.toggleSelection(item.id))) }
                         )
                             .onAppear {
                                 loadThumbnail(for: item)
@@ -272,6 +290,7 @@ struct LibraryGridView: View {
 struct LibraryGridCell: View {
     let item: LibraryItem
     let thumbnail: NSImage?
+    let snippet: String?
     let isSelected: Bool
     let isDownloadingSubtitle: Bool
     let hasSubtitles: Bool
@@ -408,6 +427,14 @@ struct LibraryGridCell: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+
+            if let snippet = snippet {
+                Text(snippet)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
 
             HStack(spacing: 2) {
                 if let upload = item.uploadDate {

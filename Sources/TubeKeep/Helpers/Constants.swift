@@ -25,11 +25,7 @@ enum Constants {
     static let statusBarHeight: CGFloat = 22
 
     static var channelStorageDirectory: String {
-        guard let json = UserDefaults.standard.string(forKey: settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let s = try? JSONDecoder().decode(Settings.self, from: data)
-        else { return defaultStorageDirectory }
-        return s.storageDirectory
+        Settings.loadSettings().storageDirectory
     }
 
     static let openMainWindowNotification = Notification.Name("com.tubekeep.openMainWindow")

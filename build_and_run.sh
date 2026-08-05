@@ -50,6 +50,9 @@ run_platform() {
       "$SCRIPT_DIR/scripts/build-macos.sh" "$MODE" "$DO_CLEAN"
       if [ "$NO_LAUNCH" = false ]; then
         log "🔄 Killing existing $APP_NAME..."
+        for pid in $(pgrep -x "$APP_NAME" 2>/dev/null); do
+          pkill -9 -P "$pid" 2>/dev/null || true
+        done
         pkill -x "$APP_NAME" 2>/dev/null || true
         sleep 0.3
         log "🚀 Launching $APP_NAME..."

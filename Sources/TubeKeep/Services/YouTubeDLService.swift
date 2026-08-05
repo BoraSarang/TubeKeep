@@ -373,12 +373,11 @@ actor YouTubeDLService {
             try? FileManager.default.createDirectory(atPath: channelDir, withIntermediateDirectories: true)
             return "\(channelDir)/\(String(format: "%03d", item.channelUploadIndex)) - %(title)s.%(id)s.%(ext)s"
         }
-        let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey)
-        let settings = json.flatMap { try? JSONDecoder().decode(Settings.self, from: Data($0.utf8)) }
-        var template = settings?.filenameTemplate ?? Constants.defaultFilenameTemplate
+        let settings = Settings.loadSettings()
+        var template = settings.filenameTemplate
 
         if item.channelUploadIndex == 0,
-           settings?.skipIndexOnFailure == true {
+            settings.skipIndexOnFailure == true {
             template = DownloadItem.removeIndexPlaceholder(from: template)
         }
 

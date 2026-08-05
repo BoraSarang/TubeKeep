@@ -23,11 +23,8 @@ enum LanguageService {
             "en": "en",
             "ja": "ja,en",
         ]
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data),
-              !settings.subtitleLanguageOverride.isEmpty
-        else { return "" }
+        let settings = Settings.loadSettings()
+        guard !settings.subtitleLanguageOverride.isEmpty else { return "" }
         let result = overrides[settings.subtitleLanguageOverride] ?? ""
         log("subtitleLanguageOverride → \(result.isEmpty ? "없음" : result)")
         return result
@@ -116,11 +113,8 @@ enum LanguageService {
 extension LanguageService {
     /// 브라우저 쿠키 args (설정에서 활성화된 경우)
     static var cookiesArgs: [String] {
-        guard let json = UserDefaults.standard.string(forKey: Constants.settingsSaveKey),
-              let data = json.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(Settings.self, from: data),
-              !settings.cookiesFromBrowser.isEmpty
-        else { return [] }
+        let settings = Settings.loadSettings()
+        guard !settings.cookiesFromBrowser.isEmpty else { return [] }
         let result = ["--cookies-from-browser", settings.cookiesFromBrowser]
         log("cookiesArgs → \(result.joined(separator: " "))")
         return result

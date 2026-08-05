@@ -33,6 +33,7 @@ actor ProcessRunner {
             Task {
                 do {
                     let process = Process()
+                    ProcessRegistry.register(process)
                     if executable.hasPrefix("/") {
                         process.executableURL = URL(fileURLWithPath: executable)
                         process.arguments = arguments
@@ -84,74 +85,149 @@ actor ProcessRunner {
         }
     }
 
-    func runSync(
+    func runStreamingStdout(
         executable: String,
         arguments: [String],
-        timeout: TimeInterval = 120
-    ) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            if executable.hasPrefix("/") {
-                process.executableURL = URL(fileURLWithPath: executable)
-                process.arguments = arguments
-            } else {
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = [executable] + arguments
-            }
+        environment: [String: String] = [:]
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                let process = Process()
+                ProcessRegistry.register(process)
+                if executable.hasPrefix("/") {
+                    process.executableURL = URL(fileURLWithPath: executable)
+                    process.arguments = arguments
+                } else {
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                    process.arguments = [executable] + arguments
+                }
+                if !environment.isEmpty {
+                    var env = ProcessInfo.processInfo.environment
+                    for (key, value) in environment { env[key] = value }
+                    process.environment = env
+                }
 
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
+                let stdoutPipe = Pipe()
+                let stderrPipe = Pipe()
+                process.standardOutput = stdoutPipe
+                process.standardError = stderrPipe
 
-            let semaphore = DispatchSemaphore(value: 0)
-            process.terminationHandler = { _ in semaphore.signal() }
-
-            final class MutableData: @unchecked Sendable {
-                var data = Data()
-            }
-            let stdoutBox = MutableData()
-            let lock = NSLock()
-
-            let stdoutHandle = stdoutPipe.fileHandleForReading
-            stdoutHandle.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
-                    stdoutHandle.readabilityHandler = nil
+                do {
+                    try process.run()
+                } catch {
+                    continuation.finish(throwing: error)
                     return
                 }
-                lock.withLock { stdoutBox.data.append(data) }
-            }
 
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
-                return
-            }
+                let pid = process.processIdentifier
+                let stdoutHandle = stdoutPipe.fileHandleForReading
+                stdoutHandle.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    guard !data.isEmpty,
+                          let output = String(data: data, encoding: .utf8)
+                    else { return }
+                    continuation.yield(output)
+                }
 
-            DispatchQueue.global().async {
-                let result = semaphore.wait(timeout: .now() + timeout)
-
+                await withTaskCancellationHandler {
+                    process.waitUntilExit()
+                } onCancel: {
+                    process.terminate()
+                    kill(pid, SIGKILL)
+                }
                 stdoutHandle.readabilityHandler = nil
 
-                if result == .timedOut {
-                    process.terminate()
-                    continuation.resume(throwing: ProcessError.executionFailed("Timeout after \(Int(timeout))초"))
+                if Task.isCancelled {
+                    continuation.finish(throwing: CancellationError())
                     return
                 }
 
                 let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                 let stderr = String(data: stderrData, encoding: .utf8) ?? ""
 
-                guard process.terminationStatus == 0 else {
-                    continuation.resume(throwing: ProcessError.executionFailed(stderr))
-                    return
+                if process.terminationStatus == 0 {
+                    continuation.finish()
+                } else {
+                    continuation.finish(
+                        throwing: ProcessError.executionFailed(
+                            stderr.isEmpty ? "Exit code: \(process.terminationStatus)" : stderr
+                        )
+                    )
                 }
-
-                let output = String(data: stdoutBox.data, encoding: .utf8) ?? ""
-                continuation.resume(returning: output)
             }
+        }
+    }
+
+    func runSync(
+        executable: String,
+        arguments: [String],
+        timeout: TimeInterval = 120
+    ) async throws -> String {
+        let process = Process()
+        ProcessRegistry.register(process)
+        if executable.hasPrefix("/") {
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+        } else {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [executable] + arguments
+        }
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in semaphore.signal() }
+
+        final class MutableData: @unchecked Sendable {
+            var data = Data()
+        }
+        let stdoutBox = MutableData()
+        let lock = NSLock()
+
+        let stdoutHandle = stdoutPipe.fileHandleForReading
+        stdoutHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                stdoutHandle.readabilityHandler = nil
+                return
+            }
+            lock.withLock { stdoutBox.data.append(data) }
+        }
+
+        try process.run()
+
+        let pid = process.processIdentifier
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global().async {
+                    let result = semaphore.wait(timeout: .now() + timeout)
+
+                    stdoutHandle.readabilityHandler = nil
+
+                    if result == .timedOut {
+                        process.terminate()
+                        continuation.resume(throwing: ProcessError.executionFailed("Timeout after \(Int(timeout))초"))
+                        return
+                    }
+
+                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+
+                    guard process.terminationStatus == 0 else {
+                        continuation.resume(throwing: ProcessError.executionFailed(stderr))
+                        return
+                    }
+
+                    let output = String(data: stdoutBox.data, encoding: .utf8) ?? ""
+                    continuation.resume(returning: output)
+                }
+            }
+        } onCancel: {
+            process.terminate()
+            kill(pid, SIGKILL)
         }
     }
 }
