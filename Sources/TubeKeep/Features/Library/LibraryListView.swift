@@ -197,7 +197,7 @@ struct LibraryListView: View {
                         snippet: snippetMap[item.id],
                         isSelected: store.library.selectedIds.contains(item.id),
                         hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
-                        hasPodcast: store.library.podcastAvailableIds.contains(item.id),
+                        hasPodcast: store.library.podcast.availableIds.contains(item.id),
                         onOpen: { store.send(.library(.openFile(item.id))) },
                         onReveal: { store.send(.library(.revealInFinder(item.id))) },
                         onDelete: { store.send(.library(.removeItem(item.id))) },

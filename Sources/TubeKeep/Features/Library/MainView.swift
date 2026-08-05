@@ -224,14 +224,14 @@ struct QAInputBar: View {
                     .font(.system(size: 20))
             }
             .buttonStyle(.plain)
-            .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.library.qnaLoading)
+            .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.library.qna.loading)
         }
     }
 
     private func askQuestion() {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let videoId = store.library.qnaSelectedVideoId else { return }
-        store.send(.library(.askQuestion(videoId: videoId, question: trimmed)))
+        guard !trimmed.isEmpty, let videoId = store.library.qna.selectedVideoId else { return }
+        store.send(.library(.qna(.askQuestion(videoId: videoId, question: trimmed))))
         question = ""
     }
 }

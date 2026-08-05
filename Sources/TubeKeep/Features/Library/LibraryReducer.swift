@@ -73,19 +73,10 @@ struct LibraryReducer {
         var summaryProgressMessage = ""
 
         // Podcast (v2.5.2)
-        var podcastGeneratingIds: Set<String> = []
-        var podcastProgressMessage = ""
-        var podcastPlayingId: String?
-        var podcastError: String?
-        var podcastAvailableIds: Set<String> = []
-        var podcastLastEngine: String?
+        var podcast = PodcastReducer.State()
 
         // Q&A (v2.5.3)
-        var qnaHistoryItems: [QAHistoryItem] = []
-        var qnaLoading = false
-        var qnaError: String?
-        var qnaSelectedVideoId: String?
-        var qnaShowSheet = false
+        var qna = QnAReducer.State()
 
         // Mindmap (v2.5.4)
         var mindmap = MindmapReducer.State()
@@ -229,26 +220,11 @@ struct LibraryReducer {
         case itemTagged(videoId: String, tag: String)
 
         // Podcast (v2.5.2)
-        case generatePodcast(String)
-        case podcastProgressUpdate(videoId: String, message: String)
-        case podcastGenerated(String, PodcastResult)
-        case podcastGenerationFailed(String, String)
-        case playPodcast(String)
-        case pausePodcast
-        case stopPodcast
-        case deletePodcast(String)
+        case podcast(PodcastReducer.Action)
 
         // Q&A (v2.5.3)
         case openQnA(String)
-        case closeQnA
-        case askQuestion(videoId: String, question: String)
-        case qnaResponseReceived(QAResponse)
-        case qnaFailed(String)
-        case loadQnAHistory(String)
-        case qnaHistoryLoaded([QAHistoryItem])
-        case deleteQnAHistoryItem(Int64)
-        case deleteAllQnAHistory(String)
-        case seekToTimestamp(Double)
+        case qna(QnAReducer.Action)
 
         // Mindmap (v2.5.4)
         case mindmap(MindmapReducer.Action)
@@ -272,6 +248,8 @@ struct LibraryReducer {
     var body: some ReducerOf<Self> {
         Scope(state: \.report, action: \.report) { ReportReducer() }
         Scope(state: \.mindmap, action: \.mindmap) { MindmapReducer() }
+        Scope(state: \.qna, action: \.qna) { QnAReducer() }
+        Scope(state: \.podcast, action: \.podcast) { PodcastReducer() }
         Reduce { state, action in
             switch action {
             case .loadFromDisk:
@@ -285,8 +263,8 @@ struct LibraryReducer {
                 state.items = items
                 state.subtitleAvailableIds = Set(items.filter { Self.hasSubtitles(for: $0.id) }.map(\.id))
                 state.summaryAvailableIds = Set(items.filter { $0.summary != nil && !($0.summary?.isEmpty ?? true) }.map(\.id))
-                state.podcastAvailableIds = Set(items.filter { Self.hasPodcast(for: $0.id) }.map(\.id))
-                return .send(.checkDigest)
+                let podcastIds = Set(items.filter { Self.hasPodcast(for: $0.id) }.map(\.id))
+                return .merge(.send(.podcast(.setAvailableIds(podcastIds))), .send(.checkDigest))
 
             case .addItem(let item):
                 state.items.insert(item, at: 0)
@@ -762,17 +740,14 @@ struct LibraryReducer {
             // Summary
             case let .showSummary(videoId):
                 guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
-                if state.librarySummaryVideoId != videoId {
-                    state.qnaHistoryItems = []
-                }
                 state.librarySummaryVideoId = videoId
-                state.qnaSelectedVideoId = videoId
                 // 기존 요약이 있으면 API 호출 없이 표시
                 if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
                     state.librarySummaryText = existing
                     state.librarySummaryLoading = false
                     return .merge(
                         .send(.mindmap(.resetForVideo(videoId))),
+                        .send(.qna(.resetForVideo(videoId))),
                         .run { _ in
                             await MainActor.run {
                                 NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
@@ -787,6 +762,7 @@ struct LibraryReducer {
                 let summaryChannel = item.channelName
                 return .merge(
                     .send(.mindmap(.resetForVideo(videoId))),
+                    .send(.qna(.resetForVideo(videoId))),
                     .run { send in
                         await MainActor.run {
                         NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
@@ -917,13 +893,33 @@ struct LibraryReducer {
                 }
                 return .none
 
-            // Podcast
-            case .generatePodcast, .podcastProgressUpdate, .podcastGenerated, .podcastGenerationFailed, .playPodcast, .pausePodcast, .stopPodcast, .deletePodcast:
-                return Self.handlePodcastAction(state: &state, action: action)
+            // Podcast (reducer-scoped)
+            case let .podcast(action):
+                switch action {
+                case let .generatePodcast(videoId):
+                    if let item = state.items.first(where: { $0.id == videoId }) {
+                        state.librarySummaryVideoId = videoId
+                        state.librarySummaryLoading = false
+                        if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
+                            state.librarySummaryText = existing
+                        } else {
+                            state.librarySummaryText = nil
+                        }
+                    }
+                default:
+                    break
+                }
+                return .none
 
-            // Q&A (v2.5.3)
-            case .openQnA, .closeQnA, .askQuestion, .qnaResponseReceived, .qnaFailed, .loadQnAHistory, .qnaHistoryLoaded, .deleteQnAHistoryItem, .deleteAllQnAHistory, .seekToTimestamp:
-                return Self.handleQnAAction(state: &state, action: action)
+            // Q&A (reducer-scoped)
+            case let .openQnA(videoId):
+                return .merge(
+                    .send(.qna(.open(videoId))),
+                    .send(.showSummary(videoId))
+                )
+
+            case .qna:
+                return .none
 
             // Mindmap (reducer-scoped)
             case .mindmap:

@@ -52,7 +52,7 @@ struct LibraryGridView: View {
                             let dlSub = store.library.subtitleDownloadingIds.contains(item.id)
                             let hasSub = store.library.subtitleAvailableIds.contains(item.id)
                             let hasSum = store.library.summaryAvailableIds.contains(item.id)
-                            let hasPod = store.library.podcastAvailableIds.contains(item.id)
+                            let hasPod = store.library.podcast.availableIds.contains(item.id)
                             let prev = store.library.showThumbnailPreview
                             let thumb = thumbnailImages[item.id]
                          LibraryGridCell(

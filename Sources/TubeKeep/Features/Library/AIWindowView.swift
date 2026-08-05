@@ -15,7 +15,7 @@ struct AIWindowView: View {
     @State private var podcastTotalDuration: TimeInterval = 0
 
     private var currentItem: LibraryItem? {
-        guard let videoId = store.library.librarySummaryVideoId ?? store.library.qnaSelectedVideoId else { return nil }
+        guard let videoId = store.library.librarySummaryVideoId ?? store.library.qna.selectedVideoId else { return nil }
         return store.library.items.first(where: { $0.id == videoId })
     }
 
@@ -65,20 +65,20 @@ struct AIWindowView: View {
         }
         .onAppear {
             store.send(.library(.loadFromDisk))
-            if let videoId = store.library.qnaSelectedVideoId {
-                store.send(.library(.loadQnAHistory(videoId)))
+            if let videoId = store.library.qna.selectedVideoId {
+                store.send(.library(.qna(.loadQnAHistory(videoId))))
             }
             loadChannelAvatar()
         }
         .onChange(of: store.library.librarySummaryVideoId) { _, _ in
             loadChannelAvatar()
-            if let videoId = store.library.qnaSelectedVideoId {
-                store.send(.library(.loadQnAHistory(videoId)))
+            if let videoId = store.library.qna.selectedVideoId {
+                store.send(.library(.qna(.loadQnAHistory(videoId))))
             }
         }
-        .onChange(of: store.library.qnaSelectedVideoId) { _, newVideoId in
+        .onChange(of: store.library.qna.selectedVideoId) { _, newVideoId in
             if let videoId = newVideoId {
-                store.send(.library(.loadQnAHistory(videoId)))
+                store.send(.library(.qna(.loadQnAHistory(videoId))))
             }
         }
     }
@@ -158,16 +158,16 @@ struct AIWindowView: View {
     @ViewBuilder
     private var headerPodcastControls: some View {
         if let videoId = store.library.librarySummaryVideoId {
-            let isGenerating = store.library.podcastGeneratingIds.contains(videoId)
-            let hasPodcast = store.library.podcastAvailableIds.contains(videoId)
-            let isPlaying = store.library.podcastPlayingId == videoId
+            let isGenerating = store.library.podcast.generatingIds.contains(videoId)
+            let hasPodcast = store.library.podcast.availableIds.contains(videoId)
+            let isPlaying = store.library.podcast.playingId == videoId
 
             HStack(spacing: 4) {
                 if isGenerating {
                     ProgressView()
                         .scaleEffect(0.5)
                         .frame(width: 12, height: 12)
-                    let podcastMsg = store.library.podcastProgressMessage
+                    let podcastMsg = store.library.podcast.progressMessage
                     if !podcastMsg.isEmpty {
                         Text(podcastMsg)
                             .font(.system(size: 8))
@@ -184,9 +184,9 @@ struct AIWindowView: View {
 
                     Button {
                         if isPlaying {
-                            store.send(.library(.pausePodcast))
+                            store.send(.library(.podcast(.pausePodcast)))
                         } else {
-                            store.send(.library(.playPodcast(videoId)))
+                            store.send(.library(.podcast(.playPodcast(videoId))))
                         }
                     } label: {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
@@ -195,7 +195,7 @@ struct AIWindowView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        store.send(.library(.stopPodcast))
+                        store.send(.library(.podcast(.stopPodcast)))
                     } label: {
                         Image(systemName: "stop.fill")
                             .font(.system(size: 9))
@@ -203,7 +203,7 @@ struct AIWindowView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        store.send(.library(.deletePodcast(videoId)))
+                        store.send(.library(.podcast(.deletePodcast(videoId))))
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 8))
@@ -212,7 +212,7 @@ struct AIWindowView: View {
                     .foregroundStyle(.tertiary)
                 } else {
                     Button {
-                        store.send(.library(.generatePodcast(videoId)))
+                        store.send(.library(.podcast(.generatePodcast(videoId))))
                     } label: {
                         Image(systemName: "mic.fill")
                             .font(.system(size: 9))
@@ -234,7 +234,7 @@ struct AIWindowView: View {
                 statusBadge(icon: "captions.bubble.fill", available: store.library.subtitleAvailableIds.contains(item.id), label: "자막")
                 statusBadge(icon: "doc.text.fill", available: item.summary != nil && !(item.summary?.isEmpty ?? true), label: "요약")
                 statusBadge(icon: "list.number", available: item.chapters != nil, label: "챕터")
-                statusBadge(icon: "mic.fill", available: store.library.podcastAvailableIds.contains(item.id), label: "팟캐스트")
+                statusBadge(icon: "mic.fill", available: store.library.podcast.availableIds.contains(item.id), label: "팟캐스트")
             }
             .fixedSize()
         }
@@ -365,7 +365,7 @@ struct AIWindowView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(chapters) { chapter in
                             Button {
-                                store.send(.library(.seekToTimestamp(chapter.startTime)))
+                                store.send(.library(.qna(.seekToTimestamp(chapter.startTime))))
                             } label: {
                                 HStack(spacing: 6) {
                                     Text(chapter.startTimeFormatted)
@@ -506,7 +506,7 @@ struct AIWindowView: View {
 
             QAInputBar(store: store)
 
-            if store.library.qnaLoading {
+            if store.library.qna.loading {
                 HStack(spacing: 6) {
                     ProgressView()
                         .scaleEffect(0.7)
@@ -516,13 +516,13 @@ struct AIWindowView: View {
                 }
             }
 
-            if let error = store.library.qnaError {
+            if let error = store.library.qna.error {
                 Text(error)
                     .font(.system(size: 10))
                     .foregroundStyle(.red)
             }
 
-            if store.library.qnaHistoryItems.isEmpty && !store.library.qnaLoading {
+            if store.library.qna.historyItems.isEmpty && !store.library.qna.loading {
                 Text("질문을 입력해주세요")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -531,7 +531,7 @@ struct AIWindowView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(store.library.qnaHistoryItems) { item in
+                        ForEach(store.library.qna.historyItems) { item in
                             qaHistoryItem(item)
                         }
                     }
@@ -550,7 +550,7 @@ struct AIWindowView: View {
                     .lineLimit(2)
                 Spacer()
                 Button {
-                    store.send(.library(.deleteQnAHistoryItem(item.id)))
+                    store.send(.library(.qna(.deleteQnAHistoryItem(item.id))))
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 8))
@@ -564,7 +564,7 @@ struct AIWindowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(item.timestamps) { ts in
                         Button {
-                            store.send(.library(.seekToTimestamp(ts.startTime)))
+                            store.send(.library(.qna(.seekToTimestamp(ts.startTime))))
                         } label: {
                             HStack(alignment: .top, spacing: 4) {
                                 Text(ts.time)

@@ -12,9 +12,9 @@ struct QAView: View {
         VStack(alignment: .leading, spacing: 16) {
             headerSection
             Divider()
-            if store.library.qnaLoading {
+            if store.library.qna.loading {
                 loadingSection
-            } else if let error = store.library.qnaError {
+            } else if let error = store.library.qna.error {
                 errorSection(error)
             }
             questionInputSection
@@ -24,7 +24,7 @@ struct QAView: View {
         .padding(20)
         .frame(width: 420, height: 500)
         .onAppear {
-            store.send(.library(.loadQnAHistory(videoId)))
+            store.send(.library(.qna(.loadQnAHistory(videoId))))
         }
     }
 
@@ -35,7 +35,7 @@ struct QAView: View {
                 .font(.system(size: 14, weight: .semibold))
             Spacer()
             Button {
-                store.send(.library(.closeQnA))
+                store.send(.library(.qna(.close)))
             } label: {
                 Image(systemName: "xmark")
                     .frame(width: 14, height: 14)
@@ -87,13 +87,13 @@ struct QAView: View {
                     .font(.system(size: 20))
             }
             .buttonStyle(.plain)
-            .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.library.qnaLoading)
+            .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.library.qna.loading)
         }
     }
 
     @ViewBuilder
     private var historySection: some View {
-        if store.library.qnaHistoryItems.isEmpty {
+        if store.library.qna.historyItems.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 24))
@@ -106,7 +106,7 @@ struct QAView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(store.library.qnaHistoryItems) { item in
+                    ForEach(store.library.qna.historyItems) { item in
                         historyItemView(item)
                     }
                 }
@@ -123,7 +123,7 @@ struct QAView: View {
                     .lineLimit(2)
                 Spacer()
                 Button {
-                    store.send(.library(.deleteQnAHistoryItem(item.id)))
+                    store.send(.library(.qna(.deleteQnAHistoryItem(item.id))))
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 10))
@@ -141,7 +141,7 @@ struct QAView: View {
                 HStack(spacing: 6) {
                     ForEach(item.timestamps) { ts in
                         Button {
-                            store.send(.library(.seekToTimestamp(ts.startTime)))
+                            store.send(.library(.qna(.seekToTimestamp(ts.startTime))))
                         } label: {
                             Text(ts.time)
                                 .font(.system(size: 10, design: .monospaced))
@@ -167,7 +167,7 @@ struct QAView: View {
     private func askQuestion() {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        store.send(.library(.askQuestion(videoId: videoId, question: trimmed)))
+        store.send(.library(.qna(.askQuestion(videoId: videoId, question: trimmed))))
         question = ""
     }
 
