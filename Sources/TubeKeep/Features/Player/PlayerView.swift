@@ -43,9 +43,6 @@ struct PlayerView: View {
         .onChange(of: store.showSubtitlePanel) { _, _ in
             window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
         }
-        .onReceive(NotificationCenter.default.publisher(for: .seekToTime)) { notif in
-            if let time = notif.object as? Double { mpv.seek(to: time) }
-        }
         .onChange(of: mpv.currentTime) { _, newTime in
             if store.playerItem.videoId != nil, !mpv.isFinished, newTime > 0 {
                 store.send(.timeUpdated(newTime))
@@ -274,6 +271,9 @@ struct PlayerView: View {
             mpv.loadFile(fileURL)
         } else if let streamURL = store.streamURL {
             mpv.loadStream(streamURL)
+        }
+        if let seekTime = store.playerItem.initialSeekTime, seekTime > 0 {
+            mpv.seekAfterLoad(seekTime)
         }
     }
 

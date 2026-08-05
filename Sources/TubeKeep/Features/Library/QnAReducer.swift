@@ -111,8 +111,23 @@ struct QnAReducer {
                 }
 
             case let .seekToTimestamp(time):
-                NotificationCenter.default.post(name: .seekToTime, object: time)
-                return .none
+                let videoId = state.selectedVideoId
+                return .run { send in
+                    guard let videoId,
+                          let item = await LibraryCacheService.shared.loadItems().first(where: { $0.id == videoId }) else {
+                        return
+                    }
+                    let playerItem = PlayerItem(
+                        fileURL: URL(fileURLWithPath: item.filePath),
+                        title: item.title,
+                        videoId: item.id,
+                        duration: Double(item.duration ?? 0),
+                        initialSeekTime: time
+                    )
+                    await MainActor.run {
+                        NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
+                    }
+                }
             }
         }
     }

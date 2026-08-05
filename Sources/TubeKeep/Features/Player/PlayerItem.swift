@@ -7,14 +7,16 @@ struct PlayerItem: Equatable {
     let title: String
     let videoId: String?
     let duration: Double
+    let initialSeekTime: Double?
 
-    init(fileURL: URL? = nil, streamURL: URL? = nil, title: String, videoId: String? = nil, duration: Double = 0) {
+    init(fileURL: URL? = nil, streamURL: URL? = nil, title: String, videoId: String? = nil, duration: Double = 0, initialSeekTime: Double? = nil) {
         self.id = UUID()
         self.fileURL = fileURL
         self.streamURL = streamURL
         self.title = title
         self.videoId = videoId
         self.duration = duration
+        self.initialSeekTime = initialSeekTime
     }
 }
 

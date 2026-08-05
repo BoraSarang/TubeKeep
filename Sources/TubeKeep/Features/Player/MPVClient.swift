@@ -26,6 +26,7 @@ final class MPVClient: ObservableObject {
     private let renderQueue = DispatchQueue(label: "com.borasarang.mpv.render", qos: .userInteractive)
     private var playbackStart: Date?
     private var firstFrameLogged = false
+    private var pendingSeekTime: Double?
 
     init() { setupMPV() }
 
@@ -192,7 +193,13 @@ final class MPVClient: ObservableObject {
     private func handleEvent(_ event: mpv_event) {
         switch event.event_id {
         case MPV_EVENT_FILE_LOADED:
-            runOnMain { self.isLoaded = true }
+            runOnMain {
+                self.isLoaded = true
+                if let pendingSeekTime = self.pendingSeekTime {
+                    self.seek(to: pendingSeekTime)
+                    self.pendingSeekTime = nil
+                }
+            }
         case MPV_EVENT_END_FILE:
             guard let data = event.data else { return }
             let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
@@ -276,6 +283,14 @@ final class MPVClient: ObservableObject {
         mpv_set_property(mpv, "time-pos", MPV_FORMAT_DOUBLE, &t)
     }
 
+    func seekAfterLoad(_ time: Double) {
+        pendingSeekTime = time
+        if isLoaded {
+            seek(to: time)
+            pendingSeekTime = nil
+        }
+    }
+
     func seekRelative(_ seconds: Double) {
         guard let mpv else { return }
         mpvCommand(mpv, args: ["seek", String(format: "%.1f", seconds), "relative"])
@@ -303,6 +318,7 @@ final class MPVClient: ObservableObject {
         error = nil
         currentTime = 0
         duration = 0
+        pendingSeekTime = nil
     }
 
     private func runOnMain(_ block: @escaping () -> Void) {

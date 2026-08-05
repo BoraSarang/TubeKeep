@@ -12,6 +12,12 @@
 | T-905 | **R5 뷰 분해** | medium | done | SettingsView 1098줄, MainView 901줄 |
 | T-906 | **T1 테스트 정리 + swift test 76/76** | medium | done | AAC vs MP3 정정 |
 
+## v2.9.1 — 타임스탬프/챕터 → 플레이어 연동 픽스 ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-907 | **타임스탬프/챕터 클릭 시 플레이어 열기 + 해당 시간 이동** | high | done | 기존엔 열린 플레이어에만 seekToTime post → PlayerItem.initialSeekTime + MPVClient.seekAfterLoad(파일 로드 후 seek) 경유로 플레이어를 열고 해당 시간으로 이동, .seekToTime 알림 제거 |
+
 ---
 
 ## v2.8.1 — 에이전트 규칙(v2.1) 적용 + 개발 표준화 🚧

@@ -1,9 +1,5 @@
 import Foundation
 
-extension Notification.Name {
-    static let seekToTime = Notification.Name("seekToTime")
-}
-
 struct QAResponse: Codable, Equatable {
     let question: String
     let answer: String

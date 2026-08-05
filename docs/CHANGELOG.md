@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v2.9.1 (2026-08-05) — 타임스탬프/챕터 플레이어 연동 (macOS) ✅
+
+> R4 서브리듀서 분리 회귀 확인 중 발견된 UX 픽스. 플레이어가 닫힌 상태에서 챕터·Q&A 타임스탬프 클릭 시 무동작이던 것을 개선.
+
+### Fixes
+- **T-907**: 챕터/Q&A 타임스탬프 클릭 시 내장 플레이어를 열고 해당 시간으로 이동
+  - 기존: `.seekToTimestamp`가 `.seekToTime` 알림만 post → **이미 열린 플레이어에만** seek, 닫혀 있으면 무동작
+  - 개선: `PlayerItem.initialSeekTime` 추가 → `QnAReducer.seekToTimestamp`가 해당 영상의 `PlayerItem`을 만들어 `openPlayerWindowNotification` post(기존 창 재사용 + 새 창 생성) → `PlayerView.setupPlayer()`가 `MPVClient.seekAfterLoad()`로 **MPV_EVENT_FILE_LOADED 시점에** 정확한 위치 seek
+  - `seekToTime` 알림/`QAModels` 확장·PlayerView 리스너 제거 (사용처 없음)
+
+### Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (5.89s)
+- `swift test` ✅ 76/76 (0 failures)
+
 ## v2.9 (2026-08-05) — 리팩토링 R1~R5 + 테스트 정리 (macOS) 🔶 진행 중
 
 > 기능 동작 변경 없음. 코드 품질·유지보수 목적의 리팩토링. R1~R5 모두 완료.
