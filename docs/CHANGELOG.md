@@ -14,7 +14,7 @@
 - `./build_and_run.sh debug macos --no-launch` ✅ (5.89s)
 - `swift test` ✅ 76/76 (0 failures)
 
-## v2.9 (2026-08-05) — 리팩토링 R1~R5 + 테스트 정리 (macOS) 🔶 진행 중
+## v2.9 (2026-08-05) — 리팩토링 R1~R5 + 테스트 정리 (macOS) ✅
 
 > 기능 동작 변경 없음. 코드 품질·유지보수 목적의 리팩토링. R1~R5 모두 완료.
 
@@ -37,7 +37,7 @@
 - `./build_and_run.sh debug macos --no-launch` ✅ (R1~R3 6.25s, R5 12.40s, R4 완료 후 6.92s)
 - `swift test` ✅ 76/76 (0 failures) — R4(Report·Mindmap) 후 및 R4(QnA·Podcast) 후 재확인
 
-## v2.8.1 (2026-08-05) — v2.1 공통 규칙 적용 (macOS) 🔶 진행 중
+## v2.8.1 (2026-08-05) — v2.1 공통 규칙 적용 (macOS) ✅
 
 > 개인 프로젝트 원칙(AGENTS.local.md 장 0)을 전제로 공통 `AGENTS.md` v2.1의 macOS 적용분을 도입. 코드 행동 변경은 없고 로깅/검증/문서 인프라 중심.
 
