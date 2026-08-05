@@ -40,6 +40,21 @@
 - `./build_and_run.sh debug macos --no-launch` ✅ (14.17s)
 - `swift test` ✅ 76/76 (0 failures)
 
+### Phase C — 홈 화면 위젯 (WidgetKit)
+- **T-1020**: `TubeKeepWidget` executableTarget 추가 + `build-macos.sh`가 `Contents/PlugIns/TubeKeepWidget.appex` 조립·서명
+  - App Group `group.com.tubekeep` entitlement를 앱·위젯 양쪽에 적용 (ad-hoc 서명)
+  - 앱이 그룹 컨테이너 UserDefaults에 다운로드 상태 스냅샷(`widget_snapshot`) 기록
+- **T-1021**: `DownloadStatus` 위젯 (small/medium)
+  - 진행 중 항목(제목/진행률/속도), 대기 수, 최근 완료 표시
+  - TimelineProvider가 1분 주기로 스냅샷 갱신, 완료 시 `WidgetCenter.reloadTimelines`로 즉시 반영
+  - 진행 중 없으면 "다운로드 없음" 안내
+- 파일: `Sources/TubeKeepWidget/DownloadStatusWidget.swift`, `Sources/TubeKeep/Services/WidgetSnapshotStore.swift`, `Entitlements/*.entitlements`, `Info-Widget.plist`
+
+### Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (12.14s + 위젯 1.24s)
+- `swift test` ✅ 76/76 (0 failures)
+- `codesign -d --entitlements`로 앱·위젯 양쪽 App Group 확인 ✅
+
 ## v2.9.1 (2026-08-05) — 타임스탬프/챕터 플레이어 연동 (macOS) ✅
 
 > R4 서브리듀서 분리 회귀 확인 중 발견된 UX 픽스. 플레이어가 닫힌 상태에서 챕터·Q&A 타임스탬프 클릭 시 무동작이던 것을 개선.

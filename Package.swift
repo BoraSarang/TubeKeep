@@ -32,6 +32,12 @@ let package = Package(
                 .define("DEBUG", .when(configuration: .debug)),
             ]
         ),
+        .executableTarget(
+            name: "TubeKeepWidget",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
         .testTarget(
             name: "TubeKeepTests",
             dependencies: ["TubeKeep"],

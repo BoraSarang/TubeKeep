@@ -221,6 +221,23 @@ rm -rf "$INSTALL_DIR/$APP_NAME.app"
 cp -R "$MAIN_BUNDLE" "$INSTALL_DIR/$APP_NAME.app"
 echo "✅ Installed: $INSTALL_DIR/$APP_NAME.app"
 
-codesign --force --deep --sign - "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
+# Build widget extension
+WIDGET_NAME="TubeKeepWidget"
+echo "🔨 Building widget extension..."
+if [ "$MODE" = "debug" ]; then
+    swift build -c debug --target "$WIDGET_NAME"
+    WIDGET_EXEC="$BUILD_DIR/debug/$WIDGET_NAME"
+else
+    swift build -c release --target "$WIDGET_NAME"
+    WIDGET_EXEC="$BUILD_DIR/release/$WIDGET_NAME"
+fi
+WIDGET_BUNDLE="$INSTALL_DIR/$APP_NAME.app/Contents/PlugIns/$WIDGET_NAME.appex"
+mkdir -p "$WIDGET_BUNDLE/Contents/MacOS"
+cp "$WIDGET_EXEC" "$WIDGET_BUNDLE/Contents/MacOS/$WIDGET_NAME"
+cp "$PROJECT_DIR/Info-Widget.plist" "$WIDGET_BUNDLE/Contents/Info.plist"
+codesign --force --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeepWidget.entitlements" "$WIDGET_BUNDLE" 2>/dev/null || true
+echo "📦 Widget embedded: $WIDGET_BUNDLE"
+
+codesign --force --deep --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
 
 echo "[build] macOS $MODE DebugPanel: $([ "$MODE" = debug ] && echo ON || echo OFF)"

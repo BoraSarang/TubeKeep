@@ -36,8 +36,11 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 - `PlayerView` 컨트롤바: 속도 버튼(0.75/1.0/1.25/1.5/2.0) + A/B 버튼 + 이전/다음(재생 목록) + 자막 스타일(크기/색) 패널
 
 ### Phase C — 위젯 (WidgetKit)
-- SwiftPM `WidgetKit` 익스텐션 타깃 추가 (`.appExtension` 타깃, 별도 번들 `TubeKeepWidget`)
-- `build_and_run.sh`가 위젯 번들을 앱 번들 `Contents/PlugIns`에 포함하도록 수정
+- SwiftPM에 `TubeKeepWidget` **executableTarget** 추가 (`.appExtension` product는 macOS 위젯에서 미지원 → 위젯 코드를 executable로 빌드 후 `.appex` 번들로 수동 조립)
+- `build-macos.sh`: 위젯 빌드(`swift build --target TubeKeepWidget`) → `Contents/PlugIns/TubeKeepWidget.appex/Contents/MacOS/` 배치 + 위젯 Info.plist(`NSExtensionPointIdentifier: com.apple.widgetkit-extension`) + entitlement 서명
+- **App Group** `group.com.tubekeep`: 앱·위젯 모두 `com.apple.security.application-groups` entitlement로 ad-hoc 서명 → 그룹 컨테이너 `~/Library/Group Containers/group.com.tubekeep/`
+- 앱: 다운로드 상태 스냅샷(진행 중 제목/진행률/속도, 대기 수, 최근 완료)을 `UserDefaults(suiteName:)`에 기록 + 상태 변경 시 `WidgetCenter.reloadTimelines`
+- 위젯: TimelineProvider가 그룹 UserDefaults 스냅샷을 읽어 1분 타임라인으로 표시
 - App Group UserDefaults `group.com.tubekeep`에 다운로드 상태(진행 중 항목/진행률/대기 수/최근 완료) 기록 — `AppReducer`/`DownloadQueueReducer`가 상태 변경 시 저장
 - 위젯: 큐 진행률 링 + 진행 중 목록 + 최근 완료
 
@@ -59,8 +62,8 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 | T-1011 | PlayerReducer 재생 속도·A-B·재생 목록 State | 완료 — queue/queueIndex, setQueue/playNext/playPrevious |
 | T-1012 | PlayerView 컨트롤바 확장 | 완료 — 속도(0.75~2.0x)/A-B(3단계)/이전·다음, onChange→mpv 반영 |
 | T-1013 | A-B 반복 UX 개선 + 재생 목록 패널 | 완료 — 시작점A/끝점B 2버튼 + 슬라이더 구간 오버레이 + showQueue 패널 + playAtQueue |
-| T-1020 | WidgetKit 타깃 + App Group 상태 공유 | C |
-| T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | C |
+| T-1020 | WidgetKit 타깃 + App Group 상태 공유 | 완료 — executableTarget + 수동 appex 조립 + group.com.tubekeep entitlement |
+| T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | 완료 — DownloadStatus small/medium + 1분 타임라인 + reloadTimelines |
 | T-1030 | tubekeep:// scheme 확장 (add/open) | D |
 
 ## 5. 테스트 계획

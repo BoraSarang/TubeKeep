@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import ComposableArchitecture
 import os
+import WidgetKit
 
 @Reducer
 struct DownloadQueueReducer {
@@ -239,6 +240,7 @@ struct DownloadQueueReducer {
             case let .updateProgress(id, progress, speed):
                 state.items[id: id]?.progress = progress
                 state.items[id: id]?.downloadSpeed = speed
+                state.saveWidgetSnapshot()
                 return .none
 
             case let .downloadCompleted(id, success, outputPath, error):
@@ -281,6 +283,10 @@ struct DownloadQueueReducer {
                     #if DEBUG
                     effects.append(.send(.debugLog("✅ 완료: \(item?.videoInfo.title ?? "")")))
                     #endif
+                    state.saveWidgetSnapshot()
+                    effects.append(.run { _ in
+                        WidgetCenter.shared.reloadTimelines(ofKind: "DownloadStatus")
+                    })
                         return .merge(.merge(effects), .send(.saveQueue))
                 } else {
                     guard state.items[id: id]?.status == .downloading,
@@ -492,4 +498,17 @@ private func cleanupTempFiles(for item: DownloadItem, storageDirectory: String) 
     let tempFile = FileManager.default.temporaryDirectory
         .appendingPathComponent("tubekeep_output_\(item.id.uuidString).txt")
     try? fm.removeItem(at: tempFile)
+}
+
+extension DownloadQueueReducer.State {
+    func saveWidgetSnapshot() {
+        let active = items.filter { $0.status == .downloading }.prefix(3).map {
+            WidgetSnapshot.Active(title: $0.videoInfo.title, progress: $0.progress, speed: $0.downloadSpeed)
+        }
+        let waiting = items.filter { $0.status == .pending || $0.status == .retrying }.count
+        let recentCompleted = items.filter { $0.status == .completed }
+            .suffix(5)
+            .map { WidgetSnapshot.Recent(title: $0.videoInfo.title, completedAt: $0.downloadStartTime ?? Date()) }
+        WidgetSnapshot(active: Array(active), waiting: waiting, recentCompleted: recentCompleted).save()
+    }
 }
