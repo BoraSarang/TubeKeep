@@ -96,12 +96,12 @@ final class DownloadItemTests: XCTestCase {
 
     func testOptionsLabelAudioOnly() {
         let item = makeItem(includeSubtitles: false, audioOnly: true)
-        XCTAssertEqual(item.optionsLabel, "720p + MP3")
+        XCTAssertEqual(item.optionsLabel, "720p + AAC")
     }
 
     func testOptionsLabelAll() {
         let item = makeItem(includeSubtitles: true, audioOnly: true)
-        XCTAssertEqual(item.optionsLabel, "720p + 자막 + MP3")
+        XCTAssertEqual(item.optionsLabel, "720p + 자막 + AAC")
     }
 
     // MARK: - Helpers

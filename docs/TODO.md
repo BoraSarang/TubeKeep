@@ -1,5 +1,18 @@
 # TODO — 작업 추적 목록
 
+## v2.9 — 리팩토링 (R1~R5) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-900 | **PLAN_v2.9 + TODO 등록** | high | done | docs/plans/PLAN_v2.9_macos.md |
+| T-901 | **R1 yt-dlp 경로 단일화** | high | done | YouTubeDLService 죽은 다운로드 경로 제거 |
+| T-902 | **R2 AppReducer 중복 제거** | high | done | syncStatusBar + addToQueue 헬퍼 |
+| T-903 | **R3 죽은 코드+버그** | medium | done | errorCode/checkInstallationStatic/빈#ifDEBUG/parseFormats |
+| T-905 | **R5 뷰 분해** | medium | done | SettingsView 1098줄, MainView 901줄 |
+| T-906 | **T1 테스트 정리 + swift test 76/76** | medium | done | AAC vs MP3 정정 |
+
+---
+
 ## v2.8.1 — 에이전트 규칙(v2.1) 적용 + 개발 표준화 🚧
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |

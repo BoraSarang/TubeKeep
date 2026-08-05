@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## v2.9 (2026-08-05) — 리팩토링 R1~R5 + 테스트 정리 (macOS) 🔶 진행 중
+
+> 기능 동작 변경 없음. 코드 품질·유지보수 목적의 리팩토링. R4(서브리듀서 분리)는 파급이 커 보류.
+
+### Refactoring
+- **R1 (T-901)**: `YouTubeDLService`의 죽은 다운로드 경로(`download`/`buildDownloadArgs`/`constructOutputTemplate`, ~110줄) 제거 → 실다운로드는 `DownloadManager` 단일 경로
+- **R2 (T-902)**: `AppReducer`의 statusBar 동기화(5회)·addToQueue(2회) 중복 → `syncStatusBar`/`addItemToQueue` 헬퍼 추출. `.home(.addToQueueResponse)`/`.discoverAddToQueue` 재구성 (inout escaping 클로저 제거)
+- **R3 (T-903)**: 죽은 코드 제거 — `GeminiError.errorCode`, `YouTubeDLService.checkInstallationStatic`, `DownloadQueueReducer` 빈 `#if DEBUG` + `parseFormats` 자기비교 버그 수정 (`$0.height == $0.height` 항상 true)
+- **R5 (T-905)**: 대형 뷰 분해
+  - `SettingsView` 1098줄 → 93줄 + `SettingsDownloads/Storage/System/Notifications/AITab` + `SettingsComponents`(SettingsRow/PresetEditorSheet/공용 헬퍼)
+  - `MainView` 901줄 → ~195줄 + `AIWindowView`(요약/챕터/마인드맵/Q&A 창) 분리
+- **T1 (T-906)**: `DownloadItemTests` 오디오 라벨 기대값 `MP3` → `AAC` 정정 (실제 포맷 m4a/AAC)
+
+### Deferred
+- **R4 (T-904)**: `LibraryReducer`의 Podcast/QnA/Mindmap/Report 헬퍼를 독립 `@Reducer`+`.ifLet`/`.scope`로 분리 — 뷰 접근 경로(`store.reportLoading` 등 flat)/State/Action 대수정으로 파급 큼. 별도 세션에서 신중히 진행
+
+### Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (R1~R3 6.25s, R5 12.40s)
+- `swift test` ✅ 76/76 (0 failures)
+
 ## v2.8.1 (2026-08-05) — v2.1 공통 규칙 적용 (macOS) 🔶 진행 중
 
 > 개인 프로젝트 원칙(AGENTS.local.md 장 0)을 전제로 공통 `AGENTS.md` v2.1의 macOS 적용분을 도입. 코드 행동 변경은 없고 로깅/검증/문서 인프라 중심.
