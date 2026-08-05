@@ -25,6 +25,24 @@ struct SettingsSystemTab: View {
 
             SettingsComponents.divider()
 
+            SettingsRow(title: "플레이어 이동 시간", description: "플레이어에서 ← / → 키로 영상을 이동하는 간격 (초)") {
+                Stepper(
+                    value: Binding(
+                        get: { store.seekStepSeconds },
+                        set: { store.send(.setSeekStepSeconds($0)) }
+                    ),
+                    in: 1...60,
+                    step: 1
+                ) {
+                    Text("\(Int(store.seekStepSeconds))초")
+                        .font(.callout)
+                        .monospacedDigit()
+                }
+                .fixedSize()
+            }
+
+            SettingsComponents.divider()
+
             SettingsRow(title: "시작 시 실행", description: "로그인 시 자동 실행") {
                 Toggle(
                     "",

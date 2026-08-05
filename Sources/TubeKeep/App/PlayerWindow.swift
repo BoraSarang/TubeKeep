@@ -8,4 +8,23 @@ final class PlayerWindow: NSWindow {
             close()
         }
     }
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 123: // ←
+            postSeek(direction: -1)
+        case 124: // →
+            postSeek(direction: 1)
+        default:
+            super.keyDown(with: event)
+        }
+    }
+
+    private func postSeek(direction: Double) {
+        NotificationCenter.default.post(
+            name: Constants.playerSeekNotification,
+            object: nil,
+            userInfo: ["direction": direction]
+        )
+    }
 }

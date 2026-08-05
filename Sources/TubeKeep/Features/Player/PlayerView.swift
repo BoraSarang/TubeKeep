@@ -44,6 +44,11 @@ struct PlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
             if (notif.object as? NSWindow) == window { mpv.stop() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
+            guard let direction = notif.userInfo?["direction"] as? Double else { return }
+            let step = Settings.loadSettings().seekStepSeconds
+            mpv.seekRelative(direction * step)
+        }
         .onChange(of: store.showSubtitlePanel) { _, _ in
             window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
         }

@@ -154,6 +154,9 @@ struct AppReducer {
                         if settings.smartMode {
                             await send(.settings(.toggleSmartMode))
                         }
+                        if settings.seekStepSeconds != 5.0 {
+                            await send(.settings(.setSeekStepSeconds(settings.seekStepSeconds)))
+                        }
                         await send(.settings(.setPresets(settings.presets)))
                         if let activeId = settings.activePresetId {
                             await send(.settings(.setActivePreset(activeId)))
