@@ -64,7 +64,10 @@ struct PlayerView: View {
             if let a = newVal { mpv.setALoop(at: a) } else { mpv.clearABLoop() }
         }
         .onChange(of: store.bLoop) { _, newVal in
-            if let b = newVal { mpv.setBLoop(at: b) }
+            if let b = newVal {
+                mpv.setBLoop(at: b)
+                if let a = store.aLoop { mpv.seek(to: a) }
+            }
         }
         .onChange(of: mpv.isFinished) { _, newVal in if newVal { store.send(.videoDidEnd) } }
         .onChange(of: mpv.error) { _, newVal in if newVal != nil { mpv.stop() } }
