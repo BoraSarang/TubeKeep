@@ -58,6 +58,7 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 | T-1010 | MPVClient 속도/A-B 반복 명령 | 완료 — speed + ab-loop-a/b/off |
 | T-1011 | PlayerReducer 재생 속도·A-B·재생 목록 State | 완료 — queue/queueIndex, setQueue/playNext/playPrevious |
 | T-1012 | PlayerView 컨트롤바 확장 | 완료 — 속도(0.75~2.0x)/A-B(3단계)/이전·다음, onChange→mpv 반영 |
+| T-1013 | A-B 반복 UX 개선 + 재생 목록 패널 | 완료 — 시작점A/끝점B 2버튼 + 슬라이더 구간 오버레이 + showQueue 패널 + playAtQueue |
 | T-1020 | WidgetKit 타깃 + App Group 상태 공유 | C |
 | T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | C |
 | T-1030 | tubekeep:// scheme 확장 (add/open) | D |

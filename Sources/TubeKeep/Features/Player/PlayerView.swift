@@ -16,12 +16,16 @@ struct PlayerView: View {
     private let panelWidth: CGFloat = 320
     private let controlsAutoHideDelay: Duration = .seconds(3)
 
-    private var windowWidth: CGFloat { videoWidth + (store.showSubtitlePanel ? panelWidth : 0) }
+    private var windowWidth: CGFloat { videoWidth + (store.showQueue ? panelWidth : 0) + (store.showSubtitlePanel ? panelWidth : 0) }
     private var windowHeight: CGFloat { videoHeight }
 
     var body: some View {
         HStack(spacing: 0) {
             videoArea
+            if store.showQueue {
+                queuePanel
+                    .frame(width: panelWidth)
+            }
             if store.showSubtitlePanel {
                 subtitlePanel
                     .frame(width: panelWidth)
@@ -41,6 +45,9 @@ struct PlayerView: View {
             if (notif.object as? NSWindow) == window { mpv.stop() }
         }
         .onChange(of: store.showSubtitlePanel) { _, _ in
+            window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
+        }
+        .onChange(of: store.showQueue) { _, _ in
             window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
         }
         .onChange(of: mpv.currentTime) { _, newTime in
@@ -253,13 +260,17 @@ struct PlayerView: View {
         return HStack(spacing: 8) {
             Button { store.send(.playPrevious) } label: {
                 Image(systemName: "backward.end.fill").frame(width: 16).foregroundColor(.white)
-            }.buttonStyle(.plain).help("이전 영상").disabled(store.queue.isEmpty || store.queueIndex <= 0)
+            }.buttonStyle(.plain)
+                .help(prevQueueTitle.map { "이전: \($0)" } ?? "이전 영상")
+                .disabled(!hasPrev)
             Button { mpv.togglePlayPause() } label: {
                 Image(systemName: mpv.isPlaying ? "pause.fill" : "play.fill").frame(width: 16).foregroundColor(.white)
             }.buttonStyle(.plain).help(mpv.isPlaying ? "일시 정지" : "재생")
             Button { store.send(.playNext) } label: {
                 Image(systemName: "forward.end.fill").frame(width: 16).foregroundColor(.white)
-            }.buttonStyle(.plain).help("다음 영상").disabled(store.queue.isEmpty || store.queueIndex >= store.queue.count - 1)
+            }.buttonStyle(.plain)
+                .help(nextQueueTitle.map { "다음: \($0)" } ?? "다음 영상")
+                .disabled(!hasNext)
             Menu {
                 ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
                     Button("\(String(format: "%.2g", rate))x") { store.send(.setPlaybackRate(rate)) }
@@ -268,21 +279,103 @@ struct PlayerView: View {
                 Text("\(String(format: "%.2g", store.playbackRate))x").font(.system(size: 12, weight: .medium)).foregroundColor(.white)
                     .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.15)))
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("재생 속도")
-            Button {
-                if store.aLoop == nil { store.send(.setALoop(mpv.currentTime)) }
-                else if store.bLoop == nil { store.send(.setBLoop(mpv.currentTime)) }
-                else { store.send(.clearABLoop) }
-            } label: {
-                Text(store.aLoop == nil ? "A" : (store.bLoop == nil ? "A-B" : "A-B·✕"))
-                    .font(.system(size: 11, weight: .semibold)).foregroundColor(.white)
+            Button { store.send(.setALoop(mpv.currentTime)) } label: {
+                Text(aLoopText).font(.system(size: 11, weight: .semibold)).foregroundColor(.white)
                     .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.aLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
-            }.buttonStyle(.plain).help(store.aLoop == nil ? "반복 시작점(A) 설정" : (store.bLoop == nil ? "반복 끝점(B) 설정" : "구간 반복 해제"))
+            }.buttonStyle(.plain)
+                .help(store.aLoop == nil ? "현재 위치를 반복 시작점(A)으로 설정" : "시작점 갱신: \(timeString(store.aLoop ?? 0))")
+            Button { store.send(store.bLoop == nil ? .setBLoop(mpv.currentTime) : .clearABLoop) } label: {
+                Text(bLoopText).font(.system(size: 11, weight: .semibold)).foregroundColor(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.bLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
+            }.buttonStyle(.plain).disabled(store.aLoop == nil)
+                .help(store.bLoop == nil ? "현재 위치를 반복 끝점(B)으로 설정 (A→B 반복 시작)" : "반복 해제")
+            Button { store.send(.toggleQueue) } label: {
+                Image(systemName: "list.bullet").frame(width: 16).foregroundColor(store.showQueue ? .accentColor : .white)
+            }.buttonStyle(.plain).help("재생 목록 표시/숨김")
             Text(timeString(current)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .trailing)
             Slider(value: Binding(get: { progress }, set: { isSeeking = true; seekTime = $0 * dur }), in: 0...1, onEditingChanged: { editing in
                 if !editing { mpv.seek(to: seekTime); isSeeking = false }
             }).disabled(dur <= 0).accentColor(.white)
+                .overlay(alignment: .leading) { loopRangeOverlay(dur) }
             Text(timeString(dur)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .leading)
         }.padding(.horizontal, 12).padding(.vertical, 4)
+    }
+
+    // MARK: - Loop / Queue Helpers
+
+    private var hasPrev: Bool { store.queueIndex > 0 && !store.queue.isEmpty }
+    private var hasNext: Bool { store.queueIndex >= 0 && store.queueIndex < store.queue.count - 1 }
+    private var prevQueueTitle: String? { hasPrev ? store.queue[store.queueIndex - 1].title : nil }
+    private var nextQueueTitle: String? { hasNext ? store.queue[store.queueIndex + 1].title : nil }
+
+    private var aLoopText: String {
+        guard let a = store.aLoop else { return "A" }
+        return "A \(timeString(a))"
+    }
+
+    private var bLoopText: String {
+        guard let b = store.bLoop else { return "B" }
+        return "B \(timeString(b))"
+    }
+
+    @ViewBuilder
+    private func loopRangeOverlay(_ dur: Double) -> some View {
+        if let a = store.aLoop, let b = store.bLoop, dur > 0, a < b {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(0.5))
+                        .frame(width: max((b - a) / dur * geo.size.width, 4), height: 3)
+                        .offset(x: a / dur * geo.size.width)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Queue Panel
+
+    private var queuePanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("재생 목록").font(.headline)
+                Spacer()
+                if store.queueIndex >= 0 {
+                    Text("\(store.queueIndex + 1)/\(store.queue.count)").font(.caption).foregroundColor(.secondary)
+                }
+            }.padding(.horizontal, 12).padding(.vertical, 10)
+            Divider()
+            if store.queue.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "list.bullet").font(.title2).foregroundColor(.secondary)
+                    Text("재생 목록이 비어 있습니다.\n보관함에서 영상을 열면 목록에 추가됩니다.").font(.system(size: 12)).foregroundColor(.secondary).multilineTextAlignment(.center)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(store.queue.enumerated()), id: \.element.id) { index, item in
+                            Button { store.send(.playAtQueue(index)) } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: index == store.queueIndex ? "play.fill" : "play")
+                                        .font(.system(size: 10)).foregroundColor(index == store.queueIndex ? .accentColor : .secondary)
+                                        .frame(width: 14)
+                                    Text(item.title)
+                                        .lineLimit(1).font(.system(size: 12))
+                                        .foregroundColor(index == store.queueIndex ? .primary : .secondary)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 12).padding(.vertical, 7)
+                                .background(index == store.queueIndex ? Color.accentColor.opacity(0.14) : Color.clear)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(item.title)
+                        }
+                    }.padding(.vertical, 4)
+                }
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func timeString(_ seconds: Double) -> String {

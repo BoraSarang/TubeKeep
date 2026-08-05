@@ -26,6 +26,16 @@
   - `onChange(playbackRate/aLoop/bLoop)` → mpv 실시간 반영
 - **보관함 연동**: `openFile` 시 `filteredItems` 기준 현재 영상부터의 재생 목록을 `userInfo["queue"]`로 전달, `AppDelegate.openPlayerWindow`가 큐 설정
 
+### Phase B-2 — 플레이어 UX 개선 (A-B 반복/재생 목록)
+- **A-B 반복 UX**: 3단계 토글(A→A-B→✕)을 `시작점(A)`·`끝점(B)` 2버튼으로 분리
+  - A: 현재 위치를 시작점으로 설정/갱신 (accent 활성 + 시간 표시 `A 1:23`)
+  - B: A 설정 후 활성화, 누르면 끝점 설정 → A~B 반복 시작, 다시 누르면 해제
+  - 타임라인(슬라이더)에 A~B 반복 구간을 accent 색 바(오버레이)로 시각화
+- **재생 목록 패널**: 컨트롤바 `list.bullet` 버튼으로 우측 패널 토글
+  - 보관함에서 연 목록을 보여주고 현재 재생 하이라이트, 항목 클릭 시 즉시 재생(`playAtQueue`)
+  - 이전/다음 버튼 툴팁에 영상 제목 표시 (`다음: …`), 빈 목록이면 안내 문구
+- **PlayerWindow**: 플레이어 창 ESC로 닫기 (전체화면이면 ESC=전체화면 종료)
+
 ### Verification
 - `./build_and_run.sh debug macos --no-launch` ✅ (14.17s)
 - `swift test` ✅ 76/76 (0 failures)

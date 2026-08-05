@@ -36,6 +36,7 @@ struct PlayerReducer {
         var bLoop: Double?
         var queue: [PlayerItem] = []
         var queueIndex: Int = -1
+        var showQueue: Bool = false
     }
 
     enum Action: Equatable {
@@ -76,6 +77,8 @@ struct PlayerReducer {
         case setQueue([PlayerItem], startIndex: Int)
         case playNext
         case playPrevious
+        case playAtQueue(Int)
+        case toggleQueue
     }
 
     var body: some ReducerOf<Self> {
@@ -461,6 +464,15 @@ struct PlayerReducer {
                 guard idx >= 0 else { return .none }
                 state.queueIndex = idx
                 return .send(.loadVideo(state.queue[idx]))
+
+            case let .playAtQueue(index):
+                guard index >= 0, index < state.queue.count else { return .none }
+                state.queueIndex = index
+                return .send(.loadVideo(state.queue[index]))
+
+            case .toggleQueue:
+                state.showQueue.toggle()
+                return .none
             }
         }
     }
