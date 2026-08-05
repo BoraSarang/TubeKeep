@@ -16,8 +16,8 @@
 
 ### Documentation / 前 세션 이관
 - `docs/plans/PLAN_v2.8.1_macos.md` + `docs/TODO.md` T-875~T-882
-- 채널 다운로더 예상 소요시간(추정식) UI — **경과시간 미갱신 버그는 `bd TubeKeep-vyy`(P2)로 등록** (TimelineView 대기)
-- 플레이어 전체화면/확대 오류 픽스 이관 — `MPVOpenGLView`(NSOpenGLView 서브클래스, reshape→`openGLContext.update()`) + `MPVClient.attachView(MPVOpenGLView)`
+- 채널 다운로더 예상 소요시간(추정식) UI — **경과시간 실시간 갱신 픽스**: `loadTick`/`Timer` 제거 → `TimelineView(.periodic)` + `loadStart` 전달 (bd `TubeKeep-vyy` 닫음)
+- 플레이어 전체화면/확대 오류 픽스 이관 — `MPVOpenGLView`(NSOpenGLView 서브클래스, reshape→`openGLContext.update()`) + `MPVClient.attachView(MPVOpenGLView)` (사용자 확인 완료 ✅)
 
 ## v2.8.0 (2026-08-02) — 코드 정리 리팩터링 ✅
 
