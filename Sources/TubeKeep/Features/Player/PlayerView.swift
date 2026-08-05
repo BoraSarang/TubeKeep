@@ -16,7 +16,7 @@ struct PlayerView: View {
     private let panelWidth: CGFloat = 320
     private let controlsAutoHideDelay: Duration = .seconds(3)
 
-    private var windowWidth: CGFloat { videoWidth + (store.showQueue ? panelWidth : 0) + (store.showSubtitlePanel ? panelWidth : 0) }
+    private var windowWidth: CGFloat { videoWidth + (store.showQueue || store.showSubtitlePanel ? panelWidth : 0) }
     private var windowHeight: CGFloat { videoHeight }
 
     var body: some View {
@@ -25,8 +25,7 @@ struct PlayerView: View {
             if store.showQueue {
                 queuePanel
                     .frame(width: panelWidth)
-            }
-            if store.showSubtitlePanel {
+            } else if store.showSubtitlePanel {
                 subtitlePanel
                     .frame(width: panelWidth)
             }
@@ -206,6 +205,9 @@ struct PlayerView: View {
             Button { store.send(.toggleSubtitlePanel) } label: {
                 Image(systemName: store.showSubtitlePanel ? "sidebar.right" : "sidebar.trailing")
             }.help("자막 패널")
+            Button { store.send(.toggleQueue) } label: {
+                Image(systemName: store.showQueue ? "list.bullet.rectangle.fill" : "list.bullet.rectangle")
+            }.help("재생 목록")
             Spacer()
             Button { store.send(.toggleAlwaysOnTop) } label: {
                 Image(systemName: store.isAlwaysOnTop ? "pin.fill" : "pin")
@@ -297,9 +299,6 @@ struct PlayerView: View {
                     .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.bLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
             }.buttonStyle(.plain).disabled(store.aLoop == nil)
                 .help(store.bLoop == nil ? "현재 위치를 반복 끝점(B)으로 설정 (A→B 반복 시작)" : "반복 해제")
-            Button { store.send(.toggleQueue) } label: {
-                Image(systemName: "list.bullet").frame(width: 16).foregroundColor(store.showQueue ? .accentColor : .white)
-            }.buttonStyle(.plain).help("재생 목록 표시/숨김")
             Text(timeString(current)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .trailing)
             Slider(value: Binding(get: { progress }, set: { isSeeking = true; seekTime = $0 * dur }), in: 0...1, onEditingChanged: { editing in
                 if !editing { mpv.seek(to: seekTime); isSeeking = false }

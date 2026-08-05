@@ -243,6 +243,7 @@ struct PlayerReducer {
 
             case .toggleSubtitlePanel:
                 state.showSubtitlePanel.toggle()
+                if state.showSubtitlePanel { state.showQueue = false }
                 return .none
 
             case .checkSubtitlesAvailability:
@@ -472,6 +473,7 @@ struct PlayerReducer {
 
             case .toggleQueue:
                 state.showQueue.toggle()
+                if state.showQueue { state.showSubtitlePanel = false }
                 return .none
             }
         }
