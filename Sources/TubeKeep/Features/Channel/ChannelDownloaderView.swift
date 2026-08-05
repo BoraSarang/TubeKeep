@@ -21,6 +21,15 @@ struct ChannelDownloaderView: View {
     @State private var addChannelURL = ""
     @State private var errorMessage: String?
     @State private var isPinned = false
+    @State private var fetchTask: Task<Void, Never>?
+
+    // Channel video loading progress
+    @State private var channelLoadCount: Int = 0
+    @State private var channelLoadTotal: Int = 0
+    @State private var channelLoadStart: Date?
+    @State private var loadGeneration = 0
+    @State private var channelLoadEstimate: TimeInterval?
+    @State private var channelLoadProbeDone = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,6 +64,11 @@ struct ChannelDownloaderView: View {
                     channel: selectedChannel,
                     videos: channelVideos,
                     isLoading: isLoadingVideos,
+                    loadCount: channelLoadCount,
+                    loadTotal: channelLoadTotal,
+                    loadStart: channelLoadStart,
+                    loadEstimate: channelLoadEstimate,
+                    loadProbeDone: channelLoadProbeDone,
                     onRefresh: {
                         if let channel = selectedChannel {
                             loadVideos(for: channel, force: true)
@@ -102,6 +116,10 @@ struct ChannelDownloaderView: View {
             }
         }
         .frame(minWidth: 700, minHeight: 400)
+        .onDisappear {
+            fetchTask?.cancel()
+            fetchTask = nil
+        }
         .onAppear {
             DebugLogManager.shared?.append("[Channel] 🟢 onAppear triggered")
             channels = SubscribedChannel.loadAll()
@@ -261,11 +279,55 @@ struct ChannelDownloaderView: View {
 
         DebugLogManager.shared?.append("[Channel] ▶️ 영상 목록 로딩: \(channel.name)")
 
-        Task {
+        channelLoadCount = 0
+        channelLoadTotal = channel.videoCount > 0 ? channel.videoCount : 0
+        channelLoadEstimate = nil
+        channelLoadProbeDone = false
+        channelLoadStart = Date()
+
+        loadGeneration += 1
+        let gen = loadGeneration
+
+        fetchTask?.cancel()
+        fetchTask = Task {
+            defer {
+                Task { @MainActor in
+                    guard self.loadGeneration == gen else { return }
+                    self.fetchTask = nil
+                    self.channelLoadStart = nil
+                }
+            }
             do {
                 let service = ChannelFetchService()
+                let estimatedTotal = self.channelLoadTotal
+                if estimatedTotal >= 100 {
+                    if let est = try? await service.estimateLoadDuration(
+                        channelId: channel.id,
+                        handle: channel.handle,
+                        totalCount: estimatedTotal
+                    ), est > 0 {
+                        await MainActor.run {
+                            guard self.loadGeneration == gen else { return }
+                            self.channelLoadEstimate = est
+                            DebugLogManager.shared?.append("[Channel] ⏱ 예상 소요 \(String(format: "%.0f", est))초")
+                        }
+                    }
+                    await MainActor.run {
+                        guard self.loadGeneration == gen else { return }
+                        self.channelLoadProbeDone = true
+                    }
+                }
                 ChannelDownloadCache.clearVideoCache(channelId: channel.id)
-                let (videos, count) = try await service.fetchAllVideos(channelId: channel.id, handle: channel.handle)
+                let (videos, count) = try await service.fetchAllVideos(
+                    channelId: channel.id,
+                    handle: channel.handle,
+                    progressHandler: { loaded in
+                        Task { @MainActor in
+                            self.channelLoadCount = loaded
+                        }
+                    }
+                )
+                try Task.checkCancellation()
                 await MainActor.run {
                     channelVideos = videos
                     ChannelDownloadCache.setCachedVideos(channelId: channel.id, videos: videos)
@@ -290,6 +352,8 @@ struct ChannelDownloaderView: View {
 
                 // Refresh library in-memory state from disk
                 store.send(.library(.loadFromDisk))
+            } catch is CancellationError {
+                DebugLogManager.shared?.append("[Channel] ⛔ 영상 로드 취소됨")
             } catch {
                 await MainActor.run {
                     isLoadingVideos = false

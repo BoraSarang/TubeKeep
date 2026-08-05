@@ -92,7 +92,11 @@ actor ChannelFetchService {
         return ChannelMetadata(id: id, name: name, handle: handle, subscriberCount: subscriberCount, videoCount: videoCount)
     }
 
-    func fetchAllVideos(channelId: String, handle: String? = nil) async throws -> (videos: [ChannelVideoItem], totalCount: Int) {
+    func fetchAllVideos(
+        channelId: String,
+        handle: String? = nil,
+        progressHandler: (@Sendable (Int) -> Void)? = nil
+    ) async throws -> (videos: [ChannelVideoItem], totalCount: Int) {
         // Use /videos page to exclude Shorts; fall back to UU playlist for member-only exclusion
         let url: String
         if let handle = handle, !handle.isEmpty {
@@ -102,7 +106,7 @@ actor ChannelFetchService {
             url = "https://www.youtube.com/playlist?list=\(playlistId)"
         }
 
-        let output = try await runner.runSync(
+        let stream = await runner.runStreamingStdout(
             executable: Constants.ytDlpPath,
             arguments: [
                 "--flat-playlist",
@@ -111,42 +115,98 @@ actor ChannelFetchService {
                 "--ignore-errors",
                 "--no-warnings",
                 url,
-            ]
+            ],
+            environment: ["PYTHONUNBUFFERED": "1"]
         )
 
         var videos: [ChannelVideoItem] = []
-        let lines = output.components(separatedBy: .newlines)
-        for line in lines {
-            guard !line.isEmpty,
-                  let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let id = json["id"] as? String,
-                  let title = json["title"] as? String
-            else { continue }
-
-            // Exclude member-only / subscriber-only content
-            if let availability = json["availability"] as? String,
-               availability == "subscriber_only"
-            { continue }
-
-            let playlistIndex = json["playlist_index"] as? Int ?? 0
-            let uploadDate = json["upload_date"] as? String
-            let viewCount = json["view_count"] as? Int ?? 0
-            let duration = (json["duration"] as? Int) ?? (json["duration"] as? Double).map(Int.init) ?? 0
-
-            videos.append(ChannelVideoItem(
-                id: id,
-                title: title,
-                uploadDate: uploadDate,
-                thumbnailURL: "https://i.ytimg.com/vi/\(id)/mqdefault.jpg",
-                playlistIndex: playlistIndex,
-                viewCount: viewCount,
-                duration: duration
-            ))
+        var lineBuffer = ""
+        for try await chunk in stream {
+            lineBuffer += chunk
+            while let newlineRange = lineBuffer.range(of: "\n") {
+                let line = String(lineBuffer[..<newlineRange.lowerBound])
+                lineBuffer.removeSubrange(lineBuffer.startIndex..<newlineRange.upperBound)
+                if let item = parseVideoLine(line) {
+                    videos.append(item)
+                    progressHandler?(videos.count)
+                }
+            }
+        }
+        if !lineBuffer.isEmpty, let item = parseVideoLine(lineBuffer) {
+            videos.append(item)
+            progressHandler?(videos.count)
         }
 
         videos.sort { $0.playlistIndex < $1.playlistIndex }
         return (videos, videos.count)
+    }
+
+    func estimateLoadDuration(
+        channelId: String,
+        handle: String? = nil,
+        totalCount: Int
+    ) async throws -> TimeInterval {
+        guard totalCount > 0 else { return 0 }
+        let url: String
+        if let handle = handle, !handle.isEmpty {
+            url = "https://www.youtube.com/\(handle)/videos"
+        } else {
+            let playlistId = "UU" + (channelId.hasPrefix("UC") ? String(channelId.dropFirst(2)) : channelId)
+            url = "https://www.youtube.com/playlist?list=\(playlistId)"
+        }
+
+        let probeItems = 30
+        let start = Date()
+        let output = try await runner.runSync(
+            executable: Constants.ytDlpPath,
+            arguments: [
+                "--flat-playlist",
+                "--dump-json",
+                "--extractor-args", Constants.youtubeExtractorArgs,
+                "--ignore-errors",
+                "--no-warnings",
+                "--playlist-items", "1-\(probeItems)",
+                url,
+            ]
+        )
+        let probeElapsed = Date().timeIntervalSince(start)
+        let itemCount = output.components(separatedBy: .newlines)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .compactMap { parseVideoLine($0) }
+            .count
+
+        guard itemCount > 0, probeElapsed > 0.05 else { return 0 }
+        let rate = Double(itemCount) / probeElapsed
+        return Double(totalCount) / rate
+    }
+
+    private func parseVideoLine(_ line: String) -> ChannelVideoItem? {
+        guard !line.isEmpty,
+              let data = line.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = json["id"] as? String,
+              let title = json["title"] as? String
+        else { return nil }
+
+        // Exclude member-only / subscriber-only content
+        if let availability = json["availability"] as? String,
+           availability == "subscriber_only"
+        { return nil }
+
+        let playlistIndex = json["playlist_index"] as? Int ?? 0
+        let uploadDate = json["upload_date"] as? String
+        let viewCount = json["view_count"] as? Int ?? 0
+        let duration = (json["duration"] as? Int) ?? (json["duration"] as? Double).map(Int.init) ?? 0
+
+        return ChannelVideoItem(
+            id: id,
+            title: title,
+            uploadDate: uploadDate,
+            thumbnailURL: "https://i.ytimg.com/vi/\(id)/mqdefault.jpg",
+            playlistIndex: playlistIndex,
+            viewCount: viewCount,
+            duration: duration
+        )
     }
 
     private func fetchAvatarURL(channelId: String) async -> String {

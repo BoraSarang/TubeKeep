@@ -24,6 +24,8 @@ final class MPVClient: ObservableObject {
     private var glContext: NSOpenGLContext?
     private weak var renderView: NSView?
     private let renderQueue = DispatchQueue(label: "com.borasarang.mpv.render", qos: .userInteractive)
+    private var playbackStart: Date?
+    private var firstFrameLogged = false
 
     init() { setupMPV() }
 
@@ -64,31 +66,21 @@ final class MPVClient: ObservableObject {
         mpv = h
     }
 
-    func attachView(_ view: NSView) {
+    func attachView(_ view: MPVOpenGLView) {
         renderView = view
+        guard let ctx = view.openGLContext else { return }
+        glContext = ctx
         DispatchQueue.main.async { [weak self] in
             self?.setupOpenGL()
         }
     }
 
     private func setupOpenGL() {
-        let attrs: [NSOpenGLPixelFormatAttribute] = [
-            NSOpenGLPixelFormatAttribute(NSOpenGLPFAOpenGLProfile),
-            NSOpenGLPixelFormatAttribute(NSOpenGLProfileVersion3_2Core),
-            NSOpenGLPixelFormatAttribute(NSOpenGLPFAAccelerated),
-            NSOpenGLPixelFormatAttribute(NSOpenGLPFADoubleBuffer),
-            NSOpenGLPixelFormatAttribute(NSOpenGLPFAColorSize), NSOpenGLPixelFormatAttribute(24),
-            NSOpenGLPixelFormatAttribute(NSOpenGLPFAAllowOfflineRenderers),
-            0
-        ]
-        guard let fmt = NSOpenGLPixelFormat(attributes: attrs),
-              let ctx = NSOpenGLContext(format: fmt, share: nil) else {
-            print("[mpv] FAIL: create NSOpenGLContext")
+        guard let glCtx = glContext else {
+            DebugLogManager.shared?.append("[mpv] FAIL: no OpenGL context")
             return
         }
-        glContext = ctx
-        ctx.view = renderView
-        ctx.makeCurrentContext()
+        glCtx.makeCurrentContext()
 
         guard let mpv else { return }
 
@@ -108,7 +100,7 @@ final class MPVClient: ObservableObject {
         var rc: OpaquePointer?
         let result = mpv_render_context_create(&rc, mpv, &renderParams)
         guard result >= 0, let rc else {
-            print("[mpv] FAIL: mpv_render_context_create returned \(result)")
+            DebugLogManager.shared?.append("[mpv] FAIL: mpv_render_context_create returned \(result)")
             error = "mpv_render_context_create failed"
             return
         }
@@ -157,9 +149,15 @@ final class MPVClient: ObservableObject {
             mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil)
         ]
         let result = mpv_render_context_render(ctx, &params)
-        if result < 0 { print("[mpv] render error: \(result)") }
+        if result < 0 { DebugLogManager.shared?.append("[mpv] render error: \(result)") }
         mpv_render_context_report_swap(ctx)
         glCtx.flushBuffer()
+
+        if !firstFrameLogged, let start = playbackStart {
+            firstFrameLogged = true
+            let elapsed = Date().timeIntervalSince(start) * 1000
+            DebugLogManager.shared?.push(.PERF, category: "Player", message: "첫 프레임 렌더링", meta: ["elapsed_ms": Int(elapsed)])
+        }
     }
 
     // MARK: - Callbacks
@@ -244,12 +242,16 @@ final class MPVClient: ObservableObject {
     func loadFile(_ url: URL) {
         guard let mpv else { return }
         runOnMain { [self] in resetState() }
+        playbackStart = Date()
+        firstFrameLogged = false
         mpvCommand(mpv, args: ["loadfile", url.path])
     }
 
     func loadStream(_ url: URL) {
         guard let mpv else { return }
         runOnMain { [self] in resetState() }
+        playbackStart = Date()
+        firstFrameLogged = false
         mpvCommand(mpv, args: ["loadfile", url.absoluteString])
     }
 
@@ -316,5 +318,5 @@ private func mpvCommand(_ handle: OpaquePointer, args: [String]) {
         return mpv_command(handle, ptr)
     }
     cstrs.compactMap { $0 }.forEach { free($0) }
-    if result < 0 { print("[mpv] command failed: \(args.first ?? "?")") }
+    if result < 0 { DebugLogManager.shared?.append("[mpv] command failed: \(args.first ?? "?")") }
 }

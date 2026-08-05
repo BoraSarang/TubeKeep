@@ -6,6 +6,11 @@ struct ChannelContentView: View {
     let channel: SubscribedChannel?
     let videos: [ChannelVideoItem]
     let isLoading: Bool
+    let loadCount: Int
+    let loadTotal: Int
+    let loadStart: Date?
+    let loadEstimate: TimeInterval?
+    let loadProbeDone: Bool
     var onRefresh: (() -> Void)?
     var onDropURL: ((String) -> Void)?
     var onAddChannel: (() -> Void)?
@@ -17,11 +22,18 @@ struct ChannelContentView: View {
     @State private var presetResolution: Int
 
     init(store: StoreOf<AppReducer>, channel: SubscribedChannel?, videos: [ChannelVideoItem], isLoading: Bool,
+         loadCount: Int = 0, loadTotal: Int = 0, loadStart: Date? = nil,
+         loadEstimate: TimeInterval? = nil, loadProbeDone: Bool = false,
          onRefresh: (() -> Void)? = nil, onDropURL: ((String) -> Void)? = nil, onAddChannel: (() -> Void)? = nil) {
         self.store = store
         self.channel = channel
         self.videos = videos
         self.isLoading = isLoading
+        self.loadCount = loadCount
+        self.loadTotal = loadTotal
+        self.loadStart = loadStart
+        self.loadEstimate = loadEstimate
+        self.loadProbeDone = loadProbeDone
         self.onRefresh = onRefresh
         self.onDropURL = onDropURL
         self.onAddChannel = onAddChannel
@@ -67,10 +79,23 @@ struct ChannelContentView: View {
                 filterSortBar
                 Divider()
                 if isLoading {
-                    Spacer()
-                    ProgressView("채널 영상 목록을 불러오는 중...")
-                        .frame(maxWidth: .infinity)
-                    Spacer()
+                    VStack(spacing: 10) {
+                        Spacer()
+                        ProgressView()
+                        if loadTotal > 0 {
+                            Text("전체 \(formattedNumber(loadTotal))개 영상 확인 중")
+                                .font(.system(size: 12))
+                        }
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            let elapsed = loadStart.map { context.date.timeIntervalSince($0) } ?? 0
+                            Text(loadStatusText(elapsed: elapsed))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
                 } else {
                     videoList
                     Divider()
@@ -272,6 +297,18 @@ struct ChannelContentView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+
+    private func loadStatusText(elapsed: TimeInterval) -> String {
+        var parts = ["경과 \(String(format: "%.1f", elapsed))초"]
+        if loadTotal >= 100, loadEstimate == nil, !loadProbeDone {
+            parts.append("소요 시간 측정 중")
+        }
+        if let est = loadEstimate, est > 0, elapsed > 0.1 {
+            let remaining = max(0, est - elapsed)
+            parts.append(remaining > 0.5 ? "예상 남은 시간 약 \(max(1, Int(remaining)))초" : "거의 완료")
+        }
+        return parts.joined(separator: " • ")
     }
 
     // MARK: - Filter / Sort
