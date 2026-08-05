@@ -12,9 +12,9 @@
 | T-1011 | **PlayerReducer 재생 속도·A-B·재생 목록 State** | high | done | queue/queueIndex, setQueue/playNext/playPrevious |
 | T-1012 | **PlayerView 컨트롤바 확장** | medium | done | 속도(0.75~2.0x)/A-B(3단계)/이전·다음 + onChange→mpv 반영 |
 | T-1013 | **A-B 반복 UX 개선 + 재생 목록 패널** | medium | done | 시작점A/끝점B 2버튼 + 슬라이더 구간 오버레이 + showQueue 패널 + playAtQueue |
-| T-1020 | **WidgetKit 타깃 + App Group 상태 공유** | high | done | SwiftPM executableTarget + 수동 appex 조립 + group.com.tubekeep |
-| T-1021 | **위젯 뷰 (진행률/대기/최근 완료)** | medium | done | DownloadStatus 위젯 (small/medium), 1분 타임라인 |
-| T-1030 | **tubekeep:// scheme 확장 (add/open)** | medium | pending | 브라우저 원클릭 전송 |
+| T-1020 | **WidgetKit 타깃 + App Group 상태 공유** | high | **보류** | 실행되나 ad-hoc 서명으로 위젯 갤러리 등록 불가 (Developer ID 인증서 필요). 코드는 유지, 인증서 보유 시 활성화 |
+| T-1021 | **위젯 뷰 (진행률/대기/최근 완료)** | medium | **보류** | DownloadStatus 위젯 (small/medium) — 갤러리 미등록으로 보류 |
+| T-1030 | **tubekeep:// scheme 확장 (add/open)** | medium | done | add?url= 검증 완료, open?id= 보관함 항목 재생 (T-1030) |
 
 ---
 

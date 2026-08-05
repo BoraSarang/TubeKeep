@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NotificationCenter.default.removeObserver(self)
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     @objc private func terminateCleanup() {
         DebugLogManager.shared?.append("[App] terminateCleanup 시작 PID=\(ProcessInfo.processInfo.processIdentifier)")
         DebugLogManager.shared?.append("[App] ProcessRegistry.killAll: \(ProcessRegistry.killAll())개")
@@ -738,7 +742,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - URL Scheme
 
     @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent: NSAppleEventDescriptor) {
-        guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else { return }
+        guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+              let components = URLComponents(string: urlString) else { return }
+
+        let host = (components.host ?? "").lowercased()
+
+        if host == "add" || host == "open" {
+            let query = components.queryItems ?? []
+            if let urlValue = query.first(where: { $0.name == "url" })?.value,
+               let target = URL(string: urlValue) {
+                DispatchQueue.main.async {
+                    self.openVideoDownloaderWindow()
+                    self.store.send(.home(.setURL(target.absoluteString)))
+                    self.store.send(.home(.autoFetchInfo(target.absoluteString)))
+                }
+            } else if let id = query.first(where: { $0.name == "id" })?.value {
+                openLibraryItem(videoId: id)
+            }
+            return
+        }
+
         let videoURL = urlString
             .replacingOccurrences(of: "tubekeep://", with: "https://")
             .replacingOccurrences(of: "tubekeep:", with: "https://")
@@ -747,6 +770,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.openVideoDownloaderWindow()
             self.store.send(.home(.setURL(videoURL)))
             self.store.send(.home(.autoFetchInfo(videoURL)))
+        }
+    }
+
+    private func openLibraryItem(videoId: String) {
+        DispatchQueue.main.async {
+            guard let item = self.store.state.library.items.first(where: { $0.id == videoId }) else {
+                NSSound.beep()
+                return
+            }
+            let playerItem = PlayerItem(
+                fileURL: URL(fileURLWithPath: item.filePath),
+                title: item.title,
+                videoId: item.id,
+                duration: Double(item.duration ?? 0)
+            )
+            NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
         }
     }
 }
