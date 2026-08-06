@@ -47,6 +47,9 @@ struct MainView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onAppear {
+            ClipService.shared.regenerateThumbnailsIfNeeded()
+        }
         .overlay {
             if store.library.showDigest, let stats = store.library.digestStats {
                 digestBanner(stats)

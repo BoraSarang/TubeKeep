@@ -57,7 +57,10 @@ final class ClipService {
         try await runFFmpeg(source: sourcePath, output: outURL.path, start: start, end: end, progress: progress)
 
         let thumbURL = dir.appendingPathComponent("thumb.jpg")
-        await generateThumbnail(source: sourcePath, output: thumbURL.path, at: start)
+        let thumbOK = await generateThumbnail(source: sourcePath, output: thumbURL.path, at: start)
+        #if DEBUG
+        DebugLogManager.shared?.append("[Clip] 썸네일 \(thumbOK ? "생성 완료" : "생성 실패"): \(thumbURL.path)")
+        #endif
 
         let item = ClipItem(
             videoId: videoId,
@@ -73,22 +76,32 @@ final class ClipService {
         return item
     }
 
-    private func generateThumbnail(source: String, output: String, at time: Double) async {
+    @discardableResult
+    private func generateThumbnail(source: String, output: String, at time: Double) async -> Bool {
+        if await extractFrame(source: source, output: output, time: time) { return true }
+        #if DEBUG
+        DebugLogManager.shared?.append("[Clip] 시작점 썸네일 실패 → 첫 프레임 fallback (time=0)")
+        #endif
+        return await extractFrame(source: source, output: output, time: 0)
+    }
+
+    private func extractFrame(source: String, output: String, time: Double) async -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: Constants.ffmpegPath)
         process.arguments = [
             "-y",
-            "-ss", String(format: "%.3f", time),
             "-i", source,
+            "-ss", String(format: "%.3f", time),
             "-frames:v", "1",
             "-q:v", "2",
             output
         ]
+        let errPipe = Pipe()
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardError = errPipe
         do {
             try process.run()
-            let deadline = ContinuousClock.now + .seconds(30)
+            let deadline = ContinuousClock.now + .seconds(120)
             while process.isRunning && !Task.isCancelled {
                 if ContinuousClock.now >= deadline {
                     process.terminate()
@@ -97,10 +110,20 @@ final class ClipService {
                 try await Task.sleep(nanoseconds: 50_000_000)
             }
             if process.isRunning { process.terminate() }
+            process.waitUntilExit()
+            let stderr = String(decoding: errPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            let ok = process.terminationStatus == 0 && FileManager.default.fileExists(atPath: output)
+            if !ok {
+                #if DEBUG
+                DebugLogManager.shared?.append("[Clip] 프레임 추출 실패: time=\(time) exit=\(process.terminationStatus)\n\(stderr)")
+                #endif
+            }
+            return ok
         } catch {
             #if DEBUG
-            DebugLogManager.shared?.append("[Clip] 썸네일 생성 실패: \(error)")
+            DebugLogManager.shared?.append("[Clip] 프레임 추출 에러: \(error)")
             #endif
+            return false
         }
     }
 
@@ -120,6 +143,35 @@ final class ClipService {
         }
         try? context.save()
         return clips.count
+    }
+
+    func regenerateThumbnailsIfNeeded() {
+        for clip in allClips() {
+            let thumbURL = Self.clipsDirectory(for: clip.videoId).appendingPathComponent("thumb.jpg")
+            if clip.thumbnailPath != nil && FileManager.default.fileExists(atPath: thumbURL.path) { continue }
+            guard clip.videoId != "unknown",
+                  let source = librarySourcePath(for: clip.videoId) else {
+                #if DEBUG
+                DebugLogManager.shared?.append("[Clip] 썸네일 백필 스킵: videoId=\(clip.videoId)")
+                #endif
+                continue
+            }
+            Task {
+                let ok = await generateThumbnail(source: source, output: thumbURL.path, at: clip.start)
+                if ok {
+                    clip.thumbnailPath = thumbURL.path
+                    try? context.save()
+                }
+                #if DEBUG
+                DebugLogManager.shared?.append("[Clip] 썸네일 백필 \(ok ? "완료" : "실패"): videoId=\(clip.videoId) at=\(clip.start)")
+                #endif
+            }
+        }
+    }
+
+    private func librarySourcePath(for videoId: String) -> String? {
+        let descriptor = FetchDescriptor<LibraryItem>(predicate: #Predicate { $0.id == videoId })
+        return (try? context.fetch(descriptor))?.first?.filePath
     }
 
     static func confirmAndDeleteClipsIfAny(for videoId: String) -> Bool {
@@ -185,7 +237,7 @@ final class ClipService {
                     let key = parts[0].trimmingCharacters(in: .whitespaces)
                     let value = parts[1].trimmingCharacters(in: .whitespaces)
                     if key == "out_time_us", let us = Double(value), duration > 0 {
-                        let p = min(max(us / (duration * 1_000_000), 0), 1)
+                        let p = min(max(abs(us) / (duration * 1_000_000), 0), 1)
                         await MainActor.run { progress(p) }
                     }
                 }

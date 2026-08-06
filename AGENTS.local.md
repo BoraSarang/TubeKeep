@@ -180,6 +180,13 @@ keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
 - **주의**: 성능 영향 있음 (고해상도 프레임 드랍 가능). 재현 조건 불명확, SW 렌더링(`MPV_RENDER_API_TYPE_SW`) 전환이 확실한 회피책
 - **참조**: `Sources/TubeKeep/Features/Player/MPVClient.swift`
 
+### 5.6 클립 썸네일 미생성: PNG 코덱 소스에서 `-ss` 시크 불가 (bd TubeKeep-2gk)
+- **증상**: 클립 목록에 이미지 없음 (film.stack placeholder만 표시). `Clips/<videoId>/thumb.jpg` 부재
+- **원인**: PNG 코덱 비디오(화면 녹화/임포트 파일, 예: `조선힙합.cU1rgvWwSas.mp4`)는 프레임에 타임스탬프가 없어 ffmpeg `-ss` 시크가 즉시 "no packets"로 실패 (타임아웃 아님, 즉시 실패). 기존 코드는 stderr를 `nullDevice`로 버려 실패를 은폐
+- **조치 (적용됨, `ClipService.swift`)**: `-ss`를 `-i` 뒤로 이동, 타임아웃 120s, stderr Pipe 캡처 → 실패 시 `[Clip]` 로그, 실패 시 `time=0` 첫 프레임으로 fallback (0.07s 성공). `regenerateThumbnailsIfNeeded()` 신설 → `MainView.onAppear`에서 기존 클립 백필
+- **특이사항**: h264/av1은 `-ss` 시크 정상(0.34s). `videoId=="unknown"` 클립은 원본 소스 매칭 불가 → 썸네일 백필 스킵 (정상 동작)
+- **참조**: `Sources/TubeKeep/Services/ClipService.swift`, `Sources/TubeKeep/Features/Library/MainView.swift`
+
 ## 6. TubeKeep 버전 진행 규칙
 
 공통 규칙 + 추가:
