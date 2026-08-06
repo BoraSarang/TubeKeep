@@ -8,6 +8,7 @@ struct MainView: View {
     @State private var playbackTime: TimeInterval = 0
     @State private var playbackDuration: TimeInterval = 0
     @State private var timer: Timer?
+    @State private var shortcutsVersion = 0
 
     var body: some View {
         HStack(spacing: 0) {
@@ -92,15 +93,13 @@ struct MainView: View {
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
                 Menu("영상 다운로드") {
-                    Button("영상 다운로더") {
-                        NotificationCenter.default.post(name: Constants.openDownloaderWindowNotification, object: nil)
-                    }
-                    Button("일괄 다운로더") {
-                        NotificationCenter.default.post(name: Constants.openBatchWindowNotification, object: nil)
-                    }
-                    Button("채널 다운로더") {
-                        NotificationCenter.default.post(name: Constants.openChannelWindowNotification, object: nil)
-                    }
+                    shortcutButton("영상 다운로더", notification: Constants.openDownloaderWindowNotification, actionKey: .openDownloader)
+                    shortcutButton("일괄 다운로더", notification: Constants.openBatchWindowNotification, actionKey: .openBatchDownloader)
+                    shortcutButton("채널 다운로더", notification: Constants.openChannelWindowNotification, actionKey: .openChannelDownloader)
+                }
+                .id(shortcutsVersion)
+                .onReceive(NotificationCenter.default.publisher(for: GlobalShortcutService.didChangeNotification)) { _ in
+                    shortcutsVersion += 1
                 }
 
                 Spacer()
@@ -188,6 +187,39 @@ struct MainView: View {
 
     private func formatBytes(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    // MARK: - Shortcut Menu Items
+
+    @ViewBuilder
+    private func shortcutButton(_ title: String, notification: Notification.Name, actionKey: GlobalShortcutAction) -> some View {
+        let binding = GlobalShortcutService.shared.binding(for: actionKey)
+        if let binding, binding.isEnabled, binding.keyCode > 0 {
+            let eq = GlobalShortcutService.shared.menuKeyEquivalent(for: binding)
+            if eq.key.count == 1, eq.modifiers.contains(.command) {
+                Button(title) {
+                    NotificationCenter.default.post(name: notification, object: nil)
+                }
+                .keyboardShortcut(KeyboardShortcut(KeyEquivalent(Character(eq.key)), modifiers: Self.keyboardModifiers(eq.modifiers)))
+            } else {
+                Button("\(title)  \(binding.display)") {
+                    NotificationCenter.default.post(name: notification, object: nil)
+                }
+            }
+        } else {
+            Button(title) {
+                NotificationCenter.default.post(name: notification, object: nil)
+            }
+        }
+    }
+
+    private static func keyboardModifiers(_ flags: NSEvent.ModifierFlags) -> EventModifiers {
+        var m: EventModifiers = []
+        if flags.contains(.command) { m.insert(.command) }
+        if flags.contains(.option) { m.insert(.option) }
+        if flags.contains(.shift) { m.insert(.shift) }
+        if flags.contains(.control) { m.insert(.control) }
+        return m
     }
 }
 
