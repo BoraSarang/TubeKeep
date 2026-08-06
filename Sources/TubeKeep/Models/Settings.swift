@@ -92,6 +92,8 @@ struct Settings: Equatable, Codable {
     var activePresetId: UUID?
     var smartMode: Bool = false
     var seekStepSeconds: Double = 5.0
+    var idleAutoSummary: Bool = true
+    var idleAutoPodcast: Bool = false
 
     static let defaultPresets: [DownloadPreset] = [
         DownloadPreset(id: UUID(), name: "고품질 (4K)", formatType: .video,
@@ -113,7 +115,7 @@ struct Settings: Equatable, Codable {
         case sponsorBlock, embedMetadata, showThumbnailPreview, ttsEngine, playerMode, showChannelBadge
         case subtitleLanguageOverride, enableWhisperTranscription, whisperModelSize
         case showMenuBarNotifications, menuBarNotificationDuration, presets, activePresetId, smartMode
-        case seekStepSeconds
+        case seekStepSeconds, idleAutoSummary, idleAutoPodcast
     }
 
     init(
@@ -148,7 +150,9 @@ struct Settings: Equatable, Codable {
         presets: [DownloadPreset] = Self.defaultPresets,
         activePresetId: UUID? = nil,
         smartMode: Bool = false,
-        seekStepSeconds: Double = 5.0
+        seekStepSeconds: Double = 5.0,
+        idleAutoSummary: Bool = true,
+        idleAutoPodcast: Bool = false
     ) {
         self.concurrentDownloads = concurrentDownloads
         self.storageDirectory = storageDirectory
@@ -182,6 +186,8 @@ struct Settings: Equatable, Codable {
         self.activePresetId = activePresetId
         self.smartMode = smartMode
         self.seekStepSeconds = seekStepSeconds
+        self.idleAutoSummary = idleAutoSummary
+        self.idleAutoPodcast = idleAutoPodcast
     }
 
     init(from decoder: Decoder) throws {
@@ -218,6 +224,8 @@ struct Settings: Equatable, Codable {
         activePresetId = try c.decodeIfPresent(UUID.self, forKey: .activePresetId)
         smartMode = try c.decodeIfPresent(Bool.self, forKey: .smartMode) ?? false
         seekStepSeconds = try c.decodeIfPresent(Double.self, forKey: .seekStepSeconds) ?? 5.0
+        idleAutoSummary = try c.decodeIfPresent(Bool.self, forKey: .idleAutoSummary) ?? false
+        idleAutoPodcast = try c.decodeIfPresent(Bool.self, forKey: .idleAutoPodcast) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -254,6 +262,8 @@ struct Settings: Equatable, Codable {
         try c.encodeIfPresent(activePresetId, forKey: .activePresetId)
         try c.encode(smartMode, forKey: .smartMode)
         try c.encode(seekStepSeconds, forKey: .seekStepSeconds)
+        try c.encode(idleAutoSummary, forKey: .idleAutoSummary)
+        try c.encode(idleAutoPodcast, forKey: .idleAutoPodcast)
     }
 
     var limitRateArg: String? {

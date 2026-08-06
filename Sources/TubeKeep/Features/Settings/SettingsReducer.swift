@@ -39,6 +39,8 @@ struct SettingsReducer {
         var activePresetId: UUID?
         var smartMode: Bool = false
         var seekStepSeconds: Double = 5.0
+        var idleAutoSummary: Bool = true
+        var idleAutoPodcast: Bool = false
         var openRouterAPIKey: String {
             get { UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "openRouterAPIKey") }
@@ -84,7 +86,9 @@ struct SettingsReducer {
                 presets: presets,
                 activePresetId: activePresetId,
                 smartMode: smartMode,
-                seekStepSeconds: seekStepSeconds
+                seekStepSeconds: seekStepSeconds,
+                idleAutoSummary: idleAutoSummary,
+                idleAutoPodcast: idleAutoPodcast
             )
         }
     }
@@ -127,6 +131,8 @@ struct SettingsReducer {
         case setPresets([DownloadPreset])
         case toggleSmartMode
         case setSeekStepSeconds(Double)
+        case toggleIdleAutoSummary
+        case toggleIdleAutoPodcast
         case toggleShowMenuBarNotifications
         case setMenuBarNotificationDuration(Int)
         case setOpenRouterAPIKey(String)
@@ -364,6 +370,14 @@ struct SettingsReducer {
 
             case let .setSeekStepSeconds(value):
                 state.seekStepSeconds = max(1, min(60, value))
+                return .send(.saveSettings)
+
+            case .toggleIdleAutoSummary:
+                state.idleAutoSummary.toggle()
+                return .send(.saveSettings)
+
+            case .toggleIdleAutoPodcast:
+                state.idleAutoPodcast.toggle()
                 return .send(.saveSettings)
 
             case let .setOpenRouterAPIKey(key):

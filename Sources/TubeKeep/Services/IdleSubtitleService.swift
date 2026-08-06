@@ -65,7 +65,17 @@ final class IdleSubtitleService {
         downloadTask = Task { [weak self] in
             guard let self else { return }
             await self.downloadSubtitle(for: first)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                self.isDownloading = false
+                self.downloadTask = nil
+                return
+            }
+            await self.runAutoAI(for: first)
+            guard !Task.isCancelled else {
+                self.isDownloading = false
+                self.downloadTask = nil
+                return
+            }
             self.isDownloading = false
             self.downloadTask = nil
             self.checkIdle()
@@ -169,6 +179,84 @@ final class IdleSubtitleService {
         if saved {
             NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
         }
+        store.send(.statusBar(.updateStatusText("")))
+        store.send(.statusBar(.updateStatusDetail("")))
+    }
+
+    // MARK: - Auto AI batch
+
+    private func runAutoAI(for item: LibraryItem) async {
+        let settings = Settings.loadSettings()
+        guard settings.idleAutoSummary || settings.idleAutoPodcast else { return }
+        store.send(.statusBar(.updateStatusText("유휴 AI 자동 생성")))
+        store.send(.statusBar(.updateStatusDetail(item.title)))
+        let keys = Settings.loadAPIKeys()
+
+        if settings.idleAutoSummary, !Task.isCancelled {
+            store.send(.statusBar(.updateStatusDetail("요약 생성 중... \(item.title)")))
+            let service = SummarizationService()
+            do {
+                let result = try await service.summarizeVideo(
+                    videoId: item.id,
+                    title: item.title,
+                    channel: item.channelName,
+                    openRouterAPIKey: keys.openRouter,
+                    ax4APIKey: keys.ax4,
+                    geminiAPIKey: keys.gemini
+                )
+                guard !Task.isCancelled else { return }
+                if result.provider != "cached" {
+                    let joined = "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n")
+                    let chaptersData = try? JSONEncoder().encode(result.chapters)
+                    var updated = item
+                    updated.summary = joined
+                    updated.chapters = chaptersData
+                    await LibraryCacheService.shared.updateItem(updated)
+                    DatabaseManager.shared.updateSummary(videoId: item.id, summary: joined)
+                    DatabaseManager.shared.updateChapters(videoId: item.id, chapters: chaptersData ?? Data())
+                    NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
+                }
+                if !Task.isCancelled {
+                    store.send(.statusBar(.updateStatusDetail("태그 생성 중... \(item.title)")))
+                    let tag = await TaggingService().classify(
+                        title: item.title,
+                        channel: item.channelName,
+                        openRouterAPIKey: keys.openRouter,
+                        ax4APIKey: keys.ax4,
+                        geminiAPIKey: keys.gemini
+                    )
+                    var tagged = item
+                    tagged.tags = [tag]
+                    await LibraryCacheService.shared.updateItem(tagged)
+                }
+            } catch {
+                #if DEBUG
+                DebugLogManager.shared?.append("[IdleSub] 자동 요약 실패 — \(item.title): \(error.localizedDescription)")
+                #endif
+            }
+        }
+
+        if settings.idleAutoPodcast, !Task.isCancelled {
+            store.send(.statusBar(.updateStatusDetail("팟캐스트 생성 중... \(item.title)")))
+            let data = DatabaseManager.shared.loadVideoAIData(videoId: item.id)
+            if let transcript = data?.transcript, !transcript.isEmpty {
+                do {
+                    _ = try await PodcastService.shared.generatePodcast(
+                        videoId: item.id,
+                        title: item.title,
+                        channel: item.channelName,
+                        transcript: transcript,
+                        openRouterAPIKey: keys.openRouter,
+                        progress: nil
+                    )
+                } catch {
+                    #if DEBUG
+                    DebugLogManager.shared?.append("[IdleSub] 자동 팟캐스트 실패 — \(item.title): \(error.localizedDescription)")
+                    #endif
+                }
+            }
+        }
+
         store.send(.statusBar(.updateStatusText("")))
         store.send(.statusBar(.updateStatusDetail("")))
     }

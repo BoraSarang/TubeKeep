@@ -64,6 +64,34 @@ struct SettingsNotificationsTab: View {
             SettingsComponents.divider()
 
             idleSubtitleRow
+
+            if UserDefaults.standard.integer(forKey: IdleSubtitleService.settingKey) != 0 {
+                SettingsComponents.divider()
+
+                SettingsRow(title: "유휴 시 요약·태그 자동 생성", description: "유휴 자막 다운로드 후 요약과 태그를 자동으로 생성합니다") {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { store.idleAutoSummary },
+                            set: { _ in store.send(.toggleIdleAutoSummary) }
+                        )
+                    )
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+
+                SettingsRow(title: "유휴 시 팟캐스트 자동 생성", description: "요약 생성 후 팟캐스트도 함께 생성합니다 (시간이 다소 걸립니다)") {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { store.idleAutoPodcast },
+                            set: { _ in store.send(.toggleIdleAutoPodcast) }
+                        )
+                    )
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+            }
         }
     }
 

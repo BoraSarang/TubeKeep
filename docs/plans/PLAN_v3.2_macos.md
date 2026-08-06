@@ -56,10 +56,13 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `LibraryReducer.Action`: `.resumeFromPosition(String)` → `openFile`에 initialSeekTime 전달
 - `LibraryItem`: `lastPlaybackPosition: Double?`, `lastPlayedAt: Date?`
 
-### T-1072 유휴 AI 배치
-- `IdleSubtitleService`: 자막 저장 후 `shouldAutoSummarize`/`shouldAutoPodcast` 설정 확인 → 각 서비스 호출
-- `Settings`: `idleAutoSummary: Bool`, `idleAutoPodcast: Bool` (기본 true/false)
-- `SettingsNotificationsTab`: "유휴 시 자동 생성" 체크박스 2개
+### T-1072 유휴 AI 배치 ✅
+- `IdleSubtitleService`: 자막 저장 후 `Settings.idleAutoSummary`/`idleAutoPodcast` 확인 → `runAutoAI(for:)`에서 요약→태깅→팟캐스트 순차 실행 (완료 후 checkIdle 재개)
+- 요약: `SummarizationService.summarizeVideo` (DB 캐시 히트 `provider == "cached"`면 저장 생략), 요약+챕터 저장, `TaggingService.classify`로 태그 저장
+- 팟캐스트: `PodcastService.generatePodcast` (transcript 없으면 스킵)
+- `Settings`: `idleAutoSummary: Bool = true`, `idleAutoPodcast: Bool = false`
+- `SettingsNotificationsTab`: 유휴 자막 켜짐 시 "요약·태그 자동 생성"/"팟캐스트 자동 생성" 토글 2개 표시
+- 취소: `cancelIfDownloading`이 `downloadTask.cancel()`로 AI 배치도 중단, 각 단계에서 `Task.isCancelled` 가드
 
 ### T-1073 채널 프리셋
 - `ChannelModels`: `ChannelAutoSettings: Codable` (resolution, mp3, subtitles, dailyLimit)
