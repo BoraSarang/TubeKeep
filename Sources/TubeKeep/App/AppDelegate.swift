@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusManager: StatusBarManager?
     private var clipboardMonitor: ClipboardMonitor?
     private var channelUpdateService: ChannelUpdateService?
+    private var idleSubtitleService: IdleSubtitleService?
     private var videoDownloaderWindow: NSWindow?
     private var libraryWindowController: FixedWidthWindowController?
     private var settingsWindow: NSWindow?
@@ -236,6 +237,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let channelUpdate = ChannelUpdateService(store: store)
         channelUpdate.start()
         channelUpdateService = channelUpdate
+
+        let idleSubtitle = IdleSubtitleService(store: store)
+        idleSubtitle.start()
+        idleSubtitleService = idleSubtitle
+
+        GlobalShortcutService.shared.start()
     }
 
     private func setupMainMenu() {

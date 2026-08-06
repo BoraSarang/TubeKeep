@@ -60,6 +60,27 @@ struct SettingsNotificationsTab: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
             }
+
+            SettingsComponents.divider()
+
+            idleSubtitleRow
+        }
+    }
+
+    private var idleSubtitleRow: some View {
+        SettingsRow(title: "유휴 시 자막 자동 다운로드", description: "Mac을 N분 이상 사용하지 않으면 자막 없는 최근 영상부터 순차 다운로드합니다. 사용을 시작하면 멈춥니다") {
+            Picker("", selection: Binding(
+                get: { UserDefaults.standard.integer(forKey: IdleSubtitleService.settingKey) },
+                set: { UserDefaults.standard.set($0, forKey: IdleSubtitleService.settingKey) }
+            )) {
+                Text("끄기").tag(0)
+                Text("5분").tag(5)
+                Text("10분").tag(10)
+                Text("30분").tag(30)
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
         }
     }
 }
