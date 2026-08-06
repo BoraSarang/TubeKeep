@@ -70,9 +70,10 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `ChannelContentView`: 자동 다운로드 GroupBox 내 프리셋 UI — 채널 전환 시 loadPreset, 해상도/자막/MP3/토글 변경 시 savePreset, 자동 다운로드 켜짐 시 "하루 최대 다운로드 수" Picker(무제한/1~20)
 - `ChannelUpdateService.enqueueAutoDownload`: 채널별 프리셋 적용(해상도/자막/MP3) + 일일 한도 초과 시 skip·잔여분만 enqueue·개수 증가 기록
 
-### T-1074 중복 방지
-- `HomeReducer`: infoResponse 시 `LibraryCacheService.findItem` + `DatabaseManager.loadDownloadHistory` 확인 → `isDuplicate` State → UI 표시
-- `DownloadQueueReducer.addItems`: 중복 제외/확인 옵션
+### T-1074 중복 방지 ✅
+- `HomeReducer`: `isDuplicate` State + `setDuplicate(Bool)` 액션. infoResponse 시 `.run` effect에서 `LibraryCacheService.findItem`(MainActor) + `DatabaseManager.loadDownloadHistory`(status == "completed") 확인 (플레이리스트는 제외)
+- `HomeView`: 제목 아래 "이미 받은 영상입니다" 주황 배지
+- `DownloadQueueReducer.addItems`: 완료 이력(`status == "completed"`) 영상도 중복 스킵 + "중복된 항목이 제외되었습니다" 토스트
 
 ### T-1075 재생목록 감시
 - `ChannelModels`: `SubscribedPlaylist` (id/title) + UserDefaults 저장

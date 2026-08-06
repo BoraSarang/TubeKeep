@@ -20,6 +20,7 @@ struct HomeReducer {
         var fetchStartTime: Date?
         var fetchLogs: [String] = []
         var videoInfo: VideoInfo?
+        var isDuplicate: Bool = false
         var availableFormats: [Format] = []
         var selectedFormatId: String?
         var includeSubtitles: Bool = false
@@ -58,6 +59,7 @@ struct HomeReducer {
         case cancelFetch
         case fetchProgressLog(String)
         case infoResponse(VideoInfo, [Format])
+        case setDuplicate(Bool)
         case infoFailed(String)
         case formatSelected(String)
         case subtitlesToggled(Bool)
@@ -115,6 +117,7 @@ struct HomeReducer {
             case .cancelFetch:
                 state.isFetching = false
                 state.videoInfo = nil
+                state.isDuplicate = false
                 state.availableFormats = []
                 state.selectedFormatId = nil
                 state.errorMessage = nil
@@ -137,6 +140,7 @@ struct HomeReducer {
             case let .infoResponse(info, formats):
                 state.isFetching = false
                 state.fetchStartTime = nil
+                state.isDuplicate = false
 
                 if info.isPlaylist, state.playlistSelection == nil {
                     state.playlistSelection = PlaylistSelectionReducer.State(
@@ -164,12 +168,31 @@ struct HomeReducer {
                     state.errorMessage = "다운로드 가능한 포맷이 없습니다"
                 }
 
+                let videoId = info.id
+                let isPlaylist = info.isPlaylist
+                return .run { send in
+                    if isPlaylist {
+                        await send(.setDuplicate(false))
+                    } else {
+                        let inLibrary = await MainActor.run {
+                            LibraryCacheService.shared.findItem(id: videoId) != nil
+                        }
+                        let inHistory = DatabaseManager.shared.loadDownloadHistory().contains {
+                            $0.videoId == videoId && $0.status == "completed"
+                        }
+                        await send(.setDuplicate(inLibrary || inHistory))
+                    }
+                }
+
+            case let .setDuplicate(isDuplicate):
+                state.isDuplicate = isDuplicate
                 return .none
 
             case let .infoFailed(error):
                 state.isFetching = false
                 state.fetchStartTime = nil
                 state.videoInfo = nil
+                state.isDuplicate = false
                 state.availableFormats = []
                 state.selectedFormatId = nil
                 state.errorMessage = error

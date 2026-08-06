@@ -143,8 +143,17 @@ struct DownloadQueueReducer {
 
             case let .addItems(newItems):
                 var skipCount = 0
+                let historyIDs = Set(
+                    DatabaseManager.shared.loadDownloadHistory()
+                        .filter { $0.status == "completed" }
+                        .compactMap { $0.videoId }
+                )
                 for item in newItems {
                     if state.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) {
+                        skipCount += 1
+                        continue
+                    }
+                    if historyIDs.contains(item.videoInfo.id) {
                         skipCount += 1
                         continue
                     }

@@ -268,6 +268,12 @@ struct HomeView: View {
                     }
                     .foregroundStyle(.secondary)
 
+                    if store.isDuplicate {
+                        Label("이미 받은 영상입니다", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.orange)
+                    }
+
                     HStack(spacing: 10) {
                         Label(info.formattedDuration, systemImage: "clock")
                         Label(info.formattedDate, systemImage: "calendar")
