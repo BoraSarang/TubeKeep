@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 개발 중 — 보관함 카테고리 필터 (macOS, bd TubeKeep-iqp)
+
+### 기능 추가
+- 보관함 사이드바에 **카테고리** 섹션 추가 — 채널 목록 위, 보유 개수 내림차순 정렬 (`LibrarySidebarView`)
+- 카테고리 선택 시 채널/최근 필터와 **상호 배타** (selectedChannel=nil, filterMode=.all), 같은 카테고리 재클릭 시 해제
+- `LibraryReducer.State.selectedCategory` + `setSelectedCategory` 액션, `filteredItems`에 `tags.contains(category)` 필터 추가
+- 리포트/프로필과 동일한 `LibraryItem.tags` 기반 집계 (태깅 안 된 아이템은 "전체"에서만 노출)
+
 ## v3.1.1 (2026-08-06) — 정밀 분석 버그 수정 11종 (macOS) ✅
 
 > v3.1 릴리즈 후 전체 소스 정밀 분석(118파일)에서 확인된 핵심 버그 11종을 수정. 빌드 + `swift test` 76/76 통과. (T-1050~T-1060)

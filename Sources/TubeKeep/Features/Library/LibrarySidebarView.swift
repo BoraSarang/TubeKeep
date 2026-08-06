@@ -45,6 +45,8 @@ struct LibrarySidebarView: View {
                         filterSection
                             .padding(.vertical, 4)
                         Divider()
+                        categorySection
+                        Divider()
                         channelList
                     }
                 } else if store.library.sidebarMode == .history {
@@ -123,6 +125,7 @@ struct LibrarySidebarView: View {
         .background(Color(.windowBackgroundColor))
         .onChange(of: store.library.items) { _, newItems in
             updateChannelNames(newItems)
+            updateLibraryCategoryRows(newItems)
         }
         .onChange(of: store.library.sidebarMode) { _, mode in
             if mode == .history { loadHistory() }
@@ -139,6 +142,7 @@ struct LibrarySidebarView: View {
         }
         .onAppear {
             updateChannelNames(store.library.items)
+            updateLibraryCategoryRows(store.library.items)
             store.send(.library(.calculateDiskUsage))
         }
     }
@@ -455,6 +459,7 @@ struct LibrarySidebarView: View {
             ) {
                 store.send(.library(.setFilterMode(.all)))
                 store.send(.library(.setSelectedChannel(nil)))
+                store.send(.library(.setSelectedCategory(nil)))
             }
 
             filterRow(
@@ -490,6 +495,90 @@ struct LibrarySidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Category Filter
+
+    @State private var libraryCategoryRows: [(name: String, count: Int)] = []
+    private let categoryRowHeight: CGFloat = 26
+    private let categorySectionMaxRows = 4
+    private var categorySectionHeight: CGFloat {
+        categoryRowHeight * CGFloat(categorySectionMaxRows)
+            + 20   // LazyVStack spacing 2 × 10개 간격
+            + 8    // LazyVStack padding .vertical 4×2
+    }
+
+    private var categorySection: some View {
+        VStack(spacing: 0) {
+            SectionHeader(title: "카테고리")
+                .padding(.top, 4)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(libraryCategoryRows, id: \.name) { row in
+                        categoryFilterRow(row)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(height: categorySectionHeight)
+        }
+    }
+
+    private func categoryFilterRow(_ row: (name: String, count: Int)) -> some View {
+        let isSelected = store.library.selectedCategory == row.name
+        return Button {
+            store.send(.library(.setSelectedCategory(store.library.selectedCategory == row.name ? nil : row.name)))
+        } label: {
+            HStack {
+                Image(systemName: categorySystemIcon(row.name))
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .frame(width: 20, height: 20)
+                Text(row.name)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .lineLimit(1)
+                    .foregroundStyle(isSelected ? .white : .primary)
+                Spacer()
+                Text("\(row.count)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor : Color.clear)
+            .contentShape(Rectangle())
+            .frame(height: categoryRowHeight)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func categorySystemIcon(_ name: String) -> String {
+        switch name {
+        case "기술/IT": return "desktopcomputer"
+        case "음악": return "music.note"
+        case "게임": return "gamecontroller.fill"
+        case "뉴스/시사": return "newspaper.fill"
+        case "스포츠": return "sportscourt.fill"
+        case "엔터테인먼트": return "tv.fill"
+        case "교육/강의": return "graduationcap.fill"
+        case "요리/음식": return "fork.knife"
+        case "여행/일상": return "airplane"
+        case "과학": return "atom"
+        default: return "tag.fill"
+        }
+    }
+
+    private func updateLibraryCategoryRows(_ items: [LibraryItem]) {
+        var counts: [String: Int] = [:]
+        for item in items {
+            for tag in item.tags {
+                counts[tag, default: 0] += 1
+            }
+        }
+        libraryCategoryRows = counts
+            .map { (name: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
     }
 
     // MARK: - Channel List

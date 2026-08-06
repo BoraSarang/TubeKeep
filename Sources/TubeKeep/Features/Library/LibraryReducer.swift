@@ -19,6 +19,7 @@ struct LibraryReducer {
         var items: [LibraryItem] = []
         var searchText = ""
         var selectedChannel: String? = nil
+        var selectedCategory: String? = nil
         var sortOrder: LibrarySortOrder = .dateDesc
         var filterMode: LibraryFilterMode = .all
         var viewMode: LibraryViewMode = .grid
@@ -104,6 +105,10 @@ struct LibraryReducer {
                 result = result.filter { $0.channelId == channelId }
             }
 
+            if let category = selectedCategory {
+                result = result.filter { $0.tags.contains(category) }
+            }
+
             if !searchText.isEmpty {
                 result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
             }
@@ -168,6 +173,7 @@ struct LibraryReducer {
         case searchResultsUpdated([SearchResult])
         case playSearchMatch(String)
         case setSelectedChannel(String?)
+        case setSelectedCategory(String?)
         case setSortOrder(LibrarySortOrder)
         case setFilterMode(LibraryFilterMode)
         case setViewMode(LibraryViewMode)
@@ -347,12 +353,21 @@ struct LibraryReducer {
 
             case .setSelectedChannel(let channelId):
                 state.selectedChannel = channelId
+                state.selectedCategory = nil
                 state.selectedIds = []
                 if channelId != nil {
                     state.sortOrder = .indexDesc
                 } else {
                     state.sortOrder = .dateDesc
                 }
+                return .none
+
+            case .setSelectedCategory(let category):
+                state.selectedCategory = category
+                state.selectedChannel = nil
+                state.filterMode = .all
+                state.selectedIds = []
+                state.sortOrder = .dateDesc
                 return .none
 
             case .setSortOrder(let order):
@@ -374,6 +389,7 @@ struct LibraryReducer {
 
             case .setFilterMode(let mode):
                 state.filterMode = mode
+                state.selectedCategory = nil
                 state.selectedIds = []
                 return .none
 
