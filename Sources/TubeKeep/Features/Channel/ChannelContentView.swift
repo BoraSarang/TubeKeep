@@ -42,6 +42,7 @@ struct ChannelContentView: View {
     @State private var presetSubtitles = false
     @State private var presetAudioOnly = false
     @State private var isAddingDownloads = false
+    @State private var autoDownload = false
 
     private var filteredVideos: [ChannelVideoItem] {
         var result = videos
@@ -136,6 +137,14 @@ struct ChannelContentView: View {
         }
         .onChange(of: channel?.id) { _, _ in
             selectedIDs = []
+            if let id = channel?.id {
+                autoDownload = ChannelDownloadCache.isAutoDownloadEnabled(channelId: id)
+            }
+        }
+        .onAppear {
+            if let id = channel?.id {
+                autoDownload = ChannelDownloadCache.isAutoDownloadEnabled(channelId: id)
+            }
         }
     }
 
@@ -407,6 +416,19 @@ struct ChannelContentView: View {
                     .frame(width: 80)
 
                     Spacer()
+
+                    Toggle(isOn: $autoDownload) {
+                        Label("자동 다운로드", systemImage: "bolt.circle")
+                            .font(.system(size: 11))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .onChange(of: autoDownload) { _, enabled in
+                        if let id = channel?.id {
+                            ChannelDownloadCache.setAutoDownload(channelId: id, enabled: enabled)
+                        }
+                    }
+                    .help("이 채널에 새 영상이 올라오면 자동으로 다운로드 큐에 추가됩니다")
 
                     Toggle("자막", isOn: $presetSubtitles)
                         .toggleStyle(.switch)

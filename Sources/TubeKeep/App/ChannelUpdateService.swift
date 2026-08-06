@@ -147,6 +147,12 @@ final class ChannelUpdateService {
                 #if DEBUG
                 logManager?.append("    ✅ 새 영상 \(newVideos.count)개 발견")
                 #endif
+                if ChannelDownloadCache.isAutoDownloadEnabled(channelId: channel.id) {
+                    enqueueAutoDownload(channelId: channel.id, channelName: channel.name, videos: newVideos)
+                    #if DEBUG
+                    logManager?.append("    📥 자동 다운로드 enqueue \(newVideos.count)개")
+                    #endif
+                }
             } else {
                 #if DEBUG
                 logManager?.append("    ➖ 새 영상 없음")
@@ -176,6 +182,49 @@ final class ChannelUpdateService {
         }
         #if DEBUG
         logManager?.append("✅ 채널 업데이트 체크 완료 (새 영상 채널 \(updatedChannels.count)개)")
+        #endif
+    }
+
+    private func enqueueAutoDownload(channelId: String, channelName: String, videos: [ChannelVideoItem]) {
+        let resolution = store.state.settings.defaultResolution
+        let items = videos.map { video -> DownloadItem in
+            let format = Format(
+                id: "best[height<=\(resolution)]/best",
+                label: "\(resolution)p",
+                height: resolution,
+                ext: "mp4",
+                codec: "avc1",
+                filesize: nil,
+                fps: nil,
+                isVideoOnly: false,
+                isAudioOnly: false
+            )
+            let videoInfo = VideoInfo(
+                id: video.id,
+                title: video.title,
+                channel: channelName,
+                channelId: channelId,
+                duration: 0,
+                uploadDate: video.uploadDate ?? "",
+                thumbnailURL: video.thumbnailURL,
+                webpageURL: "https://youtube.com/watch?v=\(video.id)",
+                isPlaylist: false,
+                playlistTitle: nil,
+                playlistCount: nil
+            )
+            return DownloadItem(
+                videoInfo: videoInfo,
+                selectedFormat: format,
+                includeSubtitles: false,
+                audioOnly: false,
+                isChannelDownload: true,
+                channelUploadIndex: 0,
+                playlistIndex: video.playlistIndex
+            )
+        }
+        store.send(.downloadQueue(.addItems(items)))
+        #if DEBUG
+        logManager?.append("  [AutoDL] \(channelName): \(items.count)개 큐에 추가")
         #endif
     }
 

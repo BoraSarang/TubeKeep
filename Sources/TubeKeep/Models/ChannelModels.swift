@@ -57,6 +57,7 @@ struct ChannelDownloadCache {
     private static let videosDataKey = "channelVideosData"
     private static let newVideosKey = "channelsNewVideos"
     private static let seenVideosKey = "channelsSeenVideoIds"
+    private static let autoDownloadKey = "channelAutoDownload"
 
     private nonisolated(unsafe) static var videoCache: [String: [ChannelVideoItem]] = [:]
 
@@ -300,5 +301,23 @@ struct ChannelDownloadCache {
         dict.removeValue(forKey: channelId)
         guard let newData = try? JSONEncoder().encode(dict) else { return }
         UserDefaults.standard.set(newData, forKey: fetchTimestampsKey)
+    }
+
+    static func isAutoDownloadEnabled(channelId: String) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: autoDownloadKey),
+              let dict = try? JSONDecoder().decode([String: Bool].self, from: data)
+        else { return false }
+        return dict[channelId] ?? false
+    }
+
+    static func setAutoDownload(channelId: String, enabled: Bool) {
+        var dict: [String: Bool] = [:]
+        if let data = UserDefaults.standard.data(forKey: autoDownloadKey),
+           let d = try? JSONDecoder().decode([String: Bool].self, from: data) {
+            dict = d
+        }
+        dict[channelId] = enabled
+        guard let data = try? JSONEncoder().encode(dict) else { return }
+        UserDefaults.standard.set(data, forKey: autoDownloadKey)
     }
 }
