@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## v3.1 (2026-08-06) — 유틸리티 기능 5종 (macOS) ✅
+
+> v3.0 이후 유틸리티 기능 5종(클립 저장/카테고리, 채널 자동 다운로드, 전역 단축키, 유휴 자막 자동 다운로드, 디스크 정리) 구현 완료.
+
+### Phase A — 클립 저장 & 카테고리
+- **T-1040**: 플레이어에서 A-B 구간 클립 저장
+  - `ClipItem` SwiftData 모델 (id/videoId/channelName/title/filePath/thumbnailPath/start/end/duration/createdAt) — `PersistenceController` ModelContainer 등록
+  - `ClipService` — ffmpeg `-c copy`(재인코딩 없음) 컷 + `-progress pipe:1` 진행률 파싱 + 썸네일 캡처(`-frames:v 1`), `clipsRootDirectory`/`clipsDirectory`(`Documents/TubeKeep/Clips/<videoId>/`)
+  - `ClipError` — invalidRange/duplicateRange(동일 A-B 구간 중복 저장 금지, ±0.1초)/encodeFailed
+  - PlayerView 저장 버튼 + `ClipSavePopoverView`(진행바/경과/남은 시간) + 완료·중복 알림 배너, 저장 중 컨트롤바 숨김 방지
+- **T-1041**: 클립 카테고리
+  - `LibrarySidebarMode.clips` + `ClipView`(썸네일/채널명/구간/재생/Finder/삭제 contextMenu), `ClipReducer`(load/saveClip/deleteClip/deleteClipsForVideo)
+  - 원본 영상 삭제 시 "클립도 삭제할까요?" NSAlert (`ClipService.confirmAndDeleteClipsIfAny`, 기본: 클립도 삭제)
+
+### Phase B — 채널 자동 다운로드
+- **T-1042**: `ChannelDownloadCache`에 `channelAutoDownload` 저장 키 + `isAutoDownloadEnabled`/`setAutoDownload`, ChannelContentView GroupBox "자동 다운로드" 토글(채널 전환 시 로드)
+  - `ChannelUpdateService.enqueueAutoDownload` — 새 영상 발견 시 `downloadQueue.addItems`(settings.defaultResolution 기준)로 자동 큐 추가
+
+### Phase C — 전역 단축키
+- **T-1043**: `GlobalShortcutService` (Carbon RegisterEventHotKey + TISCopyCurrentASCIICapableKeyboardLayoutInputSource 키 표시)
+  - `GlobalShortcutAction` 3종: 다운로더 열기 / 일괄 다운로더 열기 / 채널 다운로더 열기
+  - SettingsSystemTab에 기록 UI(로컬 모니터 + `onDisappear` 해제), AppDelegate에서 `start()`
+
+### Phase D — 유휴 자막 자동 다운로드
+- **T-1044**: `IdleSubtitleService` — `CGEventSource.secondsSinceLastEventType` 시스템 유휴 감지 + 15초 타이머
+  - 유휴 시 자막 없는 최근 영상 순차 `yt-dlp --write-subs --skip-download` → `DatabaseManager.updateTranscript`, 사용자 입력 시 즉시 중단
+  - 설정 키 `idleSubtitleMinutes`(끄기/5/10/30분), SettingsNotificationsTab Picker + 상태바 "자막 자동 다운로드" 표시
+
+### Phase E — 디스크 정리
+- **T-1045**: `DiskCleanupView` — 사이드바 "디스크 정리" 항목
+  - 총 사용 용량 + 필터(모두/500MB+/1GB+/5GB+) + 정렬(용량/날짜/채널) + 개별/전체 선택 일괄 삭제
+  - `LibraryReducer.removeItems([String])` 액션 추가 (클립 유무 확인 다이얼로그 포함)
+
+### Verification
+- `./build_and_run.sh debug macos` ✅ 매 단계 통과 (libmpv ld 경고는 기존 이슈)
+- 클립 저장 실동작 검증 완료 (ffmpeg `-c copy`라 저장 매우 빠름)
+
 ## v3.0 (2026-08-06) — 전역 검색 + 플레이어 고도화 + scheme 통합 (macOS) ✅
 
 > v2.9 리팩토링 후 첫 메이저 기능 버전. Phase A(검색)·B/B-2(플레이어)·D(scheme) 완료. Phase C(위젯)·브라우저 확장은 **진행하지 않음**으로 확정.

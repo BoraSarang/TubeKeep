@@ -580,6 +580,6 @@
 | T-1043 | **전역 단축키** — 다운로더 3종 + 설정 커스텀 UI | medium | completed | GlobalShortcutService.swift + SettingsSystemTab.swift |
 | T-1044 | **유휴 시 자막 자동 다운로드** — idleTimer + 순차 처리 + 상태바 + 설정 옵션 | medium | completed | IdleSubtitleService.swift + SettingsNotificationsTab.swift |
 | T-1045 | **디스크 정리 뷰** — 정렬/필터/일괄 삭제 | medium | completed | DiskCleanupView.swift |
-| T-1046 | **v3.1 릴리즈** — 버전 3.1.0(build 21) + CHANGELOG | high | pending | |
+| T-1046 | **v3.1 릴리즈** — 버전 3.1.0(build 21) + CHANGELOG | high | completed | Info.plist + CHANGELOG + tag v3.1.0 |
 
 
