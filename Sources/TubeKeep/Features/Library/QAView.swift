@@ -64,10 +64,7 @@ struct QAView: View {
 
     @ViewBuilder
     private func errorSection(_ error: String) -> some View {
-        Text(error)
-            .font(.caption)
-            .foregroundStyle(.red)
-            .padding(.vertical, 4)
+        ErrorBanner(message: error)
     }
 
     @ViewBuilder

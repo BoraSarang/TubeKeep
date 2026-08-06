@@ -106,6 +106,24 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - 모든 탭에 `sectionHeader`(제목+설명) 적용, 설명 2줄 허용으로 통일
 - `AppDelegate`: 설정 창 크기 560x420 → 640x420
 
+### T-1080 디자인 시스템 L1·L2 (토큰 + 프리미티브) ⏳
+- `Sources/TubeKeep/Theme/DesignTokens.swift` — 색상(배지 상태색/웨이브 그라디언트/오버레이, 시스템 블루 유지) + 폰트 스케일(count/title/caption/badge) + 간격·반경 상수. DownloadQueueView WaveProgress RGB 하드코딩 4곳 대체
+- `Sources/TubeKeep/Components/` — 프리미티브 컴포넌트: `AppSearchField`(사이드바 검색 3중 중복), `StatusBadge`(자막/챕터/요약/팟캐스트/이어보기 캡슐), `EmptyStateView`(아이콘+안내+액션), `ErrorBanner`(오류 표시 통일), `SectionHeader`(SettingsComponents 통합)
+
+### T-1081 복합 컴포넌트 + 라이브러리 적용 ⏳
+- `Sources/TakeKeep/Components/SortBar.swift`, `SelectionBar.swift` — Grid/List/DiskCleanup 3중 중복 제거
+- `LibraryGridView`/`LibraryListView`: sortBar→SortBar, selectionBar→SelectionBar, emptyState→EmptyStateView, 배지 캡슐→StatusBadge
+- `DiskCleanupView`: selectionBar→SelectionBar, emptyState→EmptyStateView
+
+### T-1082 다운로드/검색/오류 적용 ⏳
+- `DownloadQueueView`: WaveProgress RGB → DesignTokens, `monospaced` 과다 축소(`monospacedDigit`), 상태 색 통일
+- `LibrarySidebarView`: 검색 필드 3종 → `AppSearchField`
+- `HomeView`/`ChannelDownloaderView`/`ChannelHeaderView`: 로컬 errorBanner → `ErrorBanner`
+
+### T-1083 디자인 시스템 문서화 + 검증 ⏳
+- `docs/DESIGN_SYSTEM.md` — 토큰 목록, 컴포넌트 스펙, 사용 가이드 (BRAND 팔레트 없음 확인)
+- 빌드 + `swift test` 76/76 + `./scripts/test-core.sh` + 세션 로그 + 커밋
+
 ## 6. 에러코드
 
 | 코드 | 메시지 |

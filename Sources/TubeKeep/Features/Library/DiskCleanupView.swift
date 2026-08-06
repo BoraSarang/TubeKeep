@@ -124,59 +124,28 @@ struct DiskCleanupView: View {
     }
 
     private var selectionBar: some View {
-        HStack {
-            Text("\(selectedIDs.count)개 선택됨")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.accentColor)
-            Spacer()
-            Button {
+        SelectionBar(
+            count: selectedIDs.count,
+            isAllSelected: !selectedIDs.isEmpty && selectedIDs.count == filteredItems.count,
+            onToggleSelectAll: {
                 if selectedIDs.count == filteredItems.count {
                     selectedIDs = []
                 } else {
                     selectedIDs = Set(filteredItems.map(\.id))
                 }
-            } label: {
-                Image(systemName: selectedIDs.count == filteredItems.count ? "checkmark.circle.fill" : "checkmark.circle")
-                Text("전체 선택")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Button {
-                store.send(.library(.revealSelectedInFinder))
-            } label: {
-                Image(systemName: "folder")
-                Text("Finder에서 보기")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Button {
+            },
+            onClearSelection: { selectedIDs = [] },
+            onReveal: { store.send(.library(.revealSelectedInFinder)) },
+            onDelete: {
                 store.send(.library(.removeItems(Array(selectedIDs))))
                 selectedIDs = []
-            } label: {
-                Image(systemName: "trash")
-                Text("선택 삭제")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(.red)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+            },
+            showsDeselect: false
+        )
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "externaldrive.badge.checkmark")
-                .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
-            Text("조건에 맞는 영상이 없습니다")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
+        EmptyStateView(icon: "externaldrive.badge.checkmark", title: "조건에 맞는 영상이 없습니다")
     }
 
     // MARK: - Cell

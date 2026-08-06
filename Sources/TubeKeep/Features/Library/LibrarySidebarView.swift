@@ -56,12 +56,7 @@ struct LibrarySidebarView: View {
                             .padding(.vertical, 8)
                         Divider()
                         VStack(spacing: 0) {
-                            Text("프로필")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                            SectionHeader(title: "프로필")
                             profileCategoryRow
                                 .padding(.bottom, 2)
                         }
@@ -190,42 +185,15 @@ struct LibrarySidebarView: View {
     // MARK: - Discover Search
 
     private var discoverSearchField: some View {
-        HStack(spacing: 4) {
-            Group {
-                if store.library.discoverSearching {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                } else {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 14, height: 14)
-
-            TextField("검색...", text: Binding(
+        AppSearchField(
+            placeholder: "검색...",
+            text: Binding(
                 get: { store.library.discoverSearchText },
                 set: { store.send(.library(.setDiscoverSearchText($0))) }
-            ))
-            .textFieldStyle(.plain)
-            .font(.system(size: 12))
-            .onSubmit {
-                store.send(.library(.discoverSearch))
-            }
-
-            if !store.library.discoverSearchText.isEmpty {
-                Button {
-                    store.send(.library(.setDiscoverSearchText("")))
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(6)
-        .background(Color(.textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+            ),
+            isSearching: store.library.discoverSearching,
+            onSubmit: { store.send(.library(.discoverSearch)) }
+        )
     }
 
     // MARK: - Discover Categories
@@ -284,12 +252,7 @@ struct LibrarySidebarView: View {
                         .padding(.leading, 12)
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("채널 필터")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                        SectionHeader(title: "채널 필터")
 
                         historyChannelRow(name: "전체", isSelected: store.library.historyFilterChannel == nil) {
                             store.send(.library(.setHistoryFilterChannel(nil)))
@@ -323,31 +286,10 @@ struct LibrarySidebarView: View {
     }
 
     private var historySearchField: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 12))
-            TextField("검색...", text: Binding(
-                get: { store.library.historySearchText },
-                set: { store.send(.library(.setHistorySearchText($0))) }
-            ))
-            .textFieldStyle(.plain)
-            .font(.system(size: 12))
-
-            if !store.library.historySearchText.isEmpty {
-                Button {
-                    store.send(.library(.setHistorySearchText("")))
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(6)
-        .background(Color(.textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        AppSearchField(placeholder: "검색...", text: Binding(
+            get: { store.library.historySearchText },
+            set: { store.send(.library(.setHistorySearchText($0))) }
+        ))
     }
 
     private func historyChannelRow(name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -386,12 +328,7 @@ struct LibrarySidebarView: View {
 
     private var discoverCategorySection: some View {
         VStack(spacing: 0) {
-            Text("카테고리")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+            SectionHeader(title: "카테고리")
 
             ScrollView {
                 LazyVStack(spacing: 2) {
@@ -501,31 +438,10 @@ struct LibrarySidebarView: View {
     // MARK: - Search
 
     private var searchField: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 12))
-            TextField("검색...", text: Binding(
-                get: { store.library.searchText },
-                set: { store.send(.library(.setSearchText($0))) }
-            ))
-            .textFieldStyle(.plain)
-            .font(.system(size: 12))
-
-            if !store.library.searchText.isEmpty {
-                Button {
-                    store.send(.library(.setSearchText("")))
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(6)
-        .background(Color(.textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        AppSearchField(placeholder: "검색...", text: Binding(
+            get: { store.library.searchText },
+            set: { store.send(.library(.setSearchText($0))) }
+        ))
     }
 
     // MARK: - Filter
@@ -613,14 +529,7 @@ struct LibrarySidebarView: View {
     }
 
     private var channelHeader: some View {
-        HStack {
-            Text("채널")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        SectionHeader(title: "채널")
     }
 
     private func channelRow(_ channel: (id: String, name: String, count: Int), index: Int) -> some View {

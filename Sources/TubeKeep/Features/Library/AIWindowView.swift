@@ -485,9 +485,7 @@ struct AIWindowView: View {
             }
 
             if let error = store.library.mindmap.error {
-                Text(error)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.red)
+                ErrorBanner(message: error)
             }
         }
         .padding(.trailing, 4)
@@ -517,9 +515,7 @@ struct AIWindowView: View {
             }
 
             if let error = store.library.qna.error {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
+                ErrorBanner(message: error)
             }
 
             if store.library.qna.historyItems.isEmpty && !store.library.qna.loading {

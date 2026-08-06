@@ -105,133 +105,35 @@ struct LibraryGridView: View {
     // MARK: - Sort Bar
 
     private var sortBar: some View {
-        HStack {
-            Text("\(store.library.filteredItems.count)개 항목")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button {
-                store.send(.library(.toggleThumbnailPreview))
-            } label: {
-                Label {
-                    Text("썸네일")
-                        .font(.system(size: 11))
-                } icon: {
-                    Image(systemName: store.library.showThumbnailPreview ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(store.library.showThumbnailPreview ? .white : .secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(store.library.showThumbnailPreview ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
-            .help(store.library.showThumbnailPreview ? "썸네일 미리보기 끄기" : "썸네일 미리보기 켜기")
-
-            Picker("정렬", selection: Binding(
-                get: { store.library.sortOrder },
-                set: { store.send(.library(.setSortOrder($0))) }
-            )) {
-                ForEach(LibrarySortOrder.allCases, id: \.self) { order in
-                    Text(order.rawValue).tag(order)
-                }
-            }
-            .pickerStyle(.menu)
-            .font(.system(size: 11))
-            .fixedSize()
-
-            viewModeToggle
-        }
-    }
-
-    private var viewModeToggle: some View {
-        Button {
-            store.send(.library(.setViewMode(.list)))
-        } label: {
-            Image(systemName: "list.bullet.rectangle")
-                .font(.system(size: 11))
-        }
-        .buttonStyle(.plain)
-        .help("목록 보기")
+        LibrarySortBar(
+            itemCount: store.library.filteredItems.count,
+            showThumbnailPreview: store.library.showThumbnailPreview,
+            sortOrder: store.library.sortOrder,
+            isGrid: true,
+            onToggleThumbnailPreview: { store.send(.library(.toggleThumbnailPreview)) },
+            onSetSortOrder: { store.send(.library(.setSortOrder($0))) },
+            onToggleViewMode: { store.send(.library(.setViewMode(.list))) }
+        )
     }
 
     // MARK: - Selection Bar
 
     private var selectionBar: some View {
-        HStack {
-            Text("\(store.library.selectedIds.count)개 선택됨")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.accentColor)
-
-            Spacer()
-
-            Button {
-                store.send(.library(.selectAll))
-            } label: {
-                Image(systemName: "checkmark.circle")
-                Text("전체 선택")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Button {
-                store.send(.library(.revealSelectedInFinder))
-            } label: {
-                Image(systemName: "folder")
-                Text("Finder에서 보기")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Button {
-                store.send(.library(.openSelected))
-            } label: {
-                Image(systemName: "play.fill")
-                Text("열기")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Button("선택 해제") {
-                store.send(.library(.clearSelection))
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-
-            Button {
-                store.send(.library(.removeSelected))
-            } label: {
-                Image(systemName: "trash")
-                Text("선택 삭제")
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(.red)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        SelectionBar(
+            count: store.library.selectedIds.count,
+            isAllSelected: !store.library.selectedIds.isEmpty && store.library.selectedIds.count == store.library.filteredItems.count,
+            onToggleSelectAll: { store.send(.library(.selectAll)) },
+            onClearSelection: { store.send(.library(.clearSelection)) },
+            onReveal: { store.send(.library(.revealSelectedInFinder)) },
+            onOpen: { store.send(.library(.openSelected)) },
+            onDelete: { store.send(.library(.removeSelected)) }
+        )
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tray")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
-
-            Text("영상은 아래와 같은 방법으로\n다운로드 받으실 수 있습니다")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
+        EmptyStateView(icon: "tray", title: "영상은 아래와 같은 방법으로\n다운로드 받으실 수 있습니다") {
             HStack(spacing: 8) {
                 downloaderButton("영상 다운로더", notification: Constants.openDownloaderWindowNotification)
                 downloaderButton("일괄 다운로더", notification: Constants.openBatchWindowNotification)
@@ -241,25 +143,13 @@ struct LibraryGridView: View {
     }
 
     private var searchEmptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
-            Text("검색 결과가 없습니다")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-        }
+        EmptyStateView(icon: "magnifyingglass", title: "검색 결과가 없습니다")
     }
 
     private func downloaderButton(_ title: String, notification: Notification.Name) -> some View {
-        Button {
+        AppPrimaryButton(title, size: .small) {
             NotificationCenter.default.post(name: notification, object: nil)
-        } label: {
-            Text(title)
-                .font(.system(size: 11))
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
     }
 
     // MARK: - Thumbnail Loading
@@ -334,103 +224,51 @@ struct LibraryGridCell: View {
                     )
 
                 if isDownloadingSubtitle {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.down.to.line.compact")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-                            .offset(y: bounceUp ? -3 : 3)
-
-                        Text("자막")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.accentColor))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                            bounceUp = true
+                    StatusBadge(icon: "arrow.down.to.line.compact", text: "자막", color: AppColors.accent)
+                        .offset(y: bounceUp ? -3 : 3)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                                bounceUp = true
+                            }
                         }
-                    }
                 } else if hasSubtitles {
-                    HStack(spacing: 3) {
-                        Image(systemName: "captions.bubble")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-
-                        Text("자막")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.blue))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    StatusBadge(icon: "captions.bubble", text: "자막", color: AppColors.badgeSubtitle)
                 }
 
                 if chapterCount > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "list.number")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-
-                        Text("\(chapterCount)")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.orange))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .offset(y: (hasSubtitles || isDownloadingSubtitle) ? 28 : 0)
+                    StatusBadge(icon: "list.number", text: "\(chapterCount)", color: AppColors.badgeChapters)
+                        .offset(y: (hasSubtitles || isDownloadingSubtitle) ? AppMetrics.badgeStackOffset : 0)
                 }
 
                 if hasSummary {
-                    HStack(spacing: 2) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.green))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .offset(y: {
-                        var offset: CGFloat = 0
-                        if hasSubtitles || isDownloadingSubtitle { offset += 28 }
-                        if chapterCount > 0 { offset += 28 }
-                        return offset
-                    }())
+                    StatusBadge(icon: "doc.text", color: AppColors.badgeSummary)
+                        .offset(y: {
+                            var offset: CGFloat = 0
+                            if hasSubtitles || isDownloadingSubtitle { offset += AppMetrics.badgeStackOffset }
+                            if chapterCount > 0 { offset += AppMetrics.badgeStackOffset }
+                            return offset
+                        }())
                 }
 
                 if hasPodcast {
-                    HStack(spacing: 2) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.purple))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .offset(y: {
-                        var offset: CGFloat = 0
-                        if hasSubtitles || isDownloadingSubtitle { offset += 28 }
-                        if chapterCount > 0 { offset += 28 }
-                        if hasSummary { offset += 28 }
-                        return offset
-                    }())
+                    StatusBadge(icon: "mic.fill", color: AppColors.badgePodcast)
+                        .offset(y: {
+                            var offset: CGFloat = 0
+                            if hasSubtitles || isDownloadingSubtitle { offset += AppMetrics.badgeStackOffset }
+                            if chapterCount > 0 { offset += AppMetrics.badgeStackOffset }
+                            if hasSummary { offset += AppMetrics.badgeStackOffset }
+                            return offset
+                        }())
                 }
             }
 
             Text(item.title)
-                .font(.system(size: 12, weight: .medium))
+                .font(AppFont.cellTitle)
                 .lineLimit(2)
                 .truncationMode(.tail)
 
             Text(item.channelName)
-                .font(.system(size: 11))
+                .font(AppFont.cellSubtitle)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -457,15 +295,15 @@ struct LibraryGridCell: View {
             HStack(spacing: 2) {
                 if let upload = item.uploadDate {
                     Text("UP:" + upload.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 10))
+                        .font(AppFont.meta)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                     Text(",")
-                        .font(.system(size: 10))
+                        .font(AppFont.meta)
                         .foregroundStyle(.quaternary)
                 }
                 Text("DN:" + item.downloadDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.system(size: 10))
+                    .font(AppFont.meta)
                     .foregroundStyle(.quaternary)
                     .lineLimit(1)
             }
@@ -514,7 +352,7 @@ struct LibraryGridCell: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(.black.opacity(0.75))
+                        .background(AppColors.overlayBadge)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                         .padding(4)
                 }
@@ -526,25 +364,15 @@ struct LibraryGridCell: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(.black.opacity(0.75))
+                        .background(AppColors.overlayBadge)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                         .padding(4)
                 }
             }
             .overlay(alignment: .topLeading) {
                 if item.resumePosition != nil {
-                    HStack(spacing: 3) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 8, weight: .bold))
-                        Text("이어보기")
-                            .font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.accentColor))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .padding(6)
+                    StatusBadge(icon: "play.fill", text: "이어보기", color: AppColors.badgeResume)
+                        .padding(6)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -585,23 +413,17 @@ struct EmptyLibraryCell: View {
 
             Spacer()
 
-            Button("영상 다운로더") {
+            AppPrimaryButton("영상 다운로더", size: .small) {
                 NotificationCenter.default.post(name: Constants.openDownloaderWindowNotification, object: nil)
             }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
 
-            Button("일괄 다운로더") {
+            AppPrimaryButton("일괄 다운로더", size: .small) {
                 NotificationCenter.default.post(name: Constants.openBatchWindowNotification, object: nil)
             }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
 
-            Button("채널 다운로더") {
+            AppPrimaryButton("채널 다운로더", size: .small) {
                 NotificationCenter.default.post(name: Constants.openChannelWindowNotification, object: nil)
             }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

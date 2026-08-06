@@ -41,7 +41,7 @@ struct DownloadQueueView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppColors.info)
             }
 
             if store.hasActiveDownloads {
@@ -56,7 +56,7 @@ struct DownloadQueueView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.red)
+                .foregroundStyle(AppColors.danger)
             }
 
         }
@@ -84,16 +84,16 @@ struct DownloadQueueView: View {
 
             if store.activeCount > 0 {
                 HStack(spacing: 3) {
-                    Circle().fill(.green).frame(width: 5, height: 5)
+                    Circle().fill(AppColors.success).frame(width: 5, height: 5)
                     Text("\(store.activeCount)")
-                        .font(.system(size: 10, design: .monospaced).weight(.semibold))
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
                     if !store.aggregateSpeed.isEmpty {
                         Text(store.aggregateSpeed)
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 9).monospacedDigit())
                     }
                     if !store.aggregateETA.isEmpty {
                         Text("\(store.aggregateETA) 남음")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 9).monospacedDigit())
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -122,7 +122,7 @@ struct DownloadQueueView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.orange)
+                .foregroundStyle(AppColors.warning)
             }
 
             if store.completedCount > 0 {
@@ -214,7 +214,7 @@ struct DownloadRow: View {
 
                 if item.status == .completed {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.success)
                         .font(.system(size: 14))
                 } else {
                     statusIcon
@@ -234,7 +234,7 @@ struct DownloadRow: View {
                     if item.status == .completed {
                         Text(item.optionsLabel)
                             .font(.system(size: 10))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(AppColors.success)
                     } else {
                         Text(item.optionsLabel)
                             .font(.system(size: 10))
@@ -243,15 +243,15 @@ struct DownloadRow: View {
                         if item.status == .downloading {
                             if !item.downloadSpeed.isEmpty {
                                 Text(item.downloadSpeed)
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(size: 10).monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
                             Text("\(Int(item.progress * 100))%")
-                                .font(.system(size: 10, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(.blue)
+                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(AppColors.info)
                             if !item.etaText.isEmpty {
                                 Text(item.etaText)
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(size: 10).monospacedDigit())
                                     .foregroundStyle(.tertiary)
                             }
                         } else if item.status == .pending {
@@ -261,18 +261,18 @@ struct DownloadRow: View {
                         } else if item.status == .paused {
                             Text("일시정지")
                                 .font(.caption)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(AppColors.warning)
                         } else if item.status == .retrying {
                             Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(AppColors.info)
                                 .font(.system(size: 10))
                             Text("재시도 \(item.retryCount)/\(store.maxRetries)...")
                                 .font(.caption)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(AppColors.info)
                         } else if item.status == .failed {
                             Text("실패")
                                 .font(.caption)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(AppColors.danger)
                             if let err = item.errorMessage, !err.isEmpty {
                                 Text(err.prefix(60))
                                     .font(.caption2)
@@ -293,7 +293,7 @@ struct DownloadRow: View {
                     } label: {
                         Image(systemName: "pause.fill")
                             .font(.system(size: 10))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AppColors.warning)
                             .frame(width: 18, height: 18)
                     }
                     .buttonStyle(.plain)
@@ -306,7 +306,7 @@ struct DownloadRow: View {
                     } label: {
                         Image(systemName: "play.fill")
                             .font(.system(size: 10))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(AppColors.info)
                             .frame(width: 18, height: 18)
                     }
                     .buttonStyle(.plain)
@@ -319,7 +319,7 @@ struct DownloadRow: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(AppColors.info)
                             .frame(width: 18, height: 18)
                     }
                     .buttonStyle(.plain)
@@ -353,13 +353,13 @@ struct DownloadRow: View {
             GeometryReader { geo in
                 if item.status == .downloading {
                     Rectangle()
-                        .fill(.blue.opacity(0.08))
+                        .fill(AppColors.progressActive)
                         .frame(width: (geo.size.width - 58) * max(0, min(1, item.progress)))
                         .offset(x: 58)
                         .animation(.linear(duration: 0.3), value: item.progress)
                 } else if item.status == .completed {
                     Rectangle()
-                        .fill(.green.opacity(0.06))
+                        .fill(AppColors.progressCompleted)
                         .frame(width: geo.size.width - 58)
                         .offset(x: 58)
                 }
@@ -372,22 +372,22 @@ struct DownloadRow: View {
         switch item.status {
         case .downloading:
             Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppColors.info)
         case .pending:
             Image(systemName: "clock")
                 .foregroundStyle(.tertiary)
         case .retrying:
             Image(systemName: "arrow.clockwise")
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppColors.info)
         case .paused:
             Image(systemName: "pause.circle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(AppColors.warning)
         case .completed:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(AppColors.success)
         case .failed:
             Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(.red)
+                .foregroundStyle(AppColors.danger)
         }
     }
 }
@@ -407,11 +407,7 @@ struct WaveProgress: View {
                 let rect = CGRect(x: offsetX, y: 0, width: barWidth, height: size.height)
 
                 // Base gradient fill
-                let baseGradient = Gradient(colors: [
-                    Color(red: 0.1, green: 0.4, blue: 0.9).opacity(0.35),
-                    Color(red: 0.0, green: 0.6, blue: 0.8).opacity(0.25),
-                    Color(red: 0.2, green: 0.3, blue: 0.8).opacity(0.35),
-                ])
+                let baseGradient = Gradient(colors: AppColors.waveBaseGradient)
                 var basePath = Path()
                 basePath.addRect(rect)
                 context.fill(basePath, with: .linearGradient(
@@ -447,9 +443,7 @@ struct WaveProgress: View {
                 var linePath = Path()
                 linePath.move(to: CGPoint(x: rect.minX, y: rect.height - 1))
                 linePath.addLine(to: CGPoint(x: rect.maxX, y: rect.height - 1))
-                context.stroke(linePath, with: .color(
-                    Color(red: 0.2, green: 0.6, blue: 1.0).opacity(0.5)
-                ), lineWidth: 1.5)
+                context.stroke(linePath, with: .color(AppColors.waveAccentLine), lineWidth: 1.5)
             }
         }
     }

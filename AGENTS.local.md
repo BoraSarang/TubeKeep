@@ -392,7 +392,21 @@ win.title = "🐛 Debug Logs"
 - **PERF/CACHE**: DebugLogger 9종 레벨, 플레이어 첫 프레임은 `.PERF`, 요약 캐시 히트는 `.CACHE`
 - **개인 편의 최우선**: 위 공통 규칙도 개인 프로젝트 원칙(장 0)을 우선으로 해석
 
-## 19. 버전 정보
+## 19. 디자인 시스템 (v3.2, T-1080~T-1083)
+
+- **권위**: `docs/DESIGN_SYSTEM.md` — 4계층 구조(L1 토큰 → L4 화면 적용)
+- **L1 토큰**: `Sources/TubeKeep/Theme/DesignTokens.swift` — `AppColors`/`AppFont`/`AppMetrics`
+- **L2·L3 컴포넌트**: `Sources/TubeKeep/Components/` — AppSearchField, StatusBadge, EmptyStateView,
+  AppPrimaryButton, ErrorBanner, SectionHeader, LibrarySortBar, SelectionBar
+- **필수 규칙**:
+  - 작업 단계에서 `.blue/.orange/.green/.red` 직접 사용 금지 → `AppColors` 경유
+  - 셀/배지/헤더 폰트는 `AppFont` 경유
+  - 정렬 바/선택 바/빈 상태/배지/검색 필드는 컴포넌트로 재사용 (중복 금지)
+  - 포인트 색은 시스템 블루(`Color.accentColor`) 유지
+  - `AppPrimaryButton` 등은 ButtonStyle 미채택 → 기존 스타일 지정과 충돌 없음
+- **검증**: 변경 후 `swift build -c debug` → `swift test`(76개) → `./scripts/test-core.sh`(23 PASS)
+
+## 20. 버전 정보
 
 - **현재 버전**: v2.8.1 (working) — 그 외 릴리즈: v2.7.7 (build 18)
 - **CFBundleShortVersionString**: 2.7.7
