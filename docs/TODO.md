@@ -619,6 +619,6 @@
 | T-1080 | **디자인 시스템 L1·L2** — DesignTokens(색/폰트/간격) + 공통 컴포넌트(SearchField/StatusBadge/EmptyState/ErrorBanner/SectionHeader) | medium | done | Theme/DesignTokens.swift + Components/ (시스템 블루 유지) |
 | T-1081 | **복합 컴포넌트 + 라이브러리 적용** — SortBar/SelectionBar + Grid/List/DiskCleanup 중복 제거 | medium | done | Components/SortBar.swift, SelectionBar.swift |
 | T-1082 | **다운로드/검색 적용** — DownloadQueue WaveProgress 토큰화 + 사이드바 검색 AppSearchField + ErrorBanner 적용(Home/Channel) | medium | done | DownloadQueueView.swift, LibrarySidebarView.swift, HomeView.swift |
-| T-1083 | **DESIGN_SYSTEM.md + 검증/커밋** — 디자인 시스템 문서화 + 빌드/테스트 + 세션 로그 | medium | 진행중 | docs/DESIGN_SYSTEM.md |
+| T-1083 | **DESIGN_SYSTEM.md + 검증/커밋** — 디자인 시스템 문서화 + 빌드/테스트 + 세션 로그 | medium | done | docs/DESIGN_SYSTEM.md |
 
 
