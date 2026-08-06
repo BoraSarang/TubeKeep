@@ -613,6 +613,6 @@
 | T-1074 | **중복 다운로드 방지** — 조회 시 중복 표시 + 스킵 | medium | done | isDuplicate 배지 + 이력 기반 스킵 |
 | T-1075 | **재생목록 감시** — 재생목록 구독 + 신규 자동 다운로드 | medium | done | SubscribedPlaylist + 사이드바 UI |
 | T-1076 | **큐 드래그 재정렬** — 대기열 순서 변경 + 영속 | medium | done | List onMove + setItems |
-| T-1077 | **핵심 기능 자동화 테스트** — test-core.sh + 수동 체크리스트 | medium | in_progress | scripts/test-core.sh + docs/tests/manual-checklist.md |
+| T-1077 | **핵심 기능 자동화 테스트** — test-core.sh + 수동 체크리스트 | medium | done | scripts/test-core.sh + docs/tests/manual-checklist.md |
 
 
