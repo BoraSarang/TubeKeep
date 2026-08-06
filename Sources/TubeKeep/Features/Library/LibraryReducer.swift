@@ -401,7 +401,7 @@ struct LibraryReducer {
                 let settings = Settings.loadSettings()
                 let itemData = state.items
                     .filter { state.selectedIds.contains($0.id) }
-                    .map { (filePath: $0.filePath, title: $0.title, id: $0.id, duration: $0.duration) }
+                    .map { (filePath: $0.filePath, title: $0.title, id: $0.id, duration: $0.duration, seek: $0.resumePosition) }
                 return .run { _ in await MainActor.run {
                     for data in itemData {
                         if settings.playerMode == .systemDefault {
@@ -411,7 +411,8 @@ struct LibraryReducer {
                                 fileURL: URL(fileURLWithPath: data.filePath),
                                 title: data.title,
                                 videoId: data.id,
-                                duration: Double(data.duration ?? 0)
+                                duration: Double(data.duration ?? 0),
+                                initialSeekTime: data.seek
                             )
                             NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
                         }
@@ -445,11 +446,20 @@ struct LibraryReducer {
                         fileURL: url,
                         title: item.title,
                         videoId: item.id,
-                        duration: Double(item.duration ?? 0)
+                        duration: Double(item.duration ?? 0),
+                        initialSeekTime: item.resumePosition
                     )
                     let queue = state.filteredItems
                         .drop { $0.id != id }
-                        .map { PlayerItem(fileURL: URL(fileURLWithPath: $0.filePath), title: $0.title, videoId: $0.id, duration: Double($0.duration ?? 0)) }
+                        .map { item in
+                            PlayerItem(
+                                fileURL: URL(fileURLWithPath: item.filePath),
+                                title: item.title,
+                                videoId: item.id,
+                                duration: Double(item.duration ?? 0),
+                                initialSeekTime: item.resumePosition
+                            )
+                        }
                     NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem, userInfo: ["queue": queue])
                 }
                 return .none

@@ -531,6 +531,36 @@ struct LibraryGridCell: View {
                         .padding(4)
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if item.resumePosition != nil {
+                    HStack(spacing: 3) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 8, weight: .bold))
+                        Text("이어보기")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.accentColor))
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .padding(6)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let progress = item.resumeProgress {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(.black.opacity(0.4))
+                            Rectangle()
+                                .fill(Color.accentColor)
+                                .frame(width: max(geo.size.width * progress, 3))
+                        }
+                    }
+                    .frame(height: 3)
+                }
+            }
             .frame(maxWidth: .infinity)
             .aspectRatio(16 / 9, contentMode: .fit)
             .clipped()

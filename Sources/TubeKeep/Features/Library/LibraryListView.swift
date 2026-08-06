@@ -337,6 +337,11 @@ private struct LibraryListRow: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
+                if let pos = item.resumePosition {
+                    Text("▶ " + LibraryItem.formatDuration(Int(pos)))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
                 if let upload = item.uploadDate {
                     Text(upload.formatted(date: .abbreviated, time: .omitted))
                         .font(.system(size: 10))
@@ -382,5 +387,20 @@ private struct LibraryListRow: View {
                     .frame(width: 48, height: 27)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let progress = item.resumeProgress {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(.black.opacity(0.4))
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(width: max(geo.size.width * progress, 2))
+                    }
+                }
+                .frame(height: 2)
+            }
+        }
+        .clipped()
     }
 }

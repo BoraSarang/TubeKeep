@@ -600,4 +600,18 @@
 | T-1059 | **IdleSubtitleService 메인 블록 + 취소 경합** — waitUntilExit → 폴링, 취소 후 후속 처리 가드 | high | done | IdleSubtitleService.swift |
 | T-1060 | **ClipService 파일명 충돌 + 메인 블록 + 취소 불가** — UUID 접미사, 썸네일 async, runFFmpeg 취소 | high | done | ClipService.swift |
 
+## v3.2 — 자주 쓰는 흐름 자동화 (이어보기/유휴 AI 배치/채널 프리셋/중복 방지/재생목록/큐 정렬) 🚧
+
+> PLAN_v3.2_macos.md. "받고 → 보고 → 정리" 반복 작업 자동화 6종.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1070 | **PLAN_v3.2 + TODO 등록** | high | done | docs/plans/PLAN_v3.2_macos.md |
+| T-1071 | **이어보기** — lastPlaybackPosition 저장 + 배지 + 재개 | high | done | 빌드+테스트 76/76 |
+| T-1072 | **유휴 AI 배치** — 자막 후 요약/태깅/팟캐스트 자동 | high | pending | |
+| T-1073 | **채널 자동 다운로드 v2** — 채널별 프리셋(해상도/MP3/자막/개수) | medium | pending | |
+| T-1074 | **중복 다운로드 방지** — 조회 시 중복 표시 + 스킵 | medium | pending | |
+| T-1075 | **재생목록 감시** — 재생목록 구독 + 신규 자동 다운로드 | medium | pending | |
+| T-1076 | **큐 드래그 재정렬** — 대기열 순서 변경 + 영속 | medium | pending | |
+
 

@@ -159,6 +159,30 @@ final class LibraryCacheService {
         return items.first { $0.id == id }
     }
 
+    // MARK: - Playback Position (이어보기)
+
+    func updatePlaybackPosition(videoId: String, position: Double) {
+        guard let item = findItem(id: videoId), position > 0 else { return }
+        item.lastPlaybackPosition = position
+        item.lastPlayedAt = Date()
+        do {
+            try context.save()
+        } catch {
+            DebugLogManager.shared?.append("[Library] 이어보기 위치 저장 실패: \(error)")
+        }
+    }
+
+    func clearPlaybackPosition(videoId: String) {
+        guard let item = findItem(id: videoId) else { return }
+        item.lastPlaybackPosition = nil
+        item.lastPlayedAt = nil
+        do {
+            try context.save()
+        } catch {
+            DebugLogManager.shared?.append("[Library] 이어보기 위치 초기화 실패: \(error)")
+        }
+    }
+
     // MARK: - Channel Names
 
     func channelNames(from items: [LibraryItem]) -> [(id: String, name: String, count: Int)] {

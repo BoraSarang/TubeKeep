@@ -21,7 +21,11 @@ final class LibraryItem: Identifiable {
     var chapters: Data?
     var subtitleLanguage: String?
 
-    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil, transcript: String? = nil, chapters: Data? = nil, subtitleLanguage: String? = nil) {
+    // v3.2: 이어보기
+    var lastPlaybackPosition: Double?
+    var lastPlayedAt: Date?
+
+    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil, transcript: String? = nil, chapters: Data? = nil, subtitleLanguage: String? = nil, lastPlaybackPosition: Double? = nil, lastPlayedAt: Date? = nil) {
         self.id = id
         self.title = title
         self.channelId = channelId
@@ -37,6 +41,8 @@ final class LibraryItem: Identifiable {
         self.transcript = transcript
         self.chapters = chapters
         self.subtitleLanguage = subtitleLanguage
+        self.lastPlaybackPosition = lastPlaybackPosition
+        self.lastPlayedAt = lastPlayedAt
     }
 
     func withChannelUploadIndex(_ index: Int) -> LibraryItem {
@@ -45,9 +51,24 @@ final class LibraryItem: Identifiable {
             thumbnailURL: thumbnailURL, filePath: filePath, downloadDate: downloadDate,
             uploadDate: uploadDate, duration: duration, channelUploadIndex: index,
             tags: tags, summary: summary, transcript: transcript, chapters: chapters,
-            subtitleLanguage: subtitleLanguage
+            subtitleLanguage: subtitleLanguage, lastPlaybackPosition: lastPlaybackPosition, lastPlayedAt: lastPlayedAt
         )
         return item
+    }
+}
+
+extension LibraryItem {
+    /// 재개 가능한 시청 위치. 5초 미만이거나 마지막 5% 구간(거의 다 봄)이면 nil.
+    var resumePosition: Double? {
+        guard let pos = lastPlaybackPosition, pos >= 5 else { return nil }
+        if let dur = duration, dur > 0, pos >= Double(dur) * 0.95 { return nil }
+        return pos
+    }
+
+    /// 썸네일 진행 바용 진행률 (0...1).
+    var resumeProgress: Double? {
+        guard let pos = resumePosition, let dur = duration, dur > 0 else { return nil }
+        return min(max(pos / Double(dur), 0), 1)
     }
 }
 

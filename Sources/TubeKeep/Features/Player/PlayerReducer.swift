@@ -43,6 +43,9 @@ struct PlayerReducer {
         var lastClipSaved = false
         var clipSaveMessage: String?
         var clipProgress: Double?
+
+        // v3.2 이어보기: 5초 간격 저장용 마지막 저장 시점
+        var lastPlaybackSaveTime: Double?
     }
 
     enum Action: Equatable {
@@ -181,6 +184,15 @@ struct PlayerReducer {
 
             case .videoDidEnd:
                 state.showUpNext = true
+                state.lastPlaybackSaveTime = nil
+                if let videoId = state.playerItem.videoId {
+                    return .merge(
+                        .send(.loadRecommendations),
+                        .run { _ in
+                            await MainActor.run { LibraryCacheService.shared.clearPlaybackPosition(videoId: videoId) }
+                        }
+                    )
+                }
                 return .send(.loadRecommendations)
 
             case .loadRecommendations:
@@ -238,6 +250,13 @@ struct PlayerReducer {
 
             case let .timeUpdated(time):
                 state.currentTime = time
+                guard let videoId = state.playerItem.videoId else { return .none }
+                if state.lastPlaybackSaveTime == nil || abs(time - state.lastPlaybackSaveTime!) >= 5 {
+                    state.lastPlaybackSaveTime = time
+                    return .run { _ in
+                        await MainActor.run { LibraryCacheService.shared.updatePlaybackPosition(videoId: videoId, position: time) }
+                    }
+                }
                 return .none
 
             case let .durationUpdated(duration):
@@ -433,6 +452,13 @@ struct PlayerReducer {
 
             case let .playingChanged(value):
                 state.isPlaying = value
+                if !value, let videoId = state.playerItem.videoId, state.currentTime > 0 {
+                    let pos = state.currentTime
+                    state.lastPlaybackSaveTime = pos
+                    return .run { _ in
+                        await MainActor.run { LibraryCacheService.shared.updatePlaybackPosition(videoId: videoId, position: pos) }
+                    }
+                }
                 return .none
 
             // v3.0 Phase B
