@@ -590,7 +590,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let hostingCtrl = NSHostingController(rootView: playerView)
         let window = PlayerWindow(contentViewController: hostingCtrl)
         window.title = playerItem.title
-        window.styleMask = [.titled, .closable, .resizable]
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.managed, .ignoresCycle, .fullScreenPrimary]
         window.identifier = NSUserInterfaceItemIdentifier("player")
