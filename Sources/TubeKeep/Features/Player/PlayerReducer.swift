@@ -37,6 +37,12 @@ struct PlayerReducer {
         var queue: [PlayerItem] = []
         var queueIndex: Int = -1
         var showQueue: Bool = false
+
+        // Clip (A-B 저장)
+        var isSavingClip = false
+        var lastClipSaved = false
+        var clipSaveMessage: String?
+        var clipProgress: Double?
     }
 
     enum Action: Equatable {
@@ -79,6 +85,14 @@ struct PlayerReducer {
         case playPrevious
         case playAtQueue(Int)
         case toggleQueue
+
+        // Clip (A-B 저장)
+        case saveClip
+        case clipProgressUpdated(Double)
+        case clipSaveFinished
+        case clipSaveFailed(String)
+        case clipSaveIndicatorExpired
+        case clipSaveMessageExpired
     }
 
     var body: some ReducerOf<Self> {
@@ -445,6 +459,69 @@ struct PlayerReducer {
             case .clearABLoop:
                 state.aLoop = nil
                 state.bLoop = nil
+                return .none
+
+            // Clip (A-B 저장)
+            case .saveClip:
+                guard let a = state.aLoop, let b = state.bLoop, a < b,
+                      let fileURL = state.playerItem.fileURL else { return .none }
+                state.isSavingClip = true
+                state.lastClipSaved = false
+                state.clipSaveMessage = nil
+                state.clipProgress = 0
+                let videoId = state.playerItem.videoId ?? "unknown"
+                let title = state.playerItem.title
+                return .run { send in
+                    let channelName = await MainActor.run {
+                        LibraryCacheService.shared.findItem(id: videoId)?.channelName
+                    }
+                    do {
+                        _ = try await ClipService.shared.saveClip(
+                            videoId: videoId,
+                            channelName: channelName,
+                            title: title,
+                            sourcePath: fileURL.path,
+                            start: a,
+                            end: b,
+                            progress: { p in send(.clipProgressUpdated(p)) }
+                        )
+                        await send(.clipSaveFinished)
+                    } catch {
+                        await send(.clipSaveFailed(error.localizedDescription))
+                    }
+                }
+
+            case .clipProgressUpdated(let progress):
+                state.clipProgress = progress
+                return .none
+
+            case .clipSaveFinished:
+                state.isSavingClip = false
+                state.lastClipSaved = true
+                state.clipProgress = nil
+                return .run { send in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await send(.clipSaveIndicatorExpired)
+                }
+
+            case .clipSaveFailed(let message):
+                state.isSavingClip = false
+                state.clipProgress = nil
+                state.clipSaveMessage = message
+                #if DEBUG
+                Task { @MainActor in DebugLogManager.shared?.append("[Clip] saveFailed: \(message)") }
+                #endif
+                return .run { send in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await send(.clipSaveMessageExpired)
+                }
+
+            case .clipSaveIndicatorExpired:
+                state.lastClipSaved = false
+                return .none
+
+            case .clipSaveMessageExpired:
+                state.clipSaveMessage = nil
                 return .none
 
             case let .setQueue(queue, startIndex):

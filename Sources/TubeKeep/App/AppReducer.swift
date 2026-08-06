@@ -12,6 +12,7 @@ struct AppReducer {
         var statusBar = StatusBarReducer.State()
         var library = LibraryReducer.State()
         var profile = ProfileReducer.State()
+        var clip = ClipReducer.State()
         var toastNotifications: [ToastNotification] = []
     }
 
@@ -22,6 +23,7 @@ struct AppReducer {
         case statusBar(StatusBarReducer.Action)
         case library(LibraryReducer.Action)
         case profile(ProfileReducer.Action)
+        case clip(ClipReducer.Action)
         case clipboardDetected(String)
         case appDidFinishLaunching
         case discoverAddToQueue(DownloadItem)
@@ -76,6 +78,9 @@ struct AppReducer {
         }
         Scope(state: \.profile, action: \.profile) {
             ProfileReducer()
+        }
+        Scope(state: \.clip, action: \.clip) {
+            ClipReducer()
         }
 
         Reduce { state, action in

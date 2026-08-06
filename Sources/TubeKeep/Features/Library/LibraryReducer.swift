@@ -8,6 +8,8 @@ enum LibrarySidebarMode: String, Equatable {
     case history = "History"
     case profile = "Profile"
     case report = "Report"
+    case clips = "Clips"
+    case diskCleanup = "Disk Cleanup"
 }
 
 @Reducer
@@ -154,6 +156,7 @@ struct LibraryReducer {
         case itemsLoaded([LibraryItem])
         case addItem(LibraryItem)
         case removeItem(String)
+        case removeItems([String])
         case removeItemsByChannel(channelId: String, channelName: String)
         case removeSelected
         case revealSelectedInFinder
@@ -278,6 +281,13 @@ struct LibraryReducer {
                 state.subtitleAvailableIds.remove(id)
                 return .run { _ in
                     await LibraryCacheService.shared.removeItem(id: id)
+                }
+
+            case .removeItems(let ids):
+                state.items.removeAll { ids.contains($0.id) }
+                state.subtitleAvailableIds.subtract(ids)
+                return .run { _ in
+                    await LibraryCacheService.shared.removeItems(ids: ids)
                 }
 
             case .removeItemsByChannel(let channelId, let channelName):

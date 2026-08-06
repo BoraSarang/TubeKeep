@@ -95,6 +95,10 @@ struct PlayerView: View {
                 SubtitleOverlay(cues: store.subtitles, currentTime: mpv.currentTime)
             }
             if store.showUpNext { upNextOverlay.transition(.opacity) }
+            if let msg = store.clipSaveMessage {
+                clipMessageBanner(msg)
+                    .transition(.opacity)
+            }
             VStack {
                 Spacer()
                 if showControls { controlBar.frame(height: controlBarHeight).background(.ultraThinMaterial).transition(.move(edge: .bottom).combined(with: .opacity)) }
@@ -113,6 +117,7 @@ struct PlayerView: View {
                 controlsTask = Task {
                     try? await Task.sleep(for: controlsAutoHideDelay)
                     guard !Task.isCancelled else { return }
+                    if store.isSavingClip { return }
                     await MainActor.run { showControls = false }
                 }
             case .ended:
@@ -300,6 +305,26 @@ struct PlayerView: View {
                     .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.bLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
             }.buttonStyle(.plain).disabled(store.aLoop == nil)
                 .help(store.bLoop == nil ? "현재 위치를 반복 끝점(B)으로 설정 (A→B 반복 시작)" : "반복 해제")
+            Button { store.send(.saveClip) } label: {
+                Group {
+                    if store.isSavingClip {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: store.lastClipSaved ? "checkmark.circle.fill" : "arrow.down.circle")
+                            .font(.system(size: 13))
+                            .foregroundColor(store.lastClipSaved ? .green : .white)
+                    }
+                }
+                .frame(width: 20)
+            }.buttonStyle(.plain)
+                .disabled(store.isSavingClip || store.aLoop == nil || store.bLoop == nil || store.playerItem.fileURL == nil)
+                .help(store.aLoop != nil && store.bLoop != nil ? "A-B 구간을 클립으로 저장" : "A와 B를 설정하면 클립으로 저장할 수 있어요")
+                .popover(isPresented: Binding(
+                    get: { store.isSavingClip },
+                    set: { _ in }
+                ), arrowEdge: .top) {
+                    ClipSavePopoverView(progress: store.clipProgress ?? 0)
+                }
             Text(timeString(current)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .trailing)
             Slider(value: Binding(get: { progress }, set: { isSeeking = true; seekTime = $0 * dur }), in: 0...1, onEditingChanged: { editing in
                 if !editing { mpv.seek(to: seekTime); isSeeking = false }
@@ -339,6 +364,23 @@ struct PlayerView: View {
     private var bLoopText: String {
         guard let b = store.bLoop else { return "B" }
         return "B \(timeString(b))"
+    }
+
+    private func clipMessageBanner(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.yellow)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.75))
+        .clipShape(Capsule())
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.top, 14)
     }
 
     @ViewBuilder
@@ -428,5 +470,59 @@ struct PlayerView: View {
         else if let win = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.identifier?.rawValue == "player" }) {
             window = win; win.toggleFullScreen(nil)
         }
+    }
+}
+
+// MARK: - Clip Save Popover
+
+struct ClipSavePopoverView: View {
+    let progress: Double
+    @State private var elapsed: TimeInterval = 0
+    @State private var startTime = Date()
+    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "scissors")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text("클립 저장 중...")
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 13, weight: .bold).monospacedDigit())
+            }
+            ProgressView(value: progress)
+                .controlSize(.small)
+            HStack {
+                Text("경과 \(formatTime(elapsed))")
+                Spacer()
+                if let remaining = remainingTime {
+                    Text("남은 시간 약 \(formatTime(remaining))")
+                }
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            Text("저장 중에도 영상은 계속 시청할 수 있어요")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .frame(width: 250)
+        .onReceive(timer) { _ in
+            elapsed = Date().timeIntervalSince(startTime)
+        }
+    }
+
+    private var remainingTime: TimeInterval? {
+        guard progress > 0.03, elapsed > 1 else { return nil }
+        let total = elapsed / progress
+        return max(total - elapsed, 0)
+    }
+
+    private func formatTime(_ t: TimeInterval) -> String {
+        let total = Int(t)
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }

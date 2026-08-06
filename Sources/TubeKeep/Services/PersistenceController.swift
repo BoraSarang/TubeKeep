@@ -19,7 +19,7 @@ final class PersistenceController {
             config = ModelConfiguration(url: storeURL)
         }
         do {
-            container = try ModelContainer(for: LibraryItem.self, SubscribedChannel.self, configurations: config)
+            container = try ModelContainer(for: LibraryItem.self, SubscribedChannel.self, ClipItem.self, configurations: config)
         } catch {
             fatalError("SwiftData 컨테이너 초기화 실패: \(error)")
         }
