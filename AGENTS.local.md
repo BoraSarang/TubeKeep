@@ -48,8 +48,8 @@
 
 | 파일 | 내용 |
 |------|------|
-| `BRAND.md` | 앱 이름, 슬로건, 브랜드 무드 |
-| `UI_DESIGN.md` | 사이드바 네비게이션, Discover 탭, AI 요약 UI |
+| `archive/BRAND.md` | 앱 이름, 슬로건, 브랜드 무드 (과거 문서 보관) |
+| `archive/UI_DESIGN.md` | 사이드바 네비게이션, Discover 탭, AI 요약 UI (과거 문서 보관) |
 | `IMAGE_CACHING.md` | 이미지 캐시 전략, 디렉토리 구조 |
 
 ### API 문서 (api/)
@@ -65,14 +65,23 @@
 ```
 docs/
 ├── plans/
-│   ├── PLAN_v2.5.2.md
-│   ├── PLAN_v2.5.3.md
-│   └── archive/          # 완료된 버전 보관
+│   ├── PLAN_v3.0_macos.md
+│   ├── PLAN_v3.1_macos.md
+│   ├── PLAN_v3.2_macos.md   # 현재 작업 버전
+│   └── archive/             # 완료된 구버전 보관 (v2.x)
 ├── tests/
-│   ├── v2.3.0.md         # ✅ 완료
-│   ├── v2.5.0.md         # 진행 중
-│   └── v2.5.x.md
+│   ├── v3.1.1.md
+│   ├── results/             # 자동/수동 테스트 결과 (auto-test-*.md)
+│   └── archive/             # 완료된 구버전 보관 (v2.x)
+├── web/                     # 랜딩 사이트 (index.html, style.css, app-icon.png)
+├── screenshots/{platform}/  # a11y-dump 3종 세트 (.a11y.txt/.storage.json/.perf.json)
+├── api/                     # API 설정 문서
+├── DESIGN_SYSTEM.md         # 디자인 시스템 정의서
+└── archive/                 # BRAND.md, UI_DESIGN.md, 2.7.7_summary.md 보관
 ```
+
+- 스크립트는 **루트 `scripts/` (소문자) 한 곳**에 통합: `build_and_run.sh` 디스패처가 `scripts/*.sh`를 호출
+- 완료된 버전은 `plans/archive/`, `tests/archive/`로 이동, 활성 버전은 최상위 유지
 
 - **계획 문서 필수 섹션**: 개요, 결정 사항, 아키텍처, 구현 단계(T-번호), State/Action 설계(TCA Reducer), UI 통합, 테스트 계획(TC-번호)
 - **테스트 문서 형식**: 빌드 명령어, 전제조건, TC별 절차/기대결과, 결과 요약표

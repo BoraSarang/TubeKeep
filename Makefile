@@ -14,7 +14,7 @@ run:
 # ── Build + DMG + GitHub Release (full pipeline) ──
 release:
 	./build_and_run.sh release --no-launch
-	./Tools/create_dmg.sh
+	./scripts/create_dmg.sh
 	@echo ""
 	@echo "🚀 Ready to release v$(VERSION)"
 	@echo "   Run 'make release-upload' to upload to GitHub Releases"
@@ -22,7 +22,7 @@ release:
 
 # ── DMG only from existing .app at /tmp/TubeKeep-build/ ──
 release-dmg:
-	./Tools/create_dmg.sh
+	./scripts/create_dmg.sh
 
 # ── Upload DMG to GitHub Releases ──
 release-upload:
@@ -37,17 +37,17 @@ release-upload:
 
 # ── Sign + Notarize (requires Developer ID cert + notary credentials) ──
 codesign:
-	./Tools/codesign.sh
+	./scripts/codesign.sh
 
 notarize:
-	./Tools/codesign.sh
+	./scripts/codesign.sh
 
 # ── Full signed release chain ──
 release-signed:
 	./build_and_run.sh release --no-launch
-	./Tools/codesign.sh
-	./Tools/create_dmg.sh
-	./Tools/codesign.sh /tmp/TubeKeep-build/TubeKeep.app Build/TubeKeep-$(VERSION).dmg
+	./scripts/codesign.sh
+	./scripts/create_dmg.sh
+	./scripts/codesign.sh /tmp/TubeKeep-build/TubeKeep.app Build/TubeKeep-$(VERSION).dmg
 	@echo ""
 	@echo "🚀 Signed release v$(VERSION) ready"
 
@@ -65,7 +65,7 @@ release-skip-build: release-dmg
 
 # ── Only sign (no build, no dmg) ──
 sign-only:
-	./Tools/codesign.sh
+	./scripts/codesign.sh
 
 clean:
 	swift package clean
