@@ -337,6 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func addShortcutItem(to menu: NSMenu, title: String, action: Selector, actionKey: GlobalShortcutAction, bindings: [GlobalShortcutAction: HotKeyBinding]) {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: actionKey.icon, accessibilityDescription: nil)
         item.target = self
         if let binding = bindings[actionKey], binding.isEnabled, binding.keyCode > 0 {
             let eq = GlobalShortcutService.shared.menuKeyEquivalent(for: binding)

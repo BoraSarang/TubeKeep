@@ -173,17 +173,17 @@ final class StatusBarManager {
 
     func rebuildMenu() {
         let menu = NSMenu()
-        let libraryItem = NSMenuItem(title: "튜브킵", action: #selector(openMainWindow), keyEquivalent: "")
+        let libraryItem = NSMenuItem(title: "🎬 튜브킵", action: #selector(openMainWindow), keyEquivalent: "")
         libraryItem.target = self
         menu.addItem(libraryItem)
         menu.addItem(NSMenuItem.separator())
-        let videoItem = NSMenuItem(title: "영상 다운로더", action: #selector(openVideoDownloaderWindow), keyEquivalent: "")
+        let videoItem = NSMenuItem(title: "⬇️ 영상 다운로더", action: #selector(openVideoDownloaderWindow), keyEquivalent: "")
         videoItem.target = self
         menu.addItem(videoItem)
-        let batchItem = NSMenuItem(title: "일괄 다운로더", action: #selector(openBatchDownloadWindow), keyEquivalent: "")
+        let batchItem = NSMenuItem(title: "📦 일괄 다운로더", action: #selector(openBatchDownloadWindow), keyEquivalent: "")
         batchItem.target = self
         menu.addItem(batchItem)
-        let channelItem = NSMenuItem(title: "채널 다운로더", action: #selector(openChannelDownloaderWindow), keyEquivalent: "")
+        let channelItem = NSMenuItem(title: "📺 채널 다운로더", action: #selector(openChannelDownloaderWindow), keyEquivalent: "")
         channelItem.target = self
         menu.addItem(channelItem)
         menu.addItem(NSMenuItem.separator())
@@ -247,7 +247,7 @@ final class StatusBarManager {
 
         menu.addItem(NSMenuItem.separator())
         let settingsItem = NSMenuItem(
-            title: "설정...",
+            title: "⚙️ 설정...",
             action: #selector(openSettingsWindow),
             keyEquivalent: ","
         )
@@ -255,7 +255,7 @@ final class StatusBarManager {
         settingsItem.keyEquivalentModifierMask = .command
         menu.addItem(settingsItem)
         let infoItem = NSMenuItem(
-            title: "정보",
+            title: "ℹ️ 정보",
             action: #selector(openAboutWindow),
             keyEquivalent: ""
         )

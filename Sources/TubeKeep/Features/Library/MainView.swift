@@ -95,10 +95,12 @@ struct MainView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
-                Menu("영상 다운로드") {
+                Menu {
                     shortcutButton("영상 다운로더", notification: Constants.openDownloaderWindowNotification, actionKey: .openDownloader)
                     shortcutButton("일괄 다운로더", notification: Constants.openBatchWindowNotification, actionKey: .openBatchDownloader)
                     shortcutButton("채널 다운로더", notification: Constants.openChannelWindowNotification, actionKey: .openChannelDownloader)
+                } label: {
+                    Label("영상 다운로드", systemImage: "arrow.down.circle.fill")
                 }
                 .id(shortcutsVersion)
                 .onReceive(NotificationCenter.default.publisher(for: GlobalShortcutService.didChangeNotification)) { _ in
@@ -200,18 +202,24 @@ struct MainView: View {
         if let binding, binding.isEnabled, binding.keyCode > 0 {
             let eq = GlobalShortcutService.shared.menuKeyEquivalent(for: binding)
             if eq.key.count == 1, eq.modifiers.contains(.command) {
-                Button(title) {
+                Button {
                     NotificationCenter.default.post(name: notification, object: nil)
+                } label: {
+                    Label(title, systemImage: actionKey.icon)
                 }
                 .keyboardShortcut(KeyboardShortcut(KeyEquivalent(Character(eq.key)), modifiers: Self.keyboardModifiers(eq.modifiers)))
             } else {
-                Button("\(title)  \(binding.display)") {
+                Button {
                     NotificationCenter.default.post(name: notification, object: nil)
+                } label: {
+                    Label("\(title)  \(binding.display)", systemImage: actionKey.icon)
                 }
             }
         } else {
-            Button(title) {
+            Button {
                 NotificationCenter.default.post(name: notification, object: nil)
+            } label: {
+                Label(title, systemImage: actionKey.icon)
             }
         }
     }
