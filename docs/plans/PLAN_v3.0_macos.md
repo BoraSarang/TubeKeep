@@ -48,9 +48,9 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 - `tubekeep://add?url=...` — URL 수신 시 다운로더 창 열고 자동 조회
 - `tubekeep://open?id=...` — 보관함 ID로 플레이어/요약 열기
 - AppDelegate `application(_:open:)` 핸들러 확장 (현재 scheme 처리와 통합)
-- 브라우저 확장(Safari/Chrome)은 별도 PLAN 검토
+- **브라우저 확장(Safari/Chrome)은 진행하지 않음 (T-1031)** — 클립보드 감시로 충분
 
-> **위젯(Phase C) 보류 안내 (2026-08-05)**: T-1020/T-1021 구현 완료했으나, ad-hoc 서명 환경에서는 macOS 위젯 갤러리 등록이 불가함 (Developer ID 인증서 필요, chronod `extensionsPendingDescriptorRefetch` 확인). 코드/인프라는 유지하며 Developer ID 인증서 보유 시 재활성화한다. 대안(메뉴바 진행률 표시)은 별도 검토 항목.
+> **위젯(Phase C) 종료 안내 (2026-08-05)**: T-1020/T-1021 구현 완료했으나 ad-hoc 서명 환경에서 위젯 갤러리 등록이 불가해 **진행하지 않음**으로 확정. 메뉴바 속도 표시로 충분. 코드는 유지하되 재활성화 계획 없음.
 
 ## 4. 구현 단계 (T-번호)
 
@@ -64,9 +64,10 @@ v2.9(리팩토링) 완료 후 첫 메이저 기능 버전. 사용자(제작자)�
 | T-1011 | PlayerReducer 재생 속도·A-B·재생 목록 State | 완료 — queue/queueIndex, setQueue/playNext/playPrevious |
 | T-1012 | PlayerView 컨트롤바 확장 | 완료 — 속도(0.75~2.0x)/A-B(3단계)/이전·다음, onChange→mpv 반영 |
 | T-1013 | A-B 반복 UX 개선 + 재생 목록 패널 | 완료 — 시작점A/끝점B 2버튼 + 슬라이더 구간 오버레이 + showQueue 패널 + playAtQueue |
-| T-1020 | WidgetKit 타깃 + App Group 상태 공유 | 완료 — executableTarget + 수동 appex 조립 + group.com.tubekeep entitlement |
-| T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | 완료 — DownloadStatus small/medium + 1분 타임라인 + reloadTimelines |
-| T-1030 | tubekeep:// scheme 확장 (add/open) | D |
+| T-1020 | WidgetKit 타깃 + App Group 상태 공유 | **진행하지 않음** — ad-hoc 서명으로 위젯 갤러리 등록 불가 |
+| T-1021 | 위젯 뷰 (진행률/대기/최근 완료) | **진행하지 않음** — 메뉴바 속도 표시로 충분 |
+| T-1030 | tubekeep:// scheme 확장 (add/open) | 완료 — add?url= 다운로더 조회, open?id= 보관함 재생 |
+| T-1031 | Safari/Chrome 확장 앱 | **진행하지 않음** — 클립보드 감시로 충분 |
 
 ## 5. 테스트 계획
 

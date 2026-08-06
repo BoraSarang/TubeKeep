@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## v3.0 (2026-08-05) — 신규 기능 (검색/플레이어/위젯/브라우저) 🔶 진행 중
+## v3.0 (2026-08-06) — 전역 검색 + 플레이어 고도화 + scheme 통합 (macOS) ✅
 
-> v2.9 리팩토링 후 첫 메이저 기능 버전. Phase A(전역 검색) 완료, B/C/D 진행 예정.
+> v2.9 리팩토링 후 첫 메이저 기능 버전. Phase A(검색)·B/B-2(플레이어)·D(scheme) 완료. Phase C(위젯)·브라우저 확장은 **진행하지 않음**으로 확정.
 
 ### Phase A — 전역 검색 보강
 - **T-1003**: 검색 결과 스니펫 개선
@@ -40,20 +40,33 @@
 - `./build_and_run.sh debug macos --no-launch` ✅ (14.17s)
 - `swift test` ✅ 76/76 (0 failures)
 
-### Phase C — 홈 화면 위젯 (WidgetKit)
+### Phase C — 홈 화면 위젯 (WidgetKit) → **진행하지 않음** ⛔
 - **T-1020**: `TubeKeepWidget` executableTarget 추가 + `build-macos.sh`가 `Contents/PlugIns/TubeKeepWidget.appex` 조립·서명
   - App Group `group.com.tubekeep` entitlement를 앱·위젯 양쪽에 적용 (ad-hoc 서명)
   - 앱이 그룹 컨테이너 UserDefaults에 다운로드 상태 스냅샷(`widget_snapshot`) 기록
 - **T-1021**: `DownloadStatus` 위젯 (small/medium)
   - 진행 중 항목(제목/진행률/속도), 대기 수, 최근 완료 표시
   - TimelineProvider가 1분 주기로 스냅샷 갱신, 완료 시 `WidgetCenter.reloadTimelines`로 즉시 반영
-  - 진행 중 없으면 "다운로드 없음" 안내
+- **결정 (2026-08-06)**: 구현은 완료했으나 ad-hoc 서명 환경에서 macOS 위젯 갤러리 등록이 불가(Developer ID 인증서 필요, chronod `extensionsPendingDescriptorRefetch` 확인). 메뉴바 속도 표시로 충분하다고 판단해 **진행하지 않음**으로 확정. 코드는 유지.
 - 파일: `Sources/TubeKeepWidget/DownloadStatusWidget.swift`, `Sources/TubeKeep/Services/WidgetSnapshotStore.swift`, `Entitlements/*.entitlements`, `Info-Widget.plist`
 
-### Verification
-- `./build_and_run.sh debug macos --no-launch` ✅ (12.14s + 위젯 1.24s)
+### Phase D — 브라우저 통합 (scheme 확장) ✅
+- **T-1030**: `tubekeep://` scheme 확장 (`handleGetURLEvent` 재작성)
+  - `tubekeep://add?url=<encoded>` — 영상 다운로더 창 열기 + URL 자동 조회
+  - `tubekeep://open?id=<videoId>` — 보관함 항목으로 플레이어 열기 (`openLibraryItem`)
+  - 기존 bare URL(`tubekeep://youtube.com/...`) 하위호환 유지
+- **T-1031**: Safari/Chrome 확장 앱 → **진행하지 않음** (클립보드 감시로 충분)
+
+### v3.0 추가 개선
+- **영상 플레이어 창 최소화 버튼** 추가 (styleMask `.miniaturizable` 누락 수정)
+- **영상 플레이어 볼륨 컨트롤** — 컨트롤바 우측 스피커 아이콘(음소거 토글) + 볼륨 슬라이더(0~100, 즉시 mpv 반영)
+- **썸네일 토글 체크박스화** — 보관함 그리드/목록 상단의 토글을 `checkmark.square`/`square` + "썸네일" 라벨로 변경
+- **앱 종료 안전장치** — 마지막 창을 닫아도 앱 유지 (`applicationShouldTerminateAfterLastWindowClosed = false`)
+- **위젯 등록 개선** — `Info-Widget.plist`에 `CFBundleSupportedPlatforms`/`DTPlatformName` 추가, `build-macos.sh`에서 `--deep` 서명 제거(위젯 entitlement 보존) + 임베드 바이너리 개별 서명
+
+### 최종 Verification
+- `./build_and_run.sh debug macos --no-launch` ✅ (Phase D·볼륨·최소화 빌드 통과)
 - `swift test` ✅ 76/76 (0 failures)
-- `codesign -d --entitlements`로 앱·위젯 양쪽 App Group 확인 ✅
 
 ## v2.9.1 (2026-08-05) — 타임스탬프/챕터 플레이어 연동 (macOS) ✅
 
