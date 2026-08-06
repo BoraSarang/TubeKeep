@@ -23,7 +23,6 @@ final class StatusBarManager {
     var onOpenChannelDownloader: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onOpenAbout: (() -> Void)?
-    var onStartSpeedTest: (() -> Void)?
 
     var onOpenBuyMeACoffee: (() -> Void)?
 
@@ -187,11 +186,6 @@ final class StatusBarManager {
         channelItem.target = self
         menu.addItem(channelItem)
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(
-            title: "인터넷 속도 측정",
-            action: #selector(startSpeedTest),
-            keyEquivalent: ""
-        ))
 
         if store.state.statusBar.hasActiveDownloads || store.state.statusBar.activeCount > 0 {
             let sep = NSMenuItem.separator()
@@ -307,7 +301,6 @@ final class StatusBarManager {
     @objc private func openChannelDownloaderWindow() { onOpenChannelDownloader?() }
     @objc private func openSettingsWindow() { onOpenSettings?() }
     @objc private func openAboutWindow() { onOpenAbout?() }
-    @objc private func startSpeedTest() { onStartSpeedTest?() }
     @objc private func quitApp() { NSApp.terminate(nil) }
     @objc private func openBuyMeACoffee() { onOpenBuyMeACoffee?() }
 

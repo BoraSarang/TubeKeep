@@ -17,7 +17,7 @@
 ┌─────────────────────────────────────────┐
 │              AppDelegate                │
 │  NSStatusBar / NSWindow x5 / NSPanel  │
-│  글로벌단축키 / 클립보드감시 / 속도측정  │
+│  글로벌단축키 / 클립보드감시  │
 └────────────────┬────────────────────────┘
                  │ Store(initialState:) { AppReducer() }
                  ▼
@@ -175,7 +175,6 @@ struct State: Equatable {
     var totalCount = 0
     var completedCount = 0
     var downloadETA = ""
-    var speedTestState: SpeedTestState = .idle  // .idle / .running / .done(speed)
 }
 ```
 
@@ -376,8 +375,6 @@ NSStatusBar.system.statusItem(withLength: 88)
 영상 다운로더       → openVideoDownloaderWindow
 일괄 다운로더       → openBatchDownloadWindow
 채널 다운로더       → openChannelDownloaderWindow
-────────────────
-인터넷 속도 측정    → startSpeedTest
 ────────────────
 설정...           → openSettingsWindow (⌘,)
 ────────────────
