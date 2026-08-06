@@ -135,6 +135,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             name: Constants.openWhisperSettingsNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshMainMenu),
+            name: GlobalShortcutService.didChangeNotification,
+            object: nil
+        )
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.modifierFlags.contains(.command) {
@@ -275,6 +281,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         editMenu.addItem(withTitle: "모두 선택", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenuItem.submenu = editMenu
 
+        addShortcutMenu(to: mainMenu)
+
         #if DEBUG
         let debugMenuItem = NSMenuItem()
         mainMenu.addItem(debugMenuItem)
@@ -307,6 +315,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         #endif
 
         NSApp.mainMenu = mainMenu
+    }
+
+    private func addShortcutMenu(to mainMenu: NSMenu) {
+        let menuItem = NSMenuItem()
+        mainMenu.addItem(menuItem)
+        let menu = NSMenu(title: "다운로더")
+
+        let bindings = GlobalShortcutService.shared.loadBindings()
+
+        addShortcutItem(to: menu, title: "영상 다운로더", action: #selector(openVideoDownloaderWindow), actionKey: .openDownloader, bindings: bindings)
+        addShortcutItem(to: menu, title: "일괄 다운로더", action: #selector(openBatchDownloadWindow), actionKey: .openBatchDownloader, bindings: bindings)
+        addShortcutItem(to: menu, title: "채널 다운로더", action: #selector(openChannelDownloaderWindow), actionKey: .openChannelDownloader, bindings: bindings)
+
+        menu.addItem(.separator())
+        let settingsItem = menu.addItem(withTitle: "설정…", action: #selector(openSettingsWindow), keyEquivalent: ",")
+        settingsItem.target = self
+
+        menuItem.submenu = menu
+    }
+
+    private func addShortcutItem(to menu: NSMenu, title: String, action: Selector, actionKey: GlobalShortcutAction, bindings: [GlobalShortcutAction: HotKeyBinding]) {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        if let binding = bindings[actionKey], binding.isEnabled, binding.keyCode > 0 {
+            let eq = GlobalShortcutService.shared.menuKeyEquivalent(for: binding)
+            if eq.key.count == 1, eq.modifiers.contains(.command) {
+                item.keyEquivalent = eq.key
+                item.keyEquivalentModifierMask = eq.modifiers
+            } else {
+                item.title = "\(title)\t\(binding.display)"
+            }
+        }
+        menu.addItem(item)
+    }
+
+    @objc private func refreshMainMenu() {
+        setupMainMenu()
     }
 
     private func migrateLibraryData() {

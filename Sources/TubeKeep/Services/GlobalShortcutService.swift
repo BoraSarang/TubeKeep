@@ -49,6 +49,8 @@ struct HotKeyBinding: Equatable, Codable {
 final class GlobalShortcutService {
     static let shared = GlobalShortcutService()
 
+    static let didChangeNotification = Notification.Name("GlobalShortcutsDidChange")
+
     private let storageKey = "globalShortcuts"
     private var hotKeyRefs: [GlobalShortcutAction: EventHotKeyRef] = [:]
     private var handlerRef: EventHandlerRef?
@@ -82,6 +84,16 @@ final class GlobalShortcutService {
         loadBindings()[action]
     }
 
+    func menuKeyEquivalent(for binding: HotKeyBinding) -> (key: String, modifiers: NSEvent.ModifierFlags) {
+        let key = GlobalShortcutService.stringFromKeyCode(binding.keyCode)?.lowercased() ?? ""
+        var flags: NSEvent.ModifierFlags = []
+        if binding.modifiers & UInt32(cmdKey) != 0 { flags.insert(.command) }
+        if binding.modifiers & UInt32(optionKey) != 0 { flags.insert(.option) }
+        if binding.modifiers & UInt32(shiftKey) != 0 { flags.insert(.shift) }
+        if binding.modifiers & UInt32(controlKey) != 0 { flags.insert(.control) }
+        return (key, flags)
+    }
+
     func saveBinding(_ action: GlobalShortcutAction, _ binding: HotKeyBinding) {
         var dict: [String: HotKeyBinding] = [:]
         if let data = UserDefaults.standard.data(forKey: storageKey),
@@ -93,6 +105,7 @@ final class GlobalShortcutService {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
         register(action: action, binding: binding)
+        NotificationCenter.default.post(name: GlobalShortcutService.didChangeNotification, object: nil)
     }
 
     func clearBinding(_ action: GlobalShortcutAction) {
@@ -104,6 +117,7 @@ final class GlobalShortcutService {
         if let newData = try? JSONEncoder().encode(dict) {
             UserDefaults.standard.set(newData, forKey: storageKey)
         }
+        NotificationCenter.default.post(name: GlobalShortcutService.didChangeNotification, object: nil)
     }
 
     // MARK: - Carbon HotKey

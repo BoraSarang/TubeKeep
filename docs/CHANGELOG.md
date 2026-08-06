@@ -22,6 +22,7 @@
 - **T-1043**: `GlobalShortcutService` (Carbon RegisterEventHotKey + TISCopyCurrentASCIICapableKeyboardLayoutInputSource 키 표시)
   - `GlobalShortcutAction` 3종: 다운로더 열기 / 일괄 다운로더 열기 / 채널 다운로더 열기
   - SettingsSystemTab에 기록 UI(로컬 모니터 + `onDisappear` 해제), AppDelegate에서 `start()`
+- **단축키 메뉴바 표시**: 메뉴바에 "다운로더" 메뉴 추가 — 전역 단축키가 설정된 항목은 키 등가물로 표시(⌘⌥S 등), command 미포함/특수키는 타이틀에 `\t단축키`로 표시, 단축키 변경 시 `GlobalShortcutService.didChangeNotification`으로 메뉴 실시간 갱신
 
 ### Phase D — 유휴 자막 자동 다운로드
 - **T-1044**: `IdleSubtitleService` — `CGEventSource.secondsSinceLastEventType` 시스템 유휴 감지 + 15초 타이머

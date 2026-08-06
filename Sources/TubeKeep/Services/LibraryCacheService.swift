@@ -106,6 +106,7 @@ final class LibraryCacheService {
 
     func removeItem(id: String) {
         if let item = findItem(id: id) {
+            guard ClipService.confirmAndDeleteClipsIfAny(for: item.id) else { return }
             BookmarkManager.ensureAccess()
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
@@ -119,6 +120,7 @@ final class LibraryCacheService {
         let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
         guard let items = try? context.fetch(descriptor) else { return }
         for item in items where idSet.contains(item.id) {
+            guard ClipService.confirmAndDeleteClipsIfAny(for: item.id) else { continue }
             BookmarkManager.ensureAccess()
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
@@ -127,7 +129,7 @@ final class LibraryCacheService {
         try? context.save()
     }
 
-    private func findItem(id: String) -> LibraryItem? {
+    func findItem(id: String) -> LibraryItem? {
         let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
         guard let items = try? context.fetch(descriptor) else { return nil }
         return items.first { $0.id == id }
