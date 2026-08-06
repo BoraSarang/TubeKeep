@@ -465,18 +465,17 @@ struct LibraryReducer {
                         duration: Double(item.duration ?? 0),
                         initialSeekTime: item.resumePosition
                     )
-                    let queue = state.filteredItems
-                        .drop { $0.id != id }
-                        .map { item in
-                            PlayerItem(
-                                fileURL: URL(fileURLWithPath: item.filePath),
-                                title: item.title,
-                                videoId: item.id,
-                                duration: Double(item.duration ?? 0),
-                                initialSeekTime: item.resumePosition
-                            )
-                        }
-                    NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem, userInfo: ["queue": queue])
+                    let queue = state.filteredItems.map { item in
+                        PlayerItem(
+                            fileURL: URL(fileURLWithPath: item.filePath),
+                            title: item.title,
+                            videoId: item.id,
+                            duration: Double(item.duration ?? 0),
+                            initialSeekTime: item.resumePosition
+                        )
+                    }
+                    let startIndex = queue.firstIndex { $0.videoId == id } ?? 0
+                    NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem, userInfo: ["queue": queue, "startIndex": startIndex])
                 }
                 return .none
 

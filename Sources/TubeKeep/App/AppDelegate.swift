@@ -618,14 +618,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func openPlayerWindow(_ notification: Notification) {
         guard let playerItem = notification.object as? PlayerItem else { return }
 
-        if let existingStore = playerStore, let window = playerWindow, window.isVisible {
+        if let existingStore = playerStore, let window = playerWindow, window.isVisible || window.isMiniaturized {
             existingStore.send(.loadVideo(playerItem))
             if let queue = notification.userInfo?["queue"] as? [PlayerItem] {
-                existingStore.send(.setQueue(queue, startIndex: 0))
+                let startIndex = notification.userInfo?["startIndex"] as? Int ?? 0
+                existingStore.send(.setQueue(queue, startIndex: startIndex))
             }
             window.title = playerItem.title
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            if notification.userInfo?["suppressBringToFront"] as? Bool != true {
+                if window.isMiniaturized { window.deminiaturize(nil) }
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
             return
         }
 
@@ -634,7 +638,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         playerStore = newStore
         if let queue = notification.userInfo?["queue"] as? [PlayerItem] {
-            newStore.send(.setQueue(queue, startIndex: 0))
+            let startIndex = notification.userInfo?["startIndex"] as? Int ?? 0
+            newStore.send(.setQueue(queue, startIndex: startIndex))
         }
         if playerItem.fileURL == nil, playerItem.videoId != nil {
             newStore.send(.loadVideo(playerItem))
