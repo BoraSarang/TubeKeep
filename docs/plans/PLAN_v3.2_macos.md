@@ -85,6 +85,12 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `DownloadQueueReducer`: `setItems([DownloadItem])` 액션 — 순서 교체 후 saveQueue(영속)
 - `DownloadQueueView`: ScrollView+LazyVStack → `List` 전환, `ForEach(store.items.reversed())` + `.onMove` — 표시 순서에서 move → reversed 복원 → `setItems` 반영
 
+### T-1077 핵심 기능 자동화 테스트 ✅
+- `scripts/test-core.sh`: 환경 의존성(swift/python3/yt-dlp/ffmpeg/ffprobe) → `swift build -c debug` → `swift test`(76개) → 설정·리소스 무결성(Info.plist 버전, error_message_ko.json·AI_MODELS.json JSON, 그룹 도메인, 저장 폴더) → `build-macos.sh` 번들 + 포함 리소스(yt-dlp/ffmpeg/ffprobe/whisper-cli/libmpv + codesign) → 스모크 테스트(앱 실행 alive → Fatal/ERROR 로그 검사 → 종료 → 잔여 yt-dlp/ffmpeg 없음) → `a11y-dump.sh` 3종
+- 리포트: `docs/tests/results/auto-test-YYYYMMDD_HHMMSS.md` (PASS/FAIL/WARN + 실패 항목)
+- 마지막에 `docs/tests/manual-checklist.md`(수동 테스트 체크리스트) 출력 — 자동화 불가 항목(TC-DL/PL/AI/CH/IDLE/SET) 안내
+- 옵션: `--skip-smoke`(앱 실행 생략), `--skip-build`(빌드·번들 생략), `--help`
+
 ## 6. 에러코드
 
 | 코드 | 메시지 |
@@ -102,6 +108,8 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - E: 재생목록 구독 → 신규 영상 자동 다운로드
 - F: 대기 항목 드래그 → 순서 변경 + 재시작 후 유지
 - `swift test` 76/76 유지 + `./build_and_run.sh debug macos` ✅
+- **자동화**: `./scripts/test-core.sh` — 환경/빌드/유닛 테스트/리소스/번들/스모크/a11y-dump 자동 수행 후 수동 체크리스트 안내
+- **수동**: `docs/tests/manual-checklist.md` — TC-DL-01~06(다운로드/중복/큐 정렬), TC-PL-01~05(재생/이어보기/클립/단축키), TC-AI-01~05(AI/유휴 배치), TC-CH-01~04(채널/재생목록), TC-IDLE/SET-01~05(유휴/설정/마이그레이션)
 
 ## 8. 롤백 계획
 
