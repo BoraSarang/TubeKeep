@@ -570,4 +570,16 @@
 | T-850 | **GitHub Pages 랜딩 페이지** — docs/index.html + style.css + app-icon.png | high | completed | |
 | T-851 | **Buy Me a Coffee** — 메뉴바 "☕ 후원하기" 항목 + AppDelegate 핸들러 (borasarang) | medium | completed | |
 
+## v3.1 — 유틸리티 기능 5종 (클립/채널 자동/단축키/자막 자동/디스크 정리) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1040 | **클립 저장** — ClipItem DB + ClipService(ffmpeg 컷) + PlayerView "클립 저장" 버튼 | high | completed | PLAN_v3.1_macos.md |
+| T-1041 | **클립 카테고리** — 사이드바 + 그리드 목록 + 재생/삭제/Finder | high | completed | ClipView.swift |
+| T-1042 | **채널 자동 다운로드 v1** — 채널별 토글 + 신규 영상 enqueue | medium | completed | ChannelModels.swift + ChannelContentView.swift + ChannelUpdateService.swift |
+| T-1043 | **전역 단축키** — 다운로더 3종 + 설정 커스텀 UI | medium | completed | GlobalShortcutService.swift + SettingsSystemTab.swift |
+| T-1044 | **유휴 시 자막 자동 다운로드** — idleTimer + 순차 처리 + 상태바 + 설정 옵션 | medium | completed | IdleSubtitleService.swift + SettingsNotificationsTab.swift |
+| T-1045 | **디스크 정리 뷰** — 정렬/필터/일괄 삭제 | medium | completed | DiskCleanupView.swift |
+| T-1046 | **v3.1 릴리즈** — 버전 3.1.0(build 21) + CHANGELOG | high | pending | |
+
 
