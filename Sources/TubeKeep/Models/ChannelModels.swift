@@ -51,6 +51,14 @@ extension ChannelVideoItem {
     }
 }
 
+struct ChannelAutoSettings: Codable, Equatable {
+    var enabled: Bool = false
+    var resolution: Int = 1080
+    var includeSubtitles: Bool = false
+    var audioOnly: Bool = false
+    var dailyLimit: Int = 0
+}
+
 struct ChannelDownloadCache {
     private static let cacheKey = "channelDownloads"
     private static let fetchTimestampsKey = "channelFetchTimestamps"
@@ -58,6 +66,8 @@ struct ChannelDownloadCache {
     private static let newVideosKey = "channelsNewVideos"
     private static let seenVideosKey = "channelsSeenVideoIds"
     private static let autoDownloadKey = "channelAutoDownload"
+    private static let autoSettingsKey = "channelAutoSettings"
+    private static let dailyCountKey = "channelDailyDownloadCount"
 
     private nonisolated(unsafe) static var videoCache: [String: [ChannelVideoItem]] = [:]
 
@@ -319,5 +329,60 @@ struct ChannelDownloadCache {
         dict[channelId] = enabled
         guard let data = try? JSONEncoder().encode(dict) else { return }
         UserDefaults.standard.set(data, forKey: autoDownloadKey)
+    }
+
+    // MARK: - Channel Auto Preset (v2)
+
+    static func loadAutoSettings(channelId: String) -> ChannelAutoSettings {
+        if let data = UserDefaults.standard.data(forKey: autoSettingsKey),
+           let dict = try? JSONDecoder().decode([String: ChannelAutoSettings].self, from: data),
+           let settings = dict[channelId] {
+            return settings
+        }
+        return ChannelAutoSettings(
+            enabled: isAutoDownloadEnabled(channelId: channelId),
+            resolution: 1080,
+            includeSubtitles: false,
+            audioOnly: false,
+            dailyLimit: 0
+        )
+    }
+
+    static func saveAutoSettings(channelId: String, settings: ChannelAutoSettings) {
+        var dict: [String: ChannelAutoSettings] = [:]
+        if let data = UserDefaults.standard.data(forKey: autoSettingsKey),
+           let d = try? JSONDecoder().decode([String: ChannelAutoSettings].self, from: data) {
+            dict = d
+        }
+        dict[channelId] = settings
+        guard let data = try? JSONEncoder().encode(dict) else { return }
+        UserDefaults.standard.set(data, forKey: autoSettingsKey)
+    }
+
+    static func dailyDownloadCount(channelId: String) -> Int {
+        guard let data = UserDefaults.standard.data(forKey: dailyCountKey),
+              let dict = try? JSONDecoder().decode([String: [String: Int]].self, from: data)
+        else { return 0 }
+        return dict[channelId]?[Self.todayKey()] ?? 0
+    }
+
+    static func incrementDailyDownloadCount(channelId: String, by count: Int) {
+        guard count > 0 else { return }
+        var dict: [String: [String: Int]] = [:]
+        if let data = UserDefaults.standard.data(forKey: dailyCountKey),
+           let d = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
+            dict = d
+        }
+        var byDay = dict[channelId] ?? [:]
+        byDay[Self.todayKey()] = (byDay[Self.todayKey()] ?? 0) + count
+        dict[channelId] = byDay
+        guard let data = try? JSONEncoder().encode(dict) else { return }
+        UserDefaults.standard.set(data, forKey: dailyCountKey)
+    }
+
+    private static func todayKey() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 }

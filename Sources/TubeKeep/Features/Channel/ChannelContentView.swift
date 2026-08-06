@@ -41,6 +41,7 @@ struct ChannelContentView: View {
     }
     @State private var presetSubtitles = false
     @State private var presetAudioOnly = false
+    @State private var presetDailyLimit = 0
     @State private var isAddingDownloads = false
     @State private var autoDownload = false
 
@@ -138,14 +139,33 @@ struct ChannelContentView: View {
         .onChange(of: channel?.id) { _, _ in
             selectedIDs = []
             if let id = channel?.id {
-                autoDownload = ChannelDownloadCache.isAutoDownloadEnabled(channelId: id)
+                loadPreset(channelId: id)
             }
         }
         .onAppear {
             if let id = channel?.id {
-                autoDownload = ChannelDownloadCache.isAutoDownloadEnabled(channelId: id)
+                loadPreset(channelId: id)
             }
         }
+    }
+
+    private func loadPreset(channelId: String) {
+        let settings = ChannelDownloadCache.loadAutoSettings(channelId: channelId)
+        autoDownload = settings.enabled
+        presetResolution = settings.resolution
+        presetSubtitles = settings.includeSubtitles
+        presetAudioOnly = settings.audioOnly
+        presetDailyLimit = settings.dailyLimit
+    }
+
+    private func savePreset(channelId: String) {
+        var settings = ChannelDownloadCache.loadAutoSettings(channelId: channelId)
+        settings.enabled = autoDownload
+        settings.resolution = presetResolution
+        settings.includeSubtitles = presetSubtitles
+        settings.audioOnly = presetAudioOnly
+        settings.dailyLimit = presetDailyLimit
+        ChannelDownloadCache.saveAutoSettings(channelId: channelId, settings: settings)
     }
 
     // MARK: - Channel Header
@@ -403,45 +423,77 @@ struct ChannelContentView: View {
     private var presetAndDownload: some View {
         VStack(spacing: 8) {
             GroupBox {
-                HStack {
-                    Text("해상도")
-                        .font(.system(size: 11))
-                    Picker("", selection: $presetResolution) {
-                        ForEach([2160, 1440, 1080, 720, 480, 360, 240, 144], id: \.self) { h in
-                            Text("\(h)p").tag(h)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .frame(width: 80)
-
-                    Spacer()
-
-                    Toggle(isOn: $autoDownload) {
-                        Label("자동 다운로드", systemImage: "bolt.circle")
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("해상도")
                             .font(.system(size: 11))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .onChange(of: autoDownload) { _, enabled in
-                        if let id = channel?.id {
-                            ChannelDownloadCache.setAutoDownload(channelId: id, enabled: enabled)
+                        Picker("", selection: $presetResolution) {
+                            ForEach([2160, 1440, 1080, 720, 480, 360, 240, 144], id: \.self) { h in
+                                Text("\(h)p").tag(h)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 80)
+                        .onChange(of: presetResolution) { _, _ in
+                            if let id = channel?.id { savePreset(channelId: id) }
+                        }
+
+                        Spacer()
+
+                        Toggle(isOn: $autoDownload) {
+                            Label("자동 다운로드", systemImage: "bolt.circle")
+                                .font(.system(size: 11))
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .onChange(of: autoDownload) { _, _ in
+                            if let id = channel?.id { savePreset(channelId: id) }
+                        }
+                        .help("이 채널에 새 영상이 올라오면 프리셋 설정으로 자동 다운로드합니다")
+
+                        Toggle("자막", isOn: $presetSubtitles)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .font(.system(size: 11))
+                            .disabled(presetAudioOnly)
+                            .onChange(of: presetSubtitles) { _, _ in
+                                if let id = channel?.id { savePreset(channelId: id) }
+                            }
+
+                        Toggle("MP3", isOn: $presetAudioOnly)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .font(.system(size: 11))
+                            .onChange(of: presetAudioOnly) { _, _ in
+                                if let id = channel?.id { savePreset(channelId: id) }
+                            }
                     }
-                    .help("이 채널에 새 영상이 올라오면 자동으로 다운로드 큐에 추가됩니다")
+                    .padding(.horizontal, 4)
 
-                    Toggle("자막", isOn: $presetSubtitles)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .font(.system(size: 11))
-                        .disabled(presetAudioOnly)
-
-                    Toggle("MP3", isOn: $presetAudioOnly)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .font(.system(size: 11))
+                    if autoDownload {
+                        HStack(spacing: 6) {
+                            Label("하루 최대 다운로드 수", systemImage: "calendar.badge.clock")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Picker("", selection: $presetDailyLimit) {
+                                Text("무제한").tag(0)
+                                ForEach(1...20, id: \.self) { n in
+                                    Text("\(n)개").tag(n)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .controlSize(.small)
+                            .frame(width: 80)
+                            .onChange(of: presetDailyLimit) { _, _ in
+                                if let id = channel?.id { savePreset(channelId: id) }
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
                 }
-                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
             }
             .padding(.horizontal, 12)
 

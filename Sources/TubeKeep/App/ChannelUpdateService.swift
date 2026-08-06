@@ -186,8 +186,26 @@ final class ChannelUpdateService {
     }
 
     private func enqueueAutoDownload(channelId: String, channelName: String, videos: [ChannelVideoItem]) {
-        let resolution = store.state.settings.defaultResolution
-        let items = videos.map { video -> DownloadItem in
+        let preset = ChannelDownloadCache.loadAutoSettings(channelId: channelId)
+        guard preset.enabled else { return }
+        let resolution = preset.resolution
+        let includeSubtitles = preset.includeSubtitles && !preset.audioOnly
+        let audioOnly = preset.audioOnly
+
+        var candidates = videos
+        if preset.dailyLimit > 0 {
+            let todayCount = ChannelDownloadCache.dailyDownloadCount(channelId: channelId)
+            let remaining = max(0, preset.dailyLimit - todayCount)
+            guard remaining > 0 else {
+                #if DEBUG
+                logManager?.append("  [AutoDL] \(channelName): 오늘 한도(\(preset.dailyLimit)개) 도달, skip")
+                #endif
+                return
+            }
+            candidates = Array(videos.prefix(remaining))
+        }
+
+        let items = candidates.map { video -> DownloadItem in
             let format = Format(
                 id: "best[height<=\(resolution)]/best",
                 label: "\(resolution)p",
@@ -215,14 +233,17 @@ final class ChannelUpdateService {
             return DownloadItem(
                 videoInfo: videoInfo,
                 selectedFormat: format,
-                includeSubtitles: false,
-                audioOnly: false,
+                includeSubtitles: includeSubtitles,
+                audioOnly: audioOnly,
                 isChannelDownload: true,
                 channelUploadIndex: 0,
                 playlistIndex: video.playlistIndex
             )
         }
         store.send(.downloadQueue(.addItems(items)))
+        if preset.dailyLimit > 0 {
+            ChannelDownloadCache.incrementDailyDownloadCount(channelId: channelId, by: items.count)
+        }
         #if DEBUG
         logManager?.append("  [AutoDL] \(channelName): \(items.count)개 큐에 추가")
         #endif

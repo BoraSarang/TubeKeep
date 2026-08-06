@@ -609,7 +609,7 @@
 | T-1070 | **PLAN_v3.2 + TODO 등록** | high | done | docs/plans/PLAN_v3.2_macos.md |
 | T-1071 | **이어보기** — lastPlaybackPosition 저장 + 배지 + 재개 | high | done | 빌드+테스트 76/76 |
 | T-1072 | **유휴 AI 배치** — 자막 후 요약/태깅/팟캐스트 자동 | high | done | Settings idleAutoSummary/Podcast + runAutoAI |
-| T-1073 | **채널 자동 다운로드 v2** — 채널별 프리셋(해상도/MP3/자막/개수) | medium | pending | |
+| T-1073 | **채널 자동 다운로드 v2** — 채널별 프리셋(해상도/MP3/자막/개수) | medium | done | ChannelAutoSettings + dailyLimit |
 | T-1074 | **중복 다운로드 방지** — 조회 시 중복 표시 + 스킵 | medium | pending | |
 | T-1075 | **재생목록 감시** — 재생목록 구독 + 신규 자동 다운로드 | medium | pending | |
 | T-1076 | **큐 드래그 재정렬** — 대기열 순서 변경 + 영속 | medium | pending | |

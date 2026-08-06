@@ -64,10 +64,11 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `SettingsNotificationsTab`: 유휴 자막 켜짐 시 "요약·태그 자동 생성"/"팟캐스트 자동 생성" 토글 2개 표시
 - 취소: `cancelIfDownloading`이 `downloadTask.cancel()`로 AI 배치도 중단, 각 단계에서 `Task.isCancelled` 가드
 
-### T-1073 채널 프리셋
-- `ChannelModels`: `ChannelAutoSettings: Codable` (resolution, mp3, subtitles, dailyLimit)
-- `ChannelDownloadCache`: `channelAutoDownloadSettings` 키, CRUD
-- `ChannelContentView`: 프리셋 편집 UI (자동 다운로드 GroupBox 내 확장)
+### T-1073 채널 프리셋 ✅
+- `ChannelModels`: `ChannelAutoSettings: Codable` (enabled, resolution, includeSubtitles, audioOnly, dailyLimit=0 무제한)
+- `ChannelDownloadCache`: `channelAutoSettings` 키 CRUD(`loadAutoSettings`/`saveAutoSettings`, 구버전 `channelAutoDownload` bool fallback) + `channelDailyDownloadCount` 일일 카운트(날짜 키)
+- `ChannelContentView`: 자동 다운로드 GroupBox 내 프리셋 UI — 채널 전환 시 loadPreset, 해상도/자막/MP3/토글 변경 시 savePreset, 자동 다운로드 켜짐 시 "하루 최대 다운로드 수" Picker(무제한/1~20)
+- `ChannelUpdateService.enqueueAutoDownload`: 채널별 프리셋 적용(해상도/자막/MP3) + 일일 한도 초과 시 skip·잔여분만 enqueue·개수 증가 기록
 
 ### T-1074 중복 방지
 - `HomeReducer`: infoResponse 시 `LibraryCacheService.findItem` + `DatabaseManager.loadDownloadHistory` 확인 → `isDuplicate` State → UI 표시
