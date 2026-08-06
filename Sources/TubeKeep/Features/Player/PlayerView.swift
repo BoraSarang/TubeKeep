@@ -5,6 +5,7 @@ struct PlayerView: View {
     let store: StoreOf<PlayerReducer>
     @StateObject private var mpv = MPVClient()
     @State private var window: NSWindow?
+    @State private var volume: Double = 100
     @State private var isSeeking = false
     @State private var seekTime: Double = 0
     @State private var showControls = false
@@ -305,7 +306,22 @@ struct PlayerView: View {
             }).disabled(dur <= 0).accentColor(.white)
                 .overlay(alignment: .leading) { loopRangeOverlay(dur) }
             Text(timeString(dur)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .leading)
+            volumeControl
         }.padding(.horizontal, 12).padding(.vertical, 4)
+    }
+
+    private var volumeControl: some View {
+        HStack(spacing: 4) {
+            Button {
+                let target = volume <= 0 ? 100.0 : 0.0
+                volume = target
+                mpv.setVolume(target)
+            } label: {
+                Image(systemName: volume <= 0 ? "speaker.slash.fill" : "speaker.fill").font(.system(size: 13)).foregroundColor(.white)
+            }.buttonStyle(.plain).help(volume <= 0 ? "음소거 해제" : "음소거")
+            Slider(value: Binding(get: { volume }, set: { newVal in volume = newVal; mpv.setVolume(newVal) }), in: 0...100)
+                .frame(width: 100).accentColor(.white).help("볼륨")
+        }
     }
 
     // MARK: - Loop / Queue Helpers
