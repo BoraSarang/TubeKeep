@@ -524,9 +524,9 @@ struct PlayerReducer {
             case .clipSaveFinished:
                 state.isSavingClip = false
                 state.lastClipSaved = true
-                state.clipProgress = nil
+                state.clipProgress = 1
                 return .run { send in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
                     await send(.clipSaveIndicatorExpired)
                 }
 
@@ -544,6 +544,7 @@ struct PlayerReducer {
 
             case .clipSaveIndicatorExpired:
                 state.lastClipSaved = false
+                state.clipProgress = nil
                 return .none
 
             case .clipSaveMessageExpired:

@@ -320,10 +320,10 @@ struct PlayerView: View {
                 .disabled(store.isSavingClip || store.aLoop == nil || store.bLoop == nil || store.playerItem.fileURL == nil)
                 .help(store.aLoop != nil && store.bLoop != nil ? "A-B 구간을 클립으로 저장" : "A와 B를 설정하면 클립으로 저장할 수 있어요")
                 .popover(isPresented: Binding(
-                    get: { store.isSavingClip },
+                    get: { store.isSavingClip || store.lastClipSaved },
                     set: { _ in }
                 ), arrowEdge: .top) {
-                    ClipSavePopoverView(progress: store.clipProgress ?? 0)
+                    ClipSavePopoverView(progress: store.clipProgress ?? 1, isComplete: store.lastClipSaved)
                 }
             Text(timeString(current)).font(.system(size: 12, weight: .medium).monospacedDigit()).foregroundColor(.white).frame(width: 50, alignment: .trailing)
             Slider(value: Binding(get: { progress }, set: { isSeeking = true; seekTime = $0 * dur }), in: 0...1, onEditingChanged: { editing in
@@ -477,39 +477,49 @@ struct PlayerView: View {
 
 struct ClipSavePopoverView: View {
     let progress: Double
+    let isComplete: Bool
     @State private var elapsed: TimeInterval = 0
     @State private var startTime = Date()
+    @State private var animProgress: Double = 0
     private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "scissors")
+                Image(systemName: isComplete ? "checkmark.circle.fill" : "scissors")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                Text("클립 저장 중...")
+                    .foregroundStyle(isComplete ? .green : Color.accentColor)
+                Text(isComplete ? "클립 저장 완료" : "클립 저장 중...")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(Int(progress * 100))%")
+                Text("\(Int((isComplete ? 1 : animProgress) * 100))%")
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
             }
-            ProgressView(value: progress)
+            ProgressView(value: isComplete ? 1 : animProgress)
                 .controlSize(.small)
             HStack {
-                Text("경과 \(formatTime(elapsed))")
+                Text(isComplete ? "클립이 보관함에 저장되었습니다" : "경과 \(formatTime(elapsed))")
                 Spacer()
-                if let remaining = remainingTime {
+                if !isComplete, let remaining = remainingTime {
                     Text("남은 시간 약 \(formatTime(remaining))")
                 }
             }
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
-            Text("저장 중에도 영상은 계속 시청할 수 있어요")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
+            if !isComplete {
+                Text("저장 중에도 영상은 계속 시청할 수 있어요")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(12)
         .frame(width: 250)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6)) { animProgress = progress }
+        }
+        .onChange(of: progress) { _, newValue in
+            withAnimation(.easeOut(duration: 0.6)) { animProgress = newValue }
+        }
         .onReceive(timer) { _ in
             elapsed = Date().timeIntervalSince(startTime)
         }
