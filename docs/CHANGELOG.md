@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## v3.1.1 (2026-08-06) — 정밀 분석 버그 수정 11종 (macOS) ✅
+
+> v3.1 릴리즈 후 전체 소스 정밀 분석(118파일)에서 확인된 핵심 버그 11종을 수정. 빌드 + `swift test` 76/76 통과. (T-1050~T-1060)
+
+### 버그 수정 (T-1050~T-1060)
+- **T-1050 — DB 3종**: `download_history` 채널 삭제 SQL `channelName`→`channel_name` 컬럼명 수정(무력화 방지), `subtitles_json` ALTER TABLE 중복 실행 방지(`columnExists` PRAGMA 체크), `qna_history` NULL 컬럼 크래시 방어(`columnText ?? ""`)
+- **T-1051 — Settings 전체 리셋 방지**: `init(from:)` 전 필드 `decodeIfPresent` + 기본값 전환 (키 누락 시 일부만 기본값, 나머지 유지)
+- **T-1052 — SwiftDataMigration 재시도**: 성공/실패 Bool 반환, 실패 시 완료 플래그 미설정 + `[Migration]` DebugLog
+- **T-1053 — App Group**: `appGroupSuiteName`을 실제 entitlements 값 `group.com.tubekeep`으로 수정
+- **T-1054 — 삭제 시 연관 데이터 정리**: `LibraryCacheService.purgeAssociatedData` — AI 데이터/QnA/FTS/썸네일 purge (영상 삭제 시 잔여 데이터 제거)
+- **T-1055 — ProcessRegistry deadlock 해소**: lock 밖에서 terminationHandler 설정 (내부 lock 중첩 방지)
+- **T-1056 — ProcessRunner 재작성**: stdout/stderr readabilityHandler drain(파이프 deadlock 방지), `withTaskCancellationHandler` + `kill(pid, SIGKILL)` 취소, `MutableData`+NSLock 데이터 레이스 방지, runSync 타임아웃/취소 처리
+- **T-1057 — DownloadManager 취소 상태**: `canceledItems` 추적, `resumeDownload`/`cancelDownload` 상태 동기화, stderr 데이터 레이스 방지, 취소/일시정지 시 성공 오판 방지
+- **T-1058 — YouTubeDLService stderr 크래시**: `data[Int(lastStderrSize)...]` → `Data(data.dropFirst(...))` 범위 크래시 방지 (2곳)
+- **T-1059 — IdleSubtitleService 메인 블록/취소 경합**: `waitUntilExit()` → 100ms 폴링 + 120s 타임아웃 + nullDevice (UI 프리즈 해소), 취소 후 후속 처리 가드
+- **T-1060 — ClipService 3종**: 클립 파일명 UUID 접미사 추가(1초 내 중복 저장 덮어쓰기 방지), 썸네일 생성 async 폴링(메인 블록 해소), `runFFmpeg` 취소 처리(`withTaskCancellationHandler` + SIGKILL + ProcessRegistry 등록)
+
+### Verification
+- `swift build -c debug` ✅ (기존 경고만 — SubscribedChannel Sendable, DigestService await, libmpv 26.0)
+- `swift test` ✅ 76/76 (0 failures)
+- 수동 테스트 항목: `docs/tests/v3.1.1.md` (TC-31-01~12, 기대 효과 포함)
+
 ## v3.1 (2026-08-06) — 유틸리티 기능 5종 (macOS) ✅
 
 > v3.0 이후 유틸리티 기능 5종(클립 저장/카테고리, 채널 자동 다운로드, 전역 단축키, 유휴 자막 자동 다운로드, 디스크 정리) 구현 완료.
