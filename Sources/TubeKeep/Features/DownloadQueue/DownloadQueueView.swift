@@ -162,22 +162,32 @@ struct DownloadQueueView: View {
     }
 
     private var listContent: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                if let toast = store.toastMessage {
-                    toastBanner(toast)
-                }
+        List {
+            if let toast = store.toastMessage {
+                toastBanner(toast)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .listRowSeparator(.hidden)
+            }
 
-                ForEach(store.items.reversed()) { item in
-                    DownloadRow(item: item, store: store)
-                    if item.id != store.items.reversed().last?.id {
-                        Divider()
-                            .padding(.leading, 48)
-                    }
+            ForEach(Array(store.items.enumerated()).reversed(), id: \.element.id) { _, item in
+                DownloadRow(item: item, store: store)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .listRowSeparator(.hidden)
+                if item.id != store.items.first?.id {
+                    Divider()
+                        .padding(.leading, 48)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
                 }
             }
-            .padding(.horizontal, 16)
+            .onMove { source, destination in
+                var display = Array(store.items.reversed())
+                display.move(fromOffsets: source, toOffset: destination)
+                store.send(.setItems(Array(display.reversed())))
+            }
         }
+        .listStyle(.plain)
+        .help("항목을 드래그하여 순서를 변경할 수 있습니다")
     }
 
     private func toastBanner(_ toast: ToastMessage) -> some View {

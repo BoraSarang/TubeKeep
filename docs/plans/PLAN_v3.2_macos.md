@@ -81,9 +81,9 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `ChannelUpdateService`: 채널 루프 후 재생목록 루프 — 1시간 주기 fetch → newVideos 저장(`playlist:` 키) → 자동 다운로드(`enqueueAutoDownload`에 `presetKey` 파라미터, 일일 한도도 `playlist:` 키로 집계)
 - `ChannelListView`: 사이드바 하단 "재생목록" 섹션 — NSAlert URL 추가/삭제/자동 다운로드 토글/신규 배지
 
-### T-1076 큐 재정렬
-- `DownloadQueueState`: queue 배열 순서 (이미 배열) → `moveQueueItem(from:to:)` 액션
-- `DownloadQueueView`: `.onMove` + 드래그 핸들 → 순서 저장
+### T-1076 큐 재정렬 ✅
+- `DownloadQueueReducer`: `setItems([DownloadItem])` 액션 — 순서 교체 후 saveQueue(영속)
+- `DownloadQueueView`: ScrollView+LazyVStack → `List` 전환, `ForEach(store.items.reversed())` + `.onMove` — 표시 순서에서 move → reversed 복원 → `setItems` 반영
 
 ## 6. 에러코드
 

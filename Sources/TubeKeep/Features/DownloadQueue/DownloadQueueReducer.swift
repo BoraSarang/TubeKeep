@@ -72,6 +72,7 @@ struct DownloadQueueReducer {
         case loadQueue
         case itemsLoaded([DownloadItem])
         case saveQueue
+        case setItems([DownloadItem])
         case addItem(DownloadItem)
         case addItems([DownloadItem])
         case removeItem(UUID)
@@ -125,6 +126,10 @@ struct DownloadQueueReducer {
             case let .itemsLoaded(items):
                 state.items = IdentifiedArray(uniqueElements: items)
                 return tryStartNextDownloads(state: &state)
+
+            case let .setItems(items):
+                state.items = IdentifiedArray(uniqueElements: items)
+                return .send(.saveQueue)
 
             case let .addItem(item):
                 guard !state.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
