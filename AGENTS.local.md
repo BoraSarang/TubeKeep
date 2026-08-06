@@ -173,6 +173,13 @@ keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
 - 사이드바 하단 표시: `[폴더] Finder에서 보기  12.3 GB  ↻` (↻ = 수동 새로고침)
 - 포맷팅: `ByteCountFormatter`
 
+### 5.5 mpv 재생 크래시 (macOS 26, bd TubeKeep-e5i)
+- **증상**: mpv 렌더 스레드(`com.borasarang.mpv.render`)에서 OpenGL→Metal 드라이버 크래시 (SIGSEGV @0x28, `_MTLDevice supportsFamily`)
+- **원인**: mpv 0.41 `MPV_RENDER_API_TYPE_OPENGL` + `hwdec=videotoolbox` GPU 경로가 macOS 26.5.2에서 드라이버 내부 크래시
+- **임시 조치 (적용됨)**: `MPVClient.setupMPV()`에서 `hwdec=no`로 변경 → CPU 디코딩, 재현되지 않음
+- **주의**: 성능 영향 있음 (고해상도 프레임 드랍 가능). 재현 조건 불명확, SW 렌더링(`MPV_RENDER_API_TYPE_SW`) 전환이 확실한 회피책
+- **참조**: `Sources/TubeKeep/Features/Player/MPVClient.swift`
+
 ## 6. TubeKeep 버전 진행 규칙
 
 공통 규칙 + 추가:

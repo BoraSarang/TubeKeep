@@ -47,7 +47,7 @@ final class MPVClient: ObservableObject {
         guard let h else { error = "mpv_create failed"; return }
 
         mpv_set_option_string(h, "vo", "libmpv")
-        mpv_set_option_string(h, "hwdec", "videotoolbox")
+        mpv_set_option_string(h, "hwdec", "no")
         mpv_set_option_string(h, "volume", "100")
         mpv_set_option_string(h, "cache", "yes")
         mpv_set_option_string(h, "keepaspect", "yes")
