@@ -1,6 +1,15 @@
 # CHANGELOG
 
-## 개발 중 — 보관함 카테고리 필터 (macOS, bd TubeKeep-iqp)
+## 개발 중 — 비슷한 영상 검색 (macOS, T-1084~1087)
+
+### 기능 추가
+- **비슷한 영상 검색** — 재생 중 영상의 제목·채널·AI 카테고리 태그를 AI 체인(OpenRouter→Gemini→규칙 폴백)으로 분석해 한글 검색어 3~4개 생성, `yt-dlp ytsearch`(기존 `TrendingService.search`)로 실제 유튜브에서 유사 영상 검색 (`SimilarVideoService.swift`)
+- 검색어 캐시: UserDefaults `similarQueriesCache` (videoId별, TTL 7일) — LLM 비용 절감
+- 플레이어 툴바 **"비슷한 영상" 버튼** → 오른쪽 사이드 패널(로딩/오류·재시도/빈 상태) — 자막/큐 패널과 상호 배타
+- 목록 클릭 → 해당 영상으로 **즉시 재생 전환** (openPlayerWindow + PlayerItem) + 컨텍스트 메뉴(다운로드/유튜브에서 열기)
+- 참고: YouTube 공식 API `relatedToVideoId` 2023 지원 종료로 검색어 기반 접근. 신규 API 키 불필요(기존 키 재사용)
+
+## 보관함 카테고리 필터 (macOS, bd TubeKeep-iqp)
 
 ### 기능 추가
 - 보관함 사이드바에 **카테고리** 섹션 추가 — 채널 목록 위, 보유 개수 내림차순 정렬 (`LibrarySidebarView`)

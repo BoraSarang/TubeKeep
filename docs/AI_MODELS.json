@@ -38,6 +38,13 @@
       "chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
       "prompt_version": "podcast_v2.5",
       "vision_support": false
+    },
+    "similar": {
+      "chain": ["openrouter/free", "gemini", "rule-fallback"],
+      "temperature": 0.2,
+      "prompt_version": "similar_v2.1",
+      "vision_support": false,
+      "cache": "UserDefaults similarQueriesCache (videoId → [String], TTL 7일)"
     }
   },
   "platforms": {

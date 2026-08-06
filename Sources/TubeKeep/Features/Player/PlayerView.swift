@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ComposableArchitecture
 
 struct PlayerView: View {
@@ -10,6 +11,7 @@ struct PlayerView: View {
     @State private var seekTime: Double = 0
     @State private var showControls = false
     @State private var controlsTask: Task<Void, Never>?
+    @State private var similarThumbnails: [String: NSImage] = [:]
 
     private let videoWidth: CGFloat = 854
     private let videoHeight: CGFloat = 480
@@ -17,66 +19,93 @@ struct PlayerView: View {
     private let panelWidth: CGFloat = 320
     private let controlsAutoHideDelay: Duration = .seconds(3)
 
-    private var windowWidth: CGFloat { videoWidth + (store.showQueue || store.showSubtitlePanel ? panelWidth : 0) }
+    private var windowWidth: CGFloat { videoWidth + (store.showQueue || store.showSubtitlePanel || store.showSimilarVideos ? panelWidth : 0) }
     private var windowHeight: CGFloat { videoHeight }
 
     var body: some View {
         HStack(spacing: 0) {
             videoArea
-            if store.showQueue {
-                queuePanel
-                    .frame(width: panelWidth)
-            } else if store.showSubtitlePanel {
-                subtitlePanel
-                    .frame(width: panelWidth)
-            }
+            rightPanel
         }
         .frame(minWidth: windowWidth, maxWidth: .infinity, minHeight: windowHeight, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .alwaysOnTop(store.isAlwaysOnTop, windowIdentifier: "player")
         .toolbar { toolbarContent }
-        .onDisappear { mpv.stop() }
-        .onChange(of: mpv.isRenderReady) { _, ready in if ready { setupPlayer() } }
-        .onChange(of: store.playerItemId) { _, _ in mpv.stop(); setupPlayer() }
-        .onChange(of: store.streamURL) { _, newURL in
-            if newURL != nil, store.playerItem.fileURL == nil { mpv.stop(); setupPlayer() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
-            if (notif.object as? NSWindow) == window { mpv.stop() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
-            guard let direction = notif.userInfo?["direction"] as? Double else { return }
-            let step = Settings.loadSettings().seekStepSeconds
-            mpv.seekRelative(direction * step)
-        }
-        .onChange(of: store.showSubtitlePanel) { _, _ in
-            window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
-        }
-        .onChange(of: store.showQueue) { _, _ in
-            window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
-        }
-        .onChange(of: mpv.currentTime) { _, newTime in
-            if store.playerItem.videoId != nil, !mpv.isFinished, newTime > 0 {
-                store.send(.timeUpdated(newTime))
-            }
-        }
-        .onChange(of: mpv.duration) { _, newDur in
-            if newDur > 0 { store.send(.durationUpdated(newDur)) }
-        }
-        .onChange(of: mpv.isPlaying) { _, newVal in store.send(.playingChanged(newVal)) }
-        .onChange(of: store.playbackRate) { _, newVal in mpv.setPlaybackRate(newVal) }
-        .onChange(of: store.aLoop) { _, newVal in
-            if let a = newVal { mpv.setALoop(at: a) } else { mpv.clearABLoop() }
-        }
-        .onChange(of: store.bLoop) { _, newVal in
-            if let b = newVal {
-                mpv.setBLoop(at: b)
-                if let a = store.aLoop { mpv.seek(to: a) }
-            }
-        }
-        .onChange(of: mpv.isFinished) { _, newVal in if newVal { store.send(.videoDidEnd) } }
-        .onChange(of: mpv.error) { _, newVal in if newVal != nil { mpv.stop() } }
+        .modifier(PlaybackReactionsModifier(
+            store: store,
+            mpv: mpv,
+            windowProvider: { window },
+            setContentSize: { window?.setContentSize(NSSize(width: windowWidth, height: windowHeight)) },
+            stopAndSetup: { setupPlayer() },
+            setupPlayer: { setupPlayer() }
+        ))
         .background(WindowAccessor { win in DispatchQueue.main.async { window = win } })
+    }
+
+    private struct PlaybackReactionsModifier: ViewModifier {
+        let store: StoreOf<PlayerReducer>
+        let mpv: MPVClient
+        let windowProvider: () -> NSWindow?
+        let setContentSize: () -> Void
+        let stopAndSetup: () -> Void
+        let setupPlayer: () -> Void
+
+        func body(content: Content) -> some View {
+            content
+                .onDisappear { mpv.stop() }
+                .onChange(of: mpv.isRenderReady) { _, ready in if ready { setupPlayer() } }
+                .onChange(of: store.playerItemId) { _, _ in stopAndSetup() }
+                .onChange(of: store.streamURL) { _, newURL in
+                    if newURL != nil, store.playerItem.fileURL == nil { stopAndSetup() }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
+                    if (notif.object as? NSWindow) == windowProvider() { mpv.stop() }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
+                    guard let direction = notif.userInfo?["direction"] as? Double else { return }
+                    let step = Settings.loadSettings().seekStepSeconds
+                    mpv.seekRelative(direction * step)
+                }
+                .onChange(of: store.showSubtitlePanel) { _, _ in setContentSize() }
+                .onChange(of: store.showQueue) { _, _ in setContentSize() }
+                .onChange(of: store.showSimilarVideos) { _, _ in setContentSize() }
+                .onChange(of: mpv.currentTime) { _, newTime in
+                    if store.playerItem.videoId != nil, !mpv.isFinished, newTime > 0 {
+                        store.send(.timeUpdated(newTime))
+                    }
+                }
+                .onChange(of: mpv.duration) { _, newDur in
+                    if newDur > 0 { store.send(.durationUpdated(newDur)) }
+                }
+                .onChange(of: mpv.isPlaying) { _, newVal in store.send(.playingChanged(newVal)) }
+                .onChange(of: store.playbackRate) { _, newVal in mpv.setPlaybackRate(newVal) }
+                .onChange(of: store.aLoop) { _, newVal in
+                    if let a = newVal { mpv.setALoop(at: a) } else { mpv.clearABLoop() }
+                }
+                .onChange(of: store.bLoop) { _, newVal in
+                    if let b = newVal {
+                        mpv.setBLoop(at: b)
+                        if let a = store.aLoop { mpv.seek(to: a) }
+                    }
+                }
+                .onChange(of: mpv.isFinished) { _, newVal in if newVal { store.send(.videoDidEnd) } }
+                .onChange(of: mpv.error) { _, newVal in if newVal != nil { mpv.stop() } }
+                .onChange(of: store.playerItem.title) { _, newTitle in
+                    if let win = windowProvider() { win.title = newTitle }
+                }
+        }
+    }
+
+    private var rightPanel: some View {
+        Group {
+            if store.showQueue {
+                queuePanel.frame(width: panelWidth)
+            } else if store.showSubtitlePanel {
+                subtitlePanel.frame(width: panelWidth)
+            } else if store.showSimilarVideos {
+                similarVideosPanel.frame(width: panelWidth)
+            }
+        }
     }
 
     // MARK: - Video Area
@@ -84,10 +113,9 @@ struct PlayerView: View {
     private var videoArea: some View {
         ZStack {
             Color.black
-            if store.isStreamLoading {
+            playbackView
+            if store.isStreamLoading || (!mpv.isLoaded && store.playerItem.videoId != nil) {
                 loadingView
-            } else {
-                playbackView
             }
             if store.fileMissing { fileMissingView }
             if let err = mpv.error { errorView(err) }
@@ -130,7 +158,8 @@ struct PlayerView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView().scaleEffect(1.5)
-            Text("스트리밍 URL을 가져오는 중...").font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
+            Text(store.isStreamLoading ? "스트리밍 URL을 가져오는 중..." : "재생 준비 중...")
+                .font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
         }
     }
 
@@ -200,6 +229,142 @@ struct PlayerView: View {
         )
     }
 
+    // MARK: - Similar Videos Panel
+
+    private var similarVideosPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("비슷한 영상").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if store.isLoadingSimilar {
+                    ProgressView().controlSize(.mini)
+                } else if !store.similarVideos.isEmpty {
+                    Button { store.send(.loadSimilarVideos) } label: {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 11))
+                    }.buttonStyle(.plain).help("새로고침")
+                }
+                Button { store.send(.clearSimilarVideos); store.send(.toggleSimilarVideos) } label: {
+                    Image(systemName: "xmark").font(.system(size: 11))
+                }.buttonStyle(.plain).help("닫기")
+            }
+            .padding(10)
+
+            Divider()
+
+            if store.isLoadingSimilar {
+                VStack(spacing: 8) {
+                    Spacer()
+                    ProgressView("검색어 생성 및 영상 검색 중...").controlSize(.small)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else if let err = store.similarError {
+                VStack(spacing: 10) {
+                    Spacer()
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 22)).foregroundStyle(.orange)
+                    Text(err).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Button("재시도") { store.send(.loadSimilarVideos) }.controlSize(.small)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .padding(16)
+            } else if store.similarVideos.isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Image(systemName: "sparkles.rectangle.stack").font(.system(size: 24)).foregroundStyle(.secondary)
+                    Text("비슷한 영상을 찾지 못했습니다").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(store.similarVideos) { video in
+                            similarVideoRow(video)
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func similarVideoRow(_ video: TrendingVideo) -> some View {
+        Button { openSimilar(video) } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Group {
+                    if let img = similarThumbnails[video.id] {
+                        Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        Color(nsColor: .underPageBackgroundColor)
+                            .overlay(Image(systemName: "video").font(.system(size: 14)).foregroundStyle(.secondary))
+                    }
+                }
+                .frame(width: 120, height: 68)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .onAppear { loadSimilarThumbnail(for: video) }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(video.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text(video.channel)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        if !video.formattedViews.isEmpty {
+                            Text("조회 \(video.formattedViews)").font(.system(size: 10)).foregroundStyle(.secondary)
+                        }
+                        if !video.formattedDuration.isEmpty {
+                            Text("· \(video.formattedDuration)").font(.system(size: 10)).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu { similarContextMenu(video) }
+    }
+
+    @ViewBuilder
+    private func similarContextMenu(_ video: TrendingVideo) -> some View {
+        Button("재생") { openSimilar(video) }
+        Button("다운로드") {
+            NotificationCenter.default.post(name: Constants.openDownloaderWindowNotification, object: nil)
+        }
+        Button("유튜브에서 열기") {
+            if let url = URL(string: video.webpageURL) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    private func openSimilar(_ video: TrendingVideo) {
+        let playerItem = PlayerItem(fileURL: nil, title: video.title, videoId: video.id)
+        store.send(.loadVideo(playerItem))
+    }
+
+    private func loadSimilarThumbnail(for video: TrendingVideo) {
+        guard similarThumbnails[video.id] == nil else { return }
+        let service = LibraryCacheService.shared
+        Task {
+            if let cached = service.cachedThumbnail(for: video.id) {
+                await MainActor.run { similarThumbnails[video.id] = cached }
+                return
+            }
+            if let data = await service.loadThumbnail(from: video.thumbnailURL, videoId: video.id),
+               let img = NSImage(data: data) {
+                await MainActor.run { similarThumbnails[video.id] = img }
+            }
+        }
+    }
+
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
@@ -214,6 +379,9 @@ struct PlayerView: View {
             Button { store.send(.toggleQueue) } label: {
                 Image(systemName: store.showQueue ? "list.bullet.rectangle.fill" : "list.bullet.rectangle")
             }.help("재생 목록")
+            Button { store.send(.toggleSimilarVideos) } label: {
+                Image(systemName: store.showSimilarVideos ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack")
+            }.help("비슷한 영상")
             Spacer()
             Button { store.send(.toggleAlwaysOnTop) } label: {
                 Image(systemName: store.isAlwaysOnTop ? "pin.fill" : "pin")

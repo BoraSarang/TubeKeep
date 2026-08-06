@@ -621,4 +621,15 @@
 | T-1082 | **다운로드/검색 적용** — DownloadQueue WaveProgress 토큰화 + 사이드바 검색 AppSearchField + ErrorBanner 적용(Home/Channel) | medium | done | DownloadQueueView.swift, LibrarySidebarView.swift, HomeView.swift |
 | T-1083 | **DESIGN_SYSTEM.md + 검증/커밋** — 디자인 시스템 문서화 + 빌드/테스트 + 세션 로그 | medium | done | docs/DESIGN_SYSTEM.md |
 
+## v3.3 — 비슷한 영상 검색 (Similar Videos) 🚧
+
+> PLAN_v3.3_similar-macos.md. 재생 중 영상 → AI 검색어 생성 → yt-dlp ytsearch로 실제 유튜브 유사 영상 검색.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1084 | **SimilarVideoService 신규** — AI 검색어 생성(OpenRouter→Gemini→규칙 폴백) + UserDefaults 캐시(7일) + 병렬 검색·병합 | high | 진행중 | docs/AI_MODELS.json models.similar |
+| T-1085 | **PlayerReducer 확장** — similarVideos/isLoadingSimilar/similarError/showSimilarVideos 상태 + Action 5종 | high | 예정 | |
+| T-1086 | **PlayerView UI** — 툴바 버튼 + SimilarVideosPanel(로딩/오류·재시도/빈 상태, 클릭→재생 전환) | high | 예정 | |
+| T-1087 | **검증** — make build + swift test 76 + 실제 재생 수동 확인 | high | 예정 | |
+
 

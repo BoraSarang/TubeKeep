@@ -22,18 +22,20 @@ final class MPVClient: ObservableObject {
     private var renderContext: OpaquePointer?
     private var displayLink: CVDisplayLink?
     private var glContext: NSOpenGLContext?
-    private weak var renderView: NSView?
+    private weak var renderView: MPVOpenGLView?
     private let renderQueue = DispatchQueue(label: "com.borasarang.mpv.render", qos: .userInteractive)
     private var playbackStart: Date?
     private var firstFrameLogged = false
     private var pendingSeekTime: Double?
     private var loopA: Double?
     private var loopB: Double?
+    private var renderCallbackLogCount = 0
 
     init() { setupMPV() }
 
     deinit {
         stopDisplayLink()
+        renderQueue.sync {}
         if let rc = renderContext { mpv_render_context_free(rc) }
         renderContext = nil
         if let h = mpv { mpv_terminate_destroy(h) }
@@ -65,6 +67,7 @@ final class MPVClient: ObservableObject {
         mpv_observe_property(h, 0, "height", MPV_FORMAT_INT64)
 
         mpv_set_wakeup_callback(h, Self.wakeupCb, Unmanaged.passUnretained(self).toOpaque())
+        mpv_request_log_messages(h, "info")
 
         mpv = h
     }
@@ -79,10 +82,14 @@ final class MPVClient: ObservableObject {
     }
 
     private func setupOpenGL() {
-        guard let glCtx = glContext else {
+        // view가 재생성되어 attachView → setupOpenGL이 중복 호출되더라도
+        // 이미 생성된 렌더 컨텍스트는 재생성하지 않는다(중복 create 시 -20 "already set").
+        if isRenderReady, renderContext != nil { return }
+        guard let view = renderView, let glCtx = view.openGLContext else {
             DebugLogManager.shared?.append("[mpv] FAIL: no OpenGL context")
             return
         }
+        glContext = glCtx
         glCtx.makeCurrentContext()
 
         guard let mpv else { return }
@@ -105,6 +112,7 @@ final class MPVClient: ObservableObject {
         guard result >= 0, let rc else {
             DebugLogManager.shared?.append("[mpv] FAIL: mpv_render_context_create returned \(result)")
             error = "mpv_render_context_create failed"
+            isRenderReady = false
             return
         }
         renderContext = rc
@@ -135,8 +143,11 @@ final class MPVClient: ObservableObject {
     // MARK: - Rendering
 
     private func renderFrame() {
-        guard let ctx = renderContext, let glCtx = glContext, let view = renderView else { return }
+        guard let ctx = renderContext, let view = renderView else { return }
         guard view.bounds.width > 0, view.bounds.height > 0 else { return }
+        // 창이동/리사이즈/레벨변경 등으로 NSOpenGLView의 context가 교체될 수 있으므로 매 프레임 현재 context를 동기화.
+        guard let glCtx = view.openGLContext else { return }
+        glContext = glCtx
         let scale = view.window?.backingScaleFactor ?? 2
         let w = Int32(view.bounds.width * scale)
         let h = Int32(view.bounds.height * scale)
@@ -177,6 +188,12 @@ final class MPVClient: ObservableObject {
         client.renderQueue.async {
             guard let rc = client.renderContext else { return }
             let flags = mpv_render_context_update(rc)
+            if client.renderCallbackLogCount < 5 {
+                client.renderCallbackLogCount += 1
+                #if DEBUG
+                Task { @MainActor in DebugLogManager.shared?.append("[mpv] renderCb flags=\(flags)") }
+                #endif
+            }
             if flags & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) != 0 {
                 client.renderFrame()
             }
@@ -194,7 +211,19 @@ final class MPVClient: ObservableObject {
 
     private func handleEvent(_ event: mpv_event) {
         switch event.event_id {
+        case MPV_EVENT_LOG_MESSAGE:
+            guard let data = event.data else { return }
+            let msg = data.assumingMemoryBound(to: mpv_event_log_message.self).pointee
+            let prefix = String(cString: msg.prefix)
+            let text = String(cString: msg.text).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return }
+            #if DEBUG
+            Task { @MainActor in DebugLogManager.shared?.append("[mpv][\(prefix)] \(text)") }
+            #endif
         case MPV_EVENT_FILE_LOADED:
+            #if DEBUG
+            Task { @MainActor in DebugLogManager.shared?.append("[mpv] FILE_LOADED") }
+            #endif
             runOnMain {
                 self.isLoaded = true
                 if let pendingSeekTime = self.pendingSeekTime {
@@ -205,6 +234,9 @@ final class MPVClient: ObservableObject {
         case MPV_EVENT_END_FILE:
             guard let data = event.data else { return }
             let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
+            #if DEBUG
+            Task { @MainActor in DebugLogManager.shared?.append("[mpv] END_FILE reason=\(endFile.reason.rawValue)") }
+            #endif
             if endFile.reason == MPV_END_FILE_REASON_EOF {
                 runOnMain { self.isFinished = true }
             } else if endFile.reason == MPV_END_FILE_REASON_ERROR {
@@ -242,6 +274,9 @@ final class MPVClient: ObservableObject {
                 if prop.format == MPV_FORMAT_INT64 {
                     let val = prop.data?.assumingMemoryBound(to: Int64.self).pointee ?? 0
                     runOnMain { self.hasVideo = val > 0 }
+                    #if DEBUG
+                    Task { @MainActor in DebugLogManager.shared?.append("[mpv] video height=\(val)") }
+                    #endif
                 }
             default: break
             }
@@ -256,6 +291,9 @@ final class MPVClient: ObservableObject {
         runOnMain { [self] in resetState() }
         playbackStart = Date()
         firstFrameLogged = false
+        #if DEBUG
+        DebugLogManager.shared?.append("[mpv] loadfile(file): \(url.lastPathComponent)")
+        #endif
         mpvCommand(mpv, args: ["loadfile", url.path])
     }
 
@@ -264,6 +302,9 @@ final class MPVClient: ObservableObject {
         runOnMain { [self] in resetState() }
         playbackStart = Date()
         firstFrameLogged = false
+        #if DEBUG
+        DebugLogManager.shared?.append("[mpv] loadfile(stream): \(url.absoluteString.prefix(80))")
+        #endif
         mpvCommand(mpv, args: ["loadfile", url.absoluteString])
     }
 

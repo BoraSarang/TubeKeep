@@ -339,6 +339,26 @@ struct State: Equatable {
 - 변환 진행률: ffmpeg `-progress pipe:1` stdout에서 `out_time_us=` 파싱 → `conversionProgress` + `conversionETA`
 - HTML 디코딩: `decodeHTMLEntities()` (static, fileprivate)
 
+### 2.9.1 비슷한 영상 검색 (v3.3)
+
+재생 중 영상과 관련성 높은 실제 유튜브 영상을 검색하는 기능.
+
+**흐름**: `PlayerView` 툴바 버튼 → `PlayerReducer.loadSimilarVideos` → `SimilarVideoService` (검색어 생성) → `TrendingService.search` ×3 병렬 → `similarVideosLoaded`.
+
+- **검색어 생성** (`SimilarVideoService.generateQueries`): OpenRouter → Gemini → 규칙 폴백 순. 폴백은 제목/채널/태그 기반 한글 검색어. AI 실패해도 항상 동작.
+- **캐시**: 검색어는 UserDefaults `similarQueriesCache` (videoId → [String], TTL 7일) — LLM 호출 절약, DB 스키마 변경 없음.
+- **검색**: `yt-dlp ytsearchN:<query>` (`TrendingService.search`) — 3개 검색어를 `async let` 병렬 호출 → 중복 제거 · 현재 영상 제외 → 상위 12개.
+- **UI**: `PlayerView.showSimilarVideos` — showQueue/showSubtitlePanel과 상호 배타. 목록 클릭 → `openPlayerWindow` + `PlayerItem` 생성으로 즉시 재생 전환. 컨텍스트 메뉴: 다운로드 / 유튜브에서 열기.
+- **참고**: YouTube 공식 API `relatedToVideoId` 지원 종료(2023-08)로 검색어 기반 접근. API 키 신규 불필요 (기존 `openRouterAPIKey`/`geminiAPIKey`).
+
+```swift
+// PlayerReducer.State 추가 (v3.3)
+var showSimilarVideos = false
+var similarVideos: [TrendingVideo] = []
+var isLoadingSimilar = false
+var similarError: String?
+```
+
 ---
 
 ## 3. UIView / AppKit 통합
@@ -868,7 +888,7 @@ enum Constants {
 | `Player/SubtitleOverlay.swift` | 비디오 위 자막 오버레이 (v2.6.0) |
 | `Player/SubtitlePanel.swift` | 자막 패널 (로딩/에러/빈 상태) (v2.6.0) |
 
-### Services/ (22)
+### Services/ (23)
 | 파일 | 설명 |
 |------|------|
 | `YouTubeDLService.swift` | yt-dlp 정보 조회 actor |
@@ -878,6 +898,7 @@ enum Constants {
 | `ChannelFetchService.swift` | 채널 정보 fetch actor |
 | `UploadOrderService.swift` | 업로드 순번 조회 actor |
 | `TrendingService.swift` | yt-dlp `ytsearch` 기반 트렌딩 검색 + 30분 TTL 캐시 |
+| `SimilarVideoService.swift` | 재생 영상 기반 유사 영상 검색 (AI 검색어 생성 + 병렬 검색 + UserDefaults 캐시) (v3.3) |
 | `SummarizationService.swift` | OpenRouter → yTeaser → A.X 4.0 → Gemini 4단계 요약 |
 | `TaggingService.swift` | OpenRouter → A.X 4.0 → Gemini → 규칙 기반 자동 태깅 |
 | `AX4Service.swift` | SKT A.X 4.0 API 클라이언트 (OpenAI 호환) |

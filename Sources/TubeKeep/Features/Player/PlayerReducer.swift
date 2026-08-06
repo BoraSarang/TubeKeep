@@ -30,6 +30,12 @@ struct PlayerReducer {
         var playerItemId: UUID = UUID()
         var fileMissing = false
 
+        // Similar Videos (v3.3)
+        var showSimilarVideos = false
+        var similarVideos: [TrendingVideo] = []
+        var isLoadingSimilar = false
+        var similarError: String? = nil
+
         // v3.0 Phase B
         var playbackRate: Double = 1.0
         var aLoop: Double?
@@ -83,11 +89,17 @@ struct PlayerReducer {
         case setALoop(Double)
         case setBLoop(Double)
         case clearABLoop
-        case setQueue([PlayerItem], startIndex: Int)
-        case playNext
+            case setQueue([PlayerItem], startIndex: Int)
+            case appendToQueue(PlayerItem)
+            case playNext
         case playPrevious
         case playAtQueue(Int)
         case toggleQueue
+        case loadSimilarVideos
+        case similarVideosLoaded([TrendingVideo])
+        case similarVideosFailed(String)
+        case toggleSimilarVideos
+        case clearSimilarVideos
 
         // Clip (A-B 저장)
         case saveClip
@@ -151,7 +163,6 @@ struct PlayerReducer {
                 #endif
                 state.streamURL = url
                 state.isStreamLoading = false
-                state.playerItemId = UUID()
                 return .none
 
             case .streamFetchFailed:
@@ -222,7 +233,7 @@ struct PlayerReducer {
             case let .startAutoPlay(videoId):
                 state.showUpNext = false
                 state.autoPlayCountdown = 0
-                return .run { _ in
+                return .run { send in
                     let data = await MainActor.run { () -> (filePath: String, title: String, id: String, duration: Int?)? in
                         guard let item = LibraryCacheService.shared.loadItems().first(where: { $0.id == videoId }) else { return nil }
                         return (item.filePath, item.title, item.id, item.duration)
@@ -234,10 +245,20 @@ struct PlayerReducer {
                         videoId: data.id,
                         duration: Double(data.duration ?? 0)
                     )
+                    await send(.appendToQueue(playerItem))
                     await MainActor.run {
-                        NotificationCenter.default.post(name: Constants.openPlayerWindowNotification, object: playerItem)
+                        NotificationCenter.default.post(
+                            name: Constants.openPlayerWindowNotification,
+                            object: playerItem,
+                            userInfo: ["suppressBringToFront": true]
+                        )
                     }
                 }
+
+            case let .appendToQueue(item):
+                state.queue.append(item)
+                state.queueIndex = state.queue.count - 1
+                return .none
 
             case .cancelAutoPlay:
                 state.showUpNext = false
@@ -578,6 +599,66 @@ struct PlayerReducer {
             case .toggleQueue:
                 state.showQueue.toggle()
                 if state.showQueue { state.showSubtitlePanel = false }
+                return .none
+
+            case .loadSimilarVideos:
+                guard let videoId = state.playerItem.videoId else {
+                    state.similarError = "네트워크 영상에서만 비슷한 영상을 찾을 수 있습니다"
+                    return .none
+                }
+                state.isLoadingSimilar = true
+                state.similarError = nil
+                let title = state.playerItem.title
+                return .run { send in
+                    let keys = Settings.loadAPIKeys()
+                    let context = await MainActor.run { () -> (channel: String, tags: [String], summary: String?)? in
+                        guard let item = LibraryCacheService.shared.findItem(id: videoId) else { return nil }
+                        let summary = DatabaseManager.shared.loadVideoAIData(videoId: videoId)?.summary ?? item.summary
+                        return (item.channelName, item.tags, summary)
+                    }
+                    let service = SimilarVideoService.shared
+                    let queries = await service.generateQueries(
+                        videoId: videoId, title: title,
+                        channel: context?.channel ?? "",
+                        tags: context?.tags ?? [],
+                        summary: context?.summary,
+                        keys: keys
+                    )
+                    do {
+                        let videos = try await service.searchSimilar(videoId: videoId, queries: queries)
+                        await send(.similarVideosLoaded(videos))
+                    } catch {
+                        await send(.similarVideosFailed(error.localizedDescription))
+                    }
+                }
+                .cancellable(id: "similarVideos", cancelInFlight: true)
+
+            case let .similarVideosLoaded(videos):
+                state.isLoadingSimilar = false
+                state.similarError = nil
+                state.similarVideos = videos
+                return .none
+
+            case let .similarVideosFailed(error):
+                state.isLoadingSimilar = false
+                state.similarError = error
+                return .none
+
+            case .toggleSimilarVideos:
+                state.showSimilarVideos.toggle()
+                if state.showSimilarVideos {
+                    state.showQueue = false
+                    state.showSubtitlePanel = false
+                    if state.similarVideos.isEmpty, state.similarError == nil {
+                        return .send(.loadSimilarVideos)
+                    }
+                }
+                return .none
+
+            case .clearSimilarVideos:
+                state.isLoadingSimilar = false
+                state.similarVideos = []
+                state.similarError = nil
                 return .none
             }
         }
