@@ -9,6 +9,13 @@ struct SettingsSystemTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            SettingsComponents.sectionHeader(
+                title: "플레이어",
+                subtitle: "영상 재생 방식과 화면 표시 옵션을 설정합니다"
+            )
+
+            SettingsComponents.divider()
+
             SettingsRow(title: "비디오 플레이어", description: "영상 재생 방식을 선택합니다") {
                 Picker(
                     "",
@@ -43,6 +50,27 @@ struct SettingsSystemTab: View {
                 }
                 .fixedSize()
             }
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "썸네일 미리보기", description: "목록에서 썸네일 미리보기를 표시합니다") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.showThumbnailPreview },
+                        set: { _ in store.send(.toggleShowThumbnailPreview) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            SettingsComponents.sectionSubHeader()
+
+            SettingsComponents.sectionHeader(
+                title: "앱 시작",
+                subtitle: "TubeKeep을 실행하는 방식을 설정합니다"
+            )
 
             SettingsComponents.divider()
 

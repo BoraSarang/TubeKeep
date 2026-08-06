@@ -565,7 +565,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.managed, .ignoresCycle]
         window.identifier = NSUserInterfaceItemIdentifier("settings")
-        window.setContentSize(NSSize(width: 560, height: 420))
+        window.setContentSize(NSSize(width: 640, height: 420))
         window.contentMinSize = window.frame.size
         window.contentMaxSize = window.frame.size
         window.center()

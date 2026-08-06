@@ -128,6 +128,12 @@ struct AppReducer {
                         if !settings.showMainWindowOnLaunch {
                             await send(.settings(.toggleShowMainWindowOnLaunch))
                         }
+                        if !settings.showOnlyVideo {
+                            await send(.settings(.toggleShowOnlyVideo))
+                        }
+                        if !settings.showThumbnailPreview {
+                            await send(.settings(.toggleShowThumbnailPreview))
+                        }
                         if !settings.sponsorBlock {
                             await send(.settings(.toggleSponsorBlock))
                         }

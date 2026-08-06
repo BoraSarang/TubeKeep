@@ -346,6 +346,49 @@ struct SettingsAITab: View {
             }
             .padding(.leading, 20)
 
+            // A.X 4.0
+            SettingsComponents.sectionSubHeader()
+
+            VStack(spacing: 0) {
+                SettingsComponents.divider()
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("A.X 4.0")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("유료 · API 키 필요 (ax4로 요약/태깅 폴백 지원)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+
+                VStack(spacing: 0) {
+                    SettingsComponents.divider()
+
+                    SettingsRow(title: "API 키") {
+                        SecureField("API 키 입력", text: Binding(
+                            get: { store.ax4APIKey },
+                            set: { store.send(.setAX4APIKey($0)) }
+                        ))
+                        .textFieldStyle(.plain)
+                        .font(.system(.callout, design: .monospaced))
+                        .frame(width: 160)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        )
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            .padding(.leading, 20)
+
             // 폴백 순서
             SettingsComponents.sectionSubHeader()
 

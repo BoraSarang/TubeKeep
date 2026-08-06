@@ -22,6 +22,8 @@ struct SettingsReducer {
         var maxUploadCheck: Int = Constants.defaultMaxUploadCheck
         var skipIndexOnFailure: Bool = false
         var showMainWindowOnLaunch: Bool = true
+        var showOnlyVideo: Bool = true
+        var showThumbnailPreview: Bool = true
         var sponsorBlock: Bool = true
         var embedMetadata: Bool = true
         var ttsEngine: TTSEngine = .edgeTTS
@@ -66,6 +68,7 @@ struct SettingsReducer {
                 limitRate: limitRate,
                 playSoundOnComplete: playSoundOnComplete,
                 clipboardMonitoring: clipboardMonitoring,
+                showOnlyVideo: showOnlyVideo,
                 defaultResolution: defaultResolution,
                 maxRetries: maxRetries,
                 launchAtLogin: launchAtLogin,
@@ -75,6 +78,7 @@ struct SettingsReducer {
                 showMainWindowOnLaunch: showMainWindowOnLaunch,
                 sponsorBlock: sponsorBlock,
                 embedMetadata: embedMetadata,
+                showThumbnailPreview: showThumbnailPreview,
                 ttsEngine: ttsEngine,
                 playerMode: playerMode,
                 showChannelBadge: showChannelBadge,
@@ -109,6 +113,8 @@ struct SettingsReducer {
         case setMaxUploadCheck(Int)
         case toggleSkipIndexOnFailure
         case toggleShowMainWindowOnLaunch
+        case toggleShowOnlyVideo
+        case toggleShowThumbnailPreview
         case toggleSponsorBlock
         case toggleEmbedMetadata
         case setTTSEngine(TTSEngine)
@@ -237,6 +243,14 @@ struct SettingsReducer {
 
             case .toggleShowMainWindowOnLaunch:
                 state.showMainWindowOnLaunch.toggle()
+                return .send(.saveSettings)
+
+            case .toggleShowOnlyVideo:
+                state.showOnlyVideo.toggle()
+                return .send(.saveSettings)
+
+            case .toggleShowThumbnailPreview:
+                state.showThumbnailPreview.toggle()
                 return .send(.saveSettings)
 
             case .toggleSponsorBlock:

@@ -15,11 +15,13 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     switch store.selectedTab {
-                    case .downloads: SettingsDownloadsTab(store: store)
-                    case .storage: SettingsStorageTab(store: store, editingPreset: $editingPreset)
-                    case .notifications: SettingsNotificationsTab(store: store)
-                    case .system: SettingsSystemTab(store: store)
+                    case .downloads: SettingsDownloadsTab(store: store, editingPreset: $editingPreset)
+                    case .channels: SettingsChannelsTab(store: store)
+                    case .automation: SettingsAutomationTab(store: store)
                     case .ai: SettingsAITab(store: store)
+                    case .storage: SettingsStorageTab(store: store)
+                    case .notifications: SettingsNotificationsTab(store: store)
+                    case .general: SettingsSystemTab(store: store)
                     }
                 }
                 .padding(.horizontal, 16)

@@ -3,9 +3,17 @@ import ComposableArchitecture
 
 struct SettingsDownloadsTab: View {
     @ObservedObject var store: StoreOf<SettingsReducer>
+    @Binding var editingPreset: DownloadPreset?
 
     var body: some View {
         VStack(spacing: 0) {
+            SettingsComponents.sectionHeader(
+                title: "다운로드 기본",
+                subtitle: "다운로드 처리 방식의 기본값을 설정합니다"
+            )
+
+            SettingsComponents.divider()
+
             SettingsRow(title: "동시 다운로드", description: "동시에 처리할 다운로드 개수") {
                 Stepper(
                     "\(store.concurrentDownloads)개",
@@ -63,37 +71,6 @@ struct SettingsDownloadsTab: View {
                 )
                 .font(.callout)
                 .fixedSize()
-            }
-
-            SettingsComponents.divider()
-
-            SettingsRow(title: "업로드 확인 개수") {
-                HStack(spacing: 4) {
-                    TextField(
-                        "500",
-                        value: Binding(
-                            get: { store.maxUploadCheck },
-                            set: { store.send(.setMaxUploadCheck($0)) }
-                        ),
-                        format: .number
-                    )
-                    .textFieldStyle(.plain)
-                    .font(.callout)
-                    .frame(width: 60)
-                    .multilineTextAlignment(.trailing)
-                    Text("개")
-                        .font(.callout)
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                )
             }
 
             SettingsComponents.divider()
@@ -183,6 +160,103 @@ struct SettingsDownloadsTab: View {
             }
 
             SettingsComponents.divider()
+
+            SettingsRow(title: "영상만 표시", description: "조회 결과에서 영상만 표시합니다") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.showOnlyVideo },
+                        set: { _ in store.send(.toggleShowOnlyVideo) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            SettingsComponents.sectionSubHeader()
+
+            SettingsComponents.sectionHeader(
+                title: "다운로드 프리셋",
+                subtitle: "자주 쓰는 다운로드 옵션을 저장해 한 번에 적용합니다"
+            )
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "Smart Mode", description: "URL 입력 시 활성 프리셋으로 바로 다운로드 큐에 추가") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.smartMode },
+                        set: { _ in store.send(.toggleSmartMode) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "활성 프리셋", description: "Smart Mode에서 사용할 다운로드 프리셋") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.activePresetId },
+                        set: { store.send(.setActivePreset($0)) }
+                    )
+                ) {
+                    Text("사용 안 함").tag(nil as UUID?)
+                    ForEach(store.presets) { preset in
+                        Text(preset.name).tag(preset.id as UUID?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+                .disabled(!store.smartMode)
+                .opacity(store.smartMode ? 1 : 0.4)
+            }
+
+            if !store.presets.isEmpty {
+                SettingsComponents.divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(store.presets.enumerated()), id: \.offset) { _, preset in
+                        HStack {
+                            Text(preset.name)
+                                .font(.callout)
+                            Spacer()
+                            Text("\(preset.formatType.rawValue) · \(preset.resolution > 0 ? "\(preset.resolution)p" : "오디오")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("편집") {
+                                editingPreset = preset
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                            Button("삭제") {
+                                store.send(.deletePreset(preset.id))
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .padding(.leading, 20)
+            }
+
+            SettingsComponents.divider()
+
+            Button("프리셋 추가") {
+                editingPreset = DownloadPreset(id: UUID(), name: "", formatType: .video, resolution: 1080, includeSubtitles: false, sponsorBlock: false, embedMetadata: true)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color.accentColor)
+            .padding(.top, 6)
+            .padding(.leading, 20)
         }
     }
 }

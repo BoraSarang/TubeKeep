@@ -98,6 +98,14 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - 로그 목록/자동 스크롤/선택(shift 다중·cmd 다중)이 `filteredLogs` 기준으로 동작
 - PERF/CACHE 레벨 필터로 성능·캐시 히트 로그만 조회 가능 (AGENTS 7.5·8.13 로그 형식 연동)
 
+### T-1079 설정 UI/UX 개편 ✅
+- `SettingsTab` 7개 재구성: 다운로드 / 채널(신규) / 자동화(신규) / AI / 저장 / 알림 / 일반 — 사용자 흐름 중심 분류 (기존 5개: 다운로드·저장·알림·시스템·AI 설정)
+- 항목 이동: 채널 탭 ← 채널 새 영상 배지(알림→) + 확인 영상 개수(다운로드→), 자동화 탭 ← 클립보드 모니터링(신규 노출) + 유휴 자막·요약·팟캐스트(알림→), 다운로드 탭 ← 프리셋(Smart Mode/활성 프리셋/목록, 저장→) + 영상만 표시(신규 노출), 일반 탭 ← 썸네일 미리보기(신규 노출)
+- `SettingsReducer.State`: `showOnlyVideo`/`showThumbnailPreview` 추가 + toggle 액션 2개 + settings computed 반영, `AppReducer` appDidFinishLaunching 로드 반영
+- `SettingsAITab`: A.X 4.0 API 키 입력 UI 추가(폴백 체인 연동), 섹션 정리
+- 모든 탭에 `sectionHeader`(제목+설명) 적용, 설명 2줄 허용으로 통일
+- `AppDelegate`: 설정 창 크기 560x420 → 640x420
+
 ## 6. 에러코드
 
 | 코드 | 메시지 |

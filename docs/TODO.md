@@ -615,5 +615,6 @@
 | T-1076 | **큐 드래그 재정렬** — 대기열 순서 변경 + 영속 | medium | done | List onMove + setItems |
 | T-1077 | **핵심 기능 자동화 테스트** — test-core.sh + 수동 체크리스트 | medium | done | scripts/test-core.sh + docs/tests/manual-checklist.md |
 | T-1078 | **디버그 로그창 고도화** — 레벨 픽커 + 검색 + 카운트 (AGENTS 19장 표준) | medium | done | DebugLogView.swift + DebugLogManager.swift |
+| T-1079 | **설정 UI/UX 개편** — 탭 7개 세분화(채널/자동화 신규) + 숨겨진 설정 노출 + 창 확대 | medium | done | Settings*.swift + SettingsTab + AppReducer + AppDelegate |
 
 

@@ -35,18 +35,22 @@ enum TTSEngine: String, CaseIterable, Codable, Equatable {
 
 enum SettingsTab: String, Equatable, CaseIterable {
     case downloads = "다운로드"
+    case channels = "채널"
+    case automation = "자동화"
+    case ai = "AI"
     case storage = "저장"
     case notifications = "알림"
-    case system = "시스템"
-    case ai = "AI 설정"
+    case general = "일반"
 
     var icon: String {
         switch self {
         case .downloads: return "arrow.down.circle"
+        case .channels: return "person.crop.rectangle"
+        case .automation: return "bolt.fill"
+        case .ai: return "sparkle"
         case .storage: return "folder"
         case .notifications: return "bell"
-        case .system: return "gearshape"
-        case .ai: return "sparkle"
+        case .general: return "gearshape"
         }
     }
 }

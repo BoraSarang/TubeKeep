@@ -1,0 +1,17 @@
+===== TubeKeep 메타데이터 (v3.1.1) =====
+빌드 시각: Thu Aug  6 16:35:05 KST 2026
+CFBundleShortVersionString: 3.1.1
+CFBundleVersion: 22
+
+===== 최근 커밋 (git log -5) =====
+1afbac1 feat(macos): 디버그 로그창 고도화 — 레벨 픽커 + 검색 + 카운트 (T-1078)
+f44eac2 test(macos): manual test results — settings persist, download pipeline verified (T-1077)
+f6bdcac feat(macos): add core automation test script + manual checklist (T-1077)
+e0a8086 feat(macos): 다운로드 큐 드래그 재정렬 (T-1076)
+85e8fb2 feat(macos): 재생목록 감시 — 구독 + 신규 자동 다운로드 (T-1075)
+
+===== 저장된 앱 =====
+drwxr-xr-x@ 3 lee  staff  96 Aug  6 16:34 /Users/lee/Applications/TubeKeep.app
+
+===== yt-dlp / ffmpeg 번들 =====
+-rwxr-xr-x@ 1 lee  staff   532B Aug  6 16:34 /Users/lee/Applications/TubeKeep.app/Contents/Resources/yt-dlp
