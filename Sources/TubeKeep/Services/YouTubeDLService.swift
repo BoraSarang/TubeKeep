@@ -99,7 +99,7 @@ actor YouTubeDLService {
             let attrs = try? fm.attributesOfItem(atPath: stderrURL.path)
             let currentSize = (attrs?[.size] as? UInt64) ?? 0
             if currentSize > lastStderrSize, let data = try? Data(contentsOf: stderrURL) {
-                let newBytes = data[Int(lastStderrSize)...]
+                let newBytes = Data(data.dropFirst(Int(lastStderrSize)))
                 if let output = String(data: newBytes, encoding: .utf8) {
                     stderrOutput += output
                     for line in output.components(separatedBy: .newlines) {
@@ -114,7 +114,7 @@ actor YouTubeDLService {
         }
 
         if let data = try? Data(contentsOf: stderrURL), data.count > Int(lastStderrSize) {
-            let newBytes = data[Int(lastStderrSize)...]
+            let newBytes = Data(data.dropFirst(Int(lastStderrSize)))
             if let output = String(data: newBytes, encoding: .utf8) {
                 stderrOutput += output
                 for line in output.components(separatedBy: .newlines) {

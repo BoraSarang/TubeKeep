@@ -7,12 +7,16 @@ enum SwiftDataMigration {
 
     static func migrateIfNeeded(context: ModelContext) {
         guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
-        migrateLibrary(context: context)
-        migrateSubscribedChannels(context: context)
-        UserDefaults.standard.set(true, forKey: migratedKey)
+        let libraryOK = migrateLibrary(context: context)
+        let channelsOK = migrateSubscribedChannels(context: context)
+        if libraryOK && channelsOK {
+            UserDefaults.standard.set(true, forKey: migratedKey)
+        } else {
+            DebugLogManager.shared?.append("[Migration] 마이그레이션 실패 (library:\(libraryOK) channels:\(channelsOK)) — 다음 실행에서 재시도")
+        }
     }
 
-    private static func migrateLibrary(context: ModelContext) {
+    private static func migrateLibrary(context: ModelContext) -> Bool {
         let saveKey = "downloadLibrary"
         let sharedDefaults = UserDefaults(suiteName: Constants.appGroupSuiteName)
 
@@ -23,9 +27,12 @@ enum SwiftDataMigration {
             data = d
         }
 
-        guard let data,
-              let dict = try? JSONDecoder().decode([String: LibraryItemDTO].self, from: data)
-        else { return }
+        guard let data else { return true }
+
+        guard let dict = try? JSONDecoder().decode([String: LibraryItemDTO].self, from: data) else {
+            DebugLogManager.shared?.append("[Migration] downloadLibrary 디코드 실패 — 기존 데이터 형식 불일치")
+            return false
+        }
 
         for (_, dto) in dict {
             let item = LibraryItem(
@@ -44,13 +51,22 @@ enum SwiftDataMigration {
             )
             context.insert(item)
         }
-        try? context.save()
+        do {
+            try context.save()
+            return true
+        } catch {
+            DebugLogManager.shared?.append("[Migration] 라이브러리 저장 실패: \(error)")
+            return false
+        }
     }
 
-    private static func migrateSubscribedChannels(context: ModelContext) {
-        guard let data = UserDefaults.standard.data(forKey: "subscribedChannels"),
-              let channels = try? JSONDecoder().decode([SubscribedChannelDTO].self, from: data)
-        else { return }
+    private static func migrateSubscribedChannels(context: ModelContext) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: "subscribedChannels") else { return true }
+
+        guard let channels = try? JSONDecoder().decode([SubscribedChannelDTO].self, from: data) else {
+            DebugLogManager.shared?.append("[Migration] subscribedChannels 디코드 실패")
+            return false
+        }
 
         for dto in channels {
             let channel = SubscribedChannel(
@@ -63,7 +79,13 @@ enum SwiftDataMigration {
             )
             context.insert(channel)
         }
-        try? context.save()
+        do {
+            try context.save()
+            return true
+        } catch {
+            DebugLogManager.shared?.append("[Migration] 채널 저장 실패: \(error)")
+            return false
+        }
     }
 }
 

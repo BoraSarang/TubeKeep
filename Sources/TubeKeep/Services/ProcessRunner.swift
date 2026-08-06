@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum ProcessError: LocalizedError {
     case notFound(String)
@@ -22,6 +23,10 @@ actor ProcessRunner {
         let percentage: Double
         let speed: String
         let eta: String
+    }
+
+    private final class MutableData: @unchecked Sendable {
+        var data = Data()
     }
 
     func run(
@@ -48,6 +53,20 @@ actor ProcessRunner {
                     process.standardError = stderrPipe
 
                     try process.run()
+                    let pid = process.processIdentifier
+
+                    let stdoutBox = MutableData()
+                    let lock = NSLock()
+
+                    let stdoutHandle = stdoutPipe.fileHandleForReading
+                    stdoutHandle.readabilityHandler = { handle in
+                        let data = handle.availableData
+                        guard !data.isEmpty else {
+                            stdoutHandle.readabilityHandler = nil
+                            return
+                        }
+                        lock.withLock { stdoutBox.data.append(data) }
+                    }
 
                     let stderrHandle = stderrPipe.fileHandleForReading
                     stderrHandle.readabilityHandler = { handle in
@@ -59,13 +78,22 @@ actor ProcessRunner {
                         progressHandler?(output)
                     }
 
-                    process.waitUntilExit()
-
+                    await withTaskCancellationHandler {
+                        process.waitUntilExit()
+                    } onCancel: {
+                        process.terminate()
+                        kill(pid, SIGKILL)
+                    }
+                    stdoutHandle.readabilityHandler = nil
                     stderrHandle.readabilityHandler = nil
 
-                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    if let stdoutOutput = String(data: stdoutData, encoding: .utf8),
-                       !stdoutOutput.isEmpty {
+                    if Task.isCancelled {
+                        continuation.finish(throwing: CancellationError())
+                        return
+                    }
+
+                    let stdoutOutput = lock.withLock { String(data: stdoutBox.data, encoding: .utf8) ?? "" }
+                    if !stdoutOutput.isEmpty {
                         continuation.yield(stdoutOutput)
                     }
 
@@ -79,7 +107,11 @@ actor ProcessRunner {
                         )
                     }
                 } catch {
-                    continuation.finish(throwing: error)
+                    if Task.isCancelled {
+                        continuation.finish(throwing: CancellationError())
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
                 }
             }
         }
@@ -120,6 +152,9 @@ actor ProcessRunner {
                 }
 
                 let pid = process.processIdentifier
+                let stderrBox = MutableData()
+                let lock = NSLock()
+
                 let stdoutHandle = stdoutPipe.fileHandleForReading
                 stdoutHandle.readabilityHandler = { handle in
                     let data = handle.availableData
@@ -129,6 +164,16 @@ actor ProcessRunner {
                     continuation.yield(output)
                 }
 
+                let stderrHandle = stderrPipe.fileHandleForReading
+                stderrHandle.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    guard !data.isEmpty else {
+                        stderrHandle.readabilityHandler = nil
+                        return
+                    }
+                    lock.withLock { stderrBox.data.append(data) }
+                }
+
                 await withTaskCancellationHandler {
                     process.waitUntilExit()
                 } onCancel: {
@@ -136,14 +181,14 @@ actor ProcessRunner {
                     kill(pid, SIGKILL)
                 }
                 stdoutHandle.readabilityHandler = nil
+                stderrHandle.readabilityHandler = nil
 
                 if Task.isCancelled {
                     continuation.finish(throwing: CancellationError())
                     return
                 }
 
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+                let stderr = lock.withLock { String(data: stderrBox.data, encoding: .utf8) ?? "" }
 
                 if process.terminationStatus == 0 {
                     continuation.finish()
@@ -164,7 +209,6 @@ actor ProcessRunner {
         timeout: TimeInterval = 120
     ) async throws -> String {
         let process = Process()
-        ProcessRegistry.register(process)
         if executable.hasPrefix("/") {
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = arguments
@@ -180,11 +224,10 @@ actor ProcessRunner {
 
         let semaphore = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in semaphore.signal() }
+        ProcessRegistry.register(process)
 
-        final class MutableData: @unchecked Sendable {
-            var data = Data()
-        }
         let stdoutBox = MutableData()
+        let stderrBox = MutableData()
         let lock = NSLock()
 
         let stdoutHandle = stdoutPipe.fileHandleForReading
@@ -197,6 +240,16 @@ actor ProcessRunner {
             lock.withLock { stdoutBox.data.append(data) }
         }
 
+        let stderrHandle = stderrPipe.fileHandleForReading
+        stderrHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                stderrHandle.readabilityHandler = nil
+                return
+            }
+            lock.withLock { stderrBox.data.append(data) }
+        }
+
         try process.run()
 
         let pid = process.processIdentifier
@@ -206,22 +259,23 @@ actor ProcessRunner {
                     let result = semaphore.wait(timeout: .now() + timeout)
 
                     stdoutHandle.readabilityHandler = nil
+                    stderrHandle.readabilityHandler = nil
 
                     if result == .timedOut {
                         process.terminate()
+                        kill(pid, SIGKILL)
                         continuation.resume(throwing: ProcessError.executionFailed("Timeout after \(Int(timeout))초"))
                         return
                     }
 
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+                    let stderr = lock.withLock { String(data: stderrBox.data, encoding: .utf8) ?? "" }
 
                     guard process.terminationStatus == 0 else {
                         continuation.resume(throwing: ProcessError.executionFailed(stderr))
                         return
                     }
 
-                    let output = String(data: stdoutBox.data, encoding: .utf8) ?? ""
+                    let output = lock.withLock { String(data: stdoutBox.data, encoding: .utf8) ?? "" }
                     continuation.resume(returning: output)
                 }
             }

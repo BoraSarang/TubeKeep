@@ -65,6 +65,7 @@ final class IdleSubtitleService {
         downloadTask = Task { [weak self] in
             guard let self else { return }
             await self.downloadSubtitle(for: first)
+            guard !Task.isCancelled else { return }
             self.isDownloading = false
             self.downloadTask = nil
             self.checkIdle()
@@ -115,13 +116,28 @@ final class IdleSubtitleService {
             args.insert(Constants.ytDlpPath, at: 0)
             process.arguments = args
         }
-        let stderrPipe = Pipe()
-        process.standardOutput = Pipe()
-        process.standardError = stderrPipe
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
         currentProcess = process
-        try? process.run()
-        process.waitUntilExit()
+
+        do {
+            try process.run()
+            let deadline = ContinuousClock.now + .seconds(120)
+            while process.isRunning && !Task.isCancelled {
+                if ContinuousClock.now >= deadline {
+                    process.terminate()
+                    break
+                }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if process.isRunning { process.terminate() }
+        } catch {
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] yt-dlp 실행 실패: \(error)")
+            #endif
+        }
         currentProcess = nil
+        if Task.isCancelled { return }
 
         let files = (try? fm.contentsOfDirectory(atPath: tmpDir.path)) ?? []
         var saved = false

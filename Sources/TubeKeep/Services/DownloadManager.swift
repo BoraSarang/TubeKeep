@@ -11,6 +11,7 @@ final class DownloadManager: @unchecked Sendable {
         var storageDirectory = Constants.defaultStorageDirectory
         var filenameTemplate = Constants.defaultFilenameTemplate
         var pausedItems: Set<UUID> = []
+        var canceledItems: Set<UUID> = []
     }
 
     private let runner = ProcessRunner()
@@ -39,6 +40,11 @@ final class DownloadManager: @unchecked Sendable {
 
         Task { [weak self] in
             guard let self = self else { return }
+
+            do {
+                try Task.checkCancellation()
+            } catch { return }
+            if stateLock.withLock({ $0.canceledItems.contains(item.id) }) { return }
 
             var args = buildDownloadArgs(item: item, outputDir: outputDir, settings: s, filenameTemplate: tmpl)
             #if DEBUG
@@ -75,6 +81,7 @@ final class DownloadManager: @unchecked Sendable {
 
             defer {
                 activeLock.withLock { _ = $0.removeValue(forKey: item.id) }
+                try? FileManager.default.removeItem(atPath: outputPathFile)
             }
 
             do {
@@ -116,10 +123,11 @@ final class DownloadManager: @unchecked Sendable {
                         var data = Data()
                     }
                     let buf = SendableData()
+                    let stderrLock = NSLock()
                     stderrHandle.readabilityHandler = { handle in
                         let data = handle.availableData
                         guard !data.isEmpty, let output = String(data: data, encoding: .utf8) else { return }
-                        buf.data.append(data)
+                        stderrLock.withLock { buf.data.append(data) }
                         for line in output.components(separatedBy: .newlines) {
                             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !trimmed.isEmpty else { continue }
@@ -134,12 +142,17 @@ final class DownloadManager: @unchecked Sendable {
                 stdoutHandle.readabilityHandler = nil
                 stderrHandle.readabilityHandler = nil
 
-                // Read remaining stderr for error message
                 let errRemaining = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                buf.data.append(errRemaining)
-                let errMsg = String(data: buf.data, encoding: .utf8)
+                let errMsg = stderrLock.withLock {
+                    buf.data.append(errRemaining)
+                    return String(data: buf.data, encoding: .utf8)
+                }
 
-                if !Task.isCancelled {
+                let suppressed = stateLock.withLock {
+                    $0.canceledItems.contains(item.id) || $0.pausedItems.contains(item.id)
+                }
+
+                if !Task.isCancelled && !suppressed {
                     let actualPath: String? = {
                         let fm = FileManager.default
                         // 1) Try after_move:filepath first
@@ -198,14 +211,20 @@ final class DownloadManager: @unchecked Sendable {
     func resumeDownload(item: DownloadItem,
                         progressHandler: @escaping @Sendable (UUID, Double, String) -> Void,
                         completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void) {
-        _ = stateLock.withLock { $0.pausedItems.remove(item.id) }
+        stateLock.withLock {
+            $0.pausedItems.remove(item.id)
+            $0.canceledItems.remove(item.id)
+        }
         startDownload(item: item, progressHandler: progressHandler, completionHandler: completionHandler)
     }
 
     func cancelDownload(itemId: UUID) {
         let process = activeLock.withLock { $0.removeValue(forKey: itemId) }
+        stateLock.withLock {
+            $0.canceledItems.insert(itemId)
+            $0.pausedItems.remove(itemId)
+        }
         if let p = process, p.isRunning { p.terminate() }
-        _ = stateLock.withLock { $0.pausedItems.remove(itemId) }
     }
 
     @discardableResult

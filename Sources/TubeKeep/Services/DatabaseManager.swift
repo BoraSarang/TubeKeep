@@ -108,11 +108,27 @@ final class DatabaseManager {
         """
 
         execute(createVideoAIData)
-        execute("ALTER TABLE video_ai_data ADD COLUMN subtitles_json TEXT;")
+        if !columnExists("subtitles_json", in: "video_ai_data") {
+            execute("ALTER TABLE video_ai_data ADD COLUMN subtitles_json TEXT;")
+        }
         execute(createQnAHistory)
         execute(createDownloadHistory)
         execute(createVideoFTS)
         log("[DB] 테이블 생성 완료")
+    }
+
+    private func columnExists(_ column: String, in table: String) -> Bool {
+        guard let db = _db else { return false }
+        var stmt: OpaquePointer?
+        let sql = "PRAGMA table_info(\(table));"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let name = columnText(stmt, 1), name == column {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - SQLITE_TRANSIENT (SQLite가 문자열을 복사하도록)
@@ -446,9 +462,9 @@ final class DatabaseManager {
             var items: [QAHistoryItem] = []
             while sqlite3_step(stmt) == SQLITE_ROW {
                 let id = sqlite3_column_int64(stmt, 0)
-                let vId = String(cString: sqlite3_column_text(stmt, 1))
-                let question = String(cString: sqlite3_column_text(stmt, 2))
-                let answer = String(cString: sqlite3_column_text(stmt, 3))
+                let vId = columnText(stmt, 1) ?? ""
+                let question = columnText(stmt, 2) ?? ""
+                let answer = columnText(stmt, 3) ?? ""
                 let timestampsJSON = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? "[]"
                 let createdAtStr = sqlite3_column_text(stmt, 5).map { String(cString: $0) } ?? ""
                 let timestamps: [QATimestamp] = (try? JSONDecoder().decode([QATimestamp].self, from: Data(timestampsJSON.utf8))) ?? []
@@ -575,7 +591,7 @@ final class DatabaseManager {
         sync {
             guard let db = _db else { return }
             var stmt: OpaquePointer?
-            let sql = "DELETE FROM download_history WHERE channelName = ?;"
+            let sql = "DELETE FROM download_history WHERE channel_name = ?;"
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
             sqlite3_bind_text(stmt, 1, (channel as NSString).utf8String, -1, nil)
             sqlite3_step(stmt)

@@ -53,11 +53,11 @@ final class ClipService {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         let ext = (sourcePath as NSString).pathExtension.isEmpty ? "mp4" : (sourcePath as NSString).pathExtension
-        let outURL = dir.appendingPathComponent("clip_\(Int(Date().timeIntervalSince1970)).\(ext)")
+        let outURL = dir.appendingPathComponent("clip_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(4)).\(ext)")
         try await runFFmpeg(source: sourcePath, output: outURL.path, start: start, end: end, progress: progress)
 
         let thumbURL = dir.appendingPathComponent("thumb.jpg")
-        generateThumbnail(source: sourcePath, output: thumbURL.path, at: start)
+        await generateThumbnail(source: sourcePath, output: thumbURL.path, at: start)
 
         let item = ClipItem(
             videoId: videoId,
@@ -73,7 +73,7 @@ final class ClipService {
         return item
     }
 
-    private func generateThumbnail(source: String, output: String, at time: Double) {
+    private func generateThumbnail(source: String, output: String, at time: Double) async {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: Constants.ffmpegPath)
         process.arguments = [
@@ -84,10 +84,24 @@ final class ClipService {
             "-q:v", "2",
             output
         ]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        try? process.run()
-        process.waitUntilExit()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let deadline = ContinuousClock.now + .seconds(30)
+            while process.isRunning && !Task.isCancelled {
+                if ContinuousClock.now >= deadline {
+                    process.terminate()
+                    break
+                }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            if process.isRunning { process.terminate() }
+        } catch {
+            #if DEBUG
+            DebugLogManager.shared?.append("[Clip] 썸네일 생성 실패: \(error)")
+            #endif
+        }
     }
 
     func deleteClip(_ clip: ClipItem) {
@@ -153,6 +167,7 @@ final class ClipService {
         process.standardOutput = outPipe
         process.standardError = Pipe()
         try process.run()
+        let pid = process.processIdentifier
 
         let duration = end - start
         let readTask = Task.detached(priority: .userInitiated) {
@@ -177,10 +192,17 @@ final class ClipService {
             }
         }
 
-        let status = await withCheckedContinuation { cont in
-            process.terminationHandler = { cont.resume(returning: $0.terminationStatus) }
+        let status = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                process.terminationHandler = { cont.resume(returning: $0.terminationStatus) }
+                ProcessRegistry.register(process)
+            }
+        } onCancel: {
+            process.terminate()
+            kill(pid, SIGKILL)
         }
         _ = await readTask.value
+        if Task.isCancelled { throw CancellationError() }
         guard status == 0 else { throw ClipError.encodeFailed(status) }
     }
 }

@@ -111,7 +111,12 @@ final class LibraryCacheService {
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
             context.delete(item)
-            try? context.save()
+            do {
+                try context.save()
+            } catch {
+                DebugLogManager.shared?.append("[Library] removeItem 저장 실패: \(error)")
+            }
+            purgeAssociatedData(for: item.id)
         }
     }
 
@@ -119,14 +124,33 @@ final class LibraryCacheService {
         let idSet = Set(ids)
         let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
         guard let items = try? context.fetch(descriptor) else { return }
+        var removed: [String] = []
         for item in items where idSet.contains(item.id) {
             guard ClipService.confirmAndDeleteClipsIfAny(for: item.id) else { continue }
             BookmarkManager.ensureAccess()
             try? FileManager.default.removeItem(atPath: item.filePath)
             ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
             context.delete(item)
+            removed.append(item.id)
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            DebugLogManager.shared?.append("[Library] removeItems 저장 실패: \(error)")
+        }
+        for id in removed {
+            purgeAssociatedData(for: id)
+        }
+    }
+
+    private func purgeAssociatedData(for videoId: String) {
+        DatabaseManager.shared.deleteVideoAIData(videoId: videoId)
+        DatabaseManager.shared.deleteAllQAHistory(videoId: videoId)
+        DatabaseManager.shared.deleteFTSIndex(videoId: videoId)
+        thumbCache.removeObject(forKey: "thumb_\(videoId)" as NSString)
+        guard let dir = cacheDir else { return }
+        let thumbFile = dir.appendingPathComponent("thumb_\(videoId).jpg")
+        try? FileManager.default.removeItem(at: thumbFile)
     }
 
     func findItem(id: String) -> LibraryItem? {

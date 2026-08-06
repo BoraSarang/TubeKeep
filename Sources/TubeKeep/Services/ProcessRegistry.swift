@@ -6,14 +6,14 @@ enum ProcessRegistry {
   private static var processes: [Process] = []
 
   static func register(_ process: Process) {
-    lock.withLock {
-      let existing = process.terminationHandler
-      process.terminationHandler = { p in
-        existing?(p)
-        Self.lock.withLock {
-          Self.processes.removeAll { $0 == p }
-        }
+    let existing = process.terminationHandler
+    process.terminationHandler = { p in
+      existing?(p)
+      Self.lock.withLock {
+        Self.processes.removeAll { $0 == p }
       }
+    }
+    lock.withLock {
       processes.append(process)
     }
   }

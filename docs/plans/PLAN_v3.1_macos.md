@@ -47,7 +47,23 @@ v3.0 릴리즈 후 사용자 요청으로 선정한 5개 기능을 구현한다.
 | T-1044 | 유휴 시 자막 자동 다운로드: idleTimer + 순차 처리 + 상태바 + 설정 옵션 | ✅ 구현 (빌드 통과, 실동작 검증 대기) |
 | T-1042 | 채널 자동 다운로드 v1: 채널별 토글 + 신규 영상 enqueue | ✅ 구현 (빌드 통과, 실동작 검증 대기) |
 | T-1045 | 디스크 정리 뷰: 정렬/필터/일괄 삭제 | ✅ 구현 (빌드 통과, 실동작 검증 대기) |
-| T-1046 | v3.1 릴리즈: 버전 3.1.0(build 21) + CHANGELOG | |
+| T-1046 | v3.1 릴리즈: 버전 3.1.0(build 21) + CHANGELOG | ✅ 릴리즈 (tag v3.1.0) |
+
+## 4-1. v3.1.1 정밀 분석 버그 수정 (T-1050~T-1060)
+
+| T-번호 | 작업 | 진행 상태 |
+|--------|------|-----------|
+| T-1050 | DB 버그 3종 (channel_name 컬럼, subtitles_json ALTER 중복, qna NULL 크래시) | ✅ 빌드+테스트 |
+| T-1051 | Settings decodeIfPresent (전체 리셋 방지) | ✅ 빌드+테스트 |
+| T-1052 | SwiftDataMigration 실패 시 재시도 | ✅ 빌드+테스트 |
+| T-1053 | appGroupSuiteName → `group.com.tubekeep` | ✅ 빌드+테스트 |
+| T-1054 | LibraryCacheService purgeAssociatedData | ✅ 빌드+테스트 |
+| T-1055 | ProcessRegistry deadlock 해소 | ✅ 빌드+테스트 |
+| T-1056 | ProcessRunner 파이프 deadlock/취소/레이스 | ✅ 빌드+테스트 |
+| T-1057 | DownloadManager 취소 상태/오판 방지 | ✅ 빌드+테스트 |
+| T-1058 | YouTubeDLService stderr 범위 크래시 | ✅ 빌드+테스트 |
+| T-1059 | IdleSubtitleService 메인 블록/취소 경합 | ✅ 빌드+테스트 |
+| T-1060 | ClipService 파일명 충돌/메인 블록/취소 | ✅ 빌드+테스트 |
 
 ## 5. 에러코드
 

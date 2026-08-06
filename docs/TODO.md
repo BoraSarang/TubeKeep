@@ -582,4 +582,22 @@
 | T-1045 | **디스크 정리 뷰** — 정렬/필터/일괄 삭제 | medium | completed | DiskCleanupView.swift |
 | T-1046 | **v3.1 릴리즈** — 버전 3.1.0(build 21) + CHANGELOG | high | completed | Info.plist + CHANGELOG + tag v3.1.0 |
 
+## v3.1.1 — 정밀 분석 버그 수정 (11파일) 🚧
+
+> 전체 소스 정밀 분석에서 확인된 핵심 버그 10종 수정. 빌드 + `swift test` 76/76 통과.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1050 | **DB 버그 3종** — `channel_name` 컬럼명 수정, `subtitles_json` ALTER 중복 방지, `qna_history` NULL 크래시 방어 | high | done | DatabaseManager.swift |
+| T-1051 | **Settings decodeIfPresent 전환** — 저장 키 누락 시 전체 리셋 방지 | high | done | Settings.swift init(from:) |
+| T-1052 | **SwiftDataMigration 실패 시 재시도** — 성공/실패 Bool 반환, 실패 시 완료 플래그 미설정 | high | done | SwiftDataMigration.swift |
+| T-1053 | **appGroupSuiteName 수정** — 실제 entitlements 값 `group.com.tubekeep`으로 | high | done | Constants.swift:5 |
+| T-1054 | **항목 삭제 시 연관 데이터 정리** — AI 데이터/QnA/FTS/썸네일 purge | medium | done | LibraryCacheService.removeItem(s) + purgeAssociatedData |
+| T-1055 | **ProcessRegistry deadlock 해소** — lock 밖에서 terminationHandler 설정 | high | done | ProcessRegistry.swift |
+| T-1056 | **ProcessRunner 파이프 deadlock/취소/데이터레이스** — stdout/stderr drain, SIGKILL 취소, MutableData+NSLock | high | done | ProcessRunner.swift 재작성 |
+| T-1057 | **DownloadManager 취소 상태 + 성공 오판 방지** — canceledItems, 취소/일시정지 시 후처리 생략 | high | done | DownloadManager.swift |
+| T-1058 | **YouTubeDLService stderr 범위 크래시** — `data[offset...]` → `dropFirst` | medium | done | YouTubeDLService.swift 2곳 |
+| T-1059 | **IdleSubtitleService 메인 블록 + 취소 경합** — waitUntilExit → 폴링, 취소 후 후속 처리 가드 | high | done | IdleSubtitleService.swift |
+| T-1060 | **ClipService 파일명 충돌 + 메인 블록 + 취소 불가** — UUID 접미사, 썸네일 async, runFFmpeg 취소 | high | done | ClipService.swift |
+
 

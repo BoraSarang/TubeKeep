@@ -2,7 +2,7 @@ import Foundation
 
 enum Constants {
     static let appName = "TubeKeep"
-    static let appGroupSuiteName = "com.tubekeep.shared"
+    static let appGroupSuiteName = "group.com.tubekeep"
     static let defaultResolution = 360
     static let defaultConcurrentDownloads = 2
     static let minConcurrentDownloads = 1
