@@ -38,6 +38,12 @@ struct MainView: View {
             case .report:
                 ReportView(store: store.scope(state: \.library, action: \.library))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .clips:
+                ClipView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .diskCleanup:
+                DiskCleanupView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .overlay {

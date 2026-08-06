@@ -69,6 +69,10 @@ struct LibrarySidebarView: View {
                     }
                 } else if store.library.sidebarMode == .report {
                     Color.clear
+                } else if store.library.sidebarMode == .clips {
+                    Color.clear
+                } else if store.library.sidebarMode == .diskCleanup {
+                    Color.clear
                 } else {
                     VStack(spacing: 0) {
                         discoverSearchField
@@ -151,6 +155,8 @@ struct LibrarySidebarView: View {
             navRow(title: "보관함", icon: "square.grid.2x2", mode: .library)
             navRow(title: "트랜드", icon: "flame", mode: .discover)
             navRow(title: "다운로드 히스토리", icon: "clock.arrow.circlepath", mode: .history)
+            navRow(title: "클립", icon: "scissors", mode: .clips)
+            navRow(title: "디스크 정리", icon: "externaldrive.badge.checkmark", mode: .diskCleanup)
             navRow(title: "내 프로필", icon: "person.text.rectangle", mode: .profile)
             navRow(title: "리포트", icon: "chart.bar.xaxis", mode: .report)
         }
