@@ -91,6 +91,13 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - 마지막에 `docs/tests/manual-checklist.md`(수동 테스트 체크리스트) 출력 — 자동화 불가 항목(TC-DL/PL/AI/CH/IDLE/SET) 안내
 - 옵션: `--skip-smoke`(앱 실행 생략), `--skip-build`(빌드·번들 생략), `--help`
 
+### T-1078 디버그 로그창 고도화 ✅
+- AGENTS 19장 DebugPanel 표준(macOS: NSWindow .floating+100, Cmd+Shift+D) 준수 — 기존 유지
+- `DebugLogManager`: `selectedLevels`(Set<DebugLogLevel>) + `searchText` 필터 상태, `levelCounts`(레벨별 카운트), `filteredLogs`(레벨+검색 조건부 computed), `toggleLevel(_:)`, `copyAll()`은 필터된 로그 기준으로 복사
+- `DebugLogView`: 상단 필터 바 — 검색 필드(카테고리/메시지/meta, 대소문자 무시, 클리어 버튼) + 레벨 픽커(전체 + ERROR/WARN/API→/API←/PERF/CACHE/SYSTEM/ACTION/INFO 토글, 레벨 색상 테두리·카운트 배지) / 하단 상태 바 — "표시/전체" 카운트 + "필터링 중" 배지
+- 로그 목록/자동 스크롤/선택(shift 다중·cmd 다중)이 `filteredLogs` 기준으로 동작
+- PERF/CACHE 레벨 필터로 성능·캐시 히트 로그만 조회 가능 (AGENTS 7.5·8.13 로그 형식 연동)
+
 ## 6. 에러코드
 
 | 코드 | 메시지 |

@@ -39,6 +39,9 @@ final class DebugLogManager: ObservableObject {
     @Published var selectedIds: Set<UUID> = []
     @Published var lastSelectedId: UUID?
 
+    @Published var selectedLevels: Set<DebugLogLevel> = []
+    @Published var searchText: String = ""
+
     private let maxLogs = 5000
     private var autoScrollPausedUntil: Date?
     private let dateFormatter: DateFormatter = {
@@ -50,6 +53,29 @@ final class DebugLogManager: ObservableObject {
     var isAutoScrollPaused: Bool {
         guard let until = autoScrollPausedUntil else { return false }
         return Date() < until
+    }
+
+    var levelCounts: [DebugLogLevel: Int] {
+        var counts: [DebugLogLevel: Int] = [:]
+        for entry in logs {
+            counts[entry.level, default: 0] += 1
+        }
+        return counts
+    }
+
+    var filteredLogs: [DebugLogEntry] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedLevels.isEmpty || !query.isEmpty else { return logs }
+        return logs.filter { entry in
+            let levelOK = selectedLevels.isEmpty || selectedLevels.contains(entry.level)
+            let searchOK = query.isEmpty || entry.formatted.localizedCaseInsensitiveContains(query)
+            return levelOK && searchOK
+        }
+    }
+
+    func toggleLevel(_ level: DebugLogLevel) {
+        if selectedLevels.contains(level) { selectedLevels.remove(level) }
+        else { selectedLevels.insert(level) }
     }
 
     func append(_ message: String) {
@@ -115,7 +141,7 @@ final class DebugLogManager: ObservableObject {
 
     func copyAll() {
         #if DEBUG
-        let text = formatForAgent(logs)
+        let text = formatForAgent(filteredLogs)
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
