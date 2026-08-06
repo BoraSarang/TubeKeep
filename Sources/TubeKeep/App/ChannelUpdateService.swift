@@ -160,6 +160,60 @@ final class ChannelUpdateService {
             }
         }
 
+        // 재생목록 감시
+        let playlists = SubscribedPlaylist.loadAll()
+        for playlist in playlists {
+            if Task.isCancelled { return }
+            let key = SubscribedPlaylist.storageKey(for: playlist.id)
+            #if DEBUG
+            logManager?.append("  재생목록 체크: \(playlist.title)")
+            #endif
+
+            let lastFetch = ChannelDownloadCache.lastFetchDate(channelId: key)
+            let minInterval: TimeInterval = 3600
+            guard Date().timeIntervalSince(lastFetch) >= minInterval else {
+                #if DEBUG
+                logManager?.append("    ⏭ 1시간 이내 fetch 완료, skip")
+                #endif
+                continue
+            }
+
+            guard let result = try? await fetchService.fetchAllVideos(
+                channelId: playlist.id, isPlaylist: true
+            ) else {
+                #if DEBUG
+                logManager?.append("    ❌ 재생목록 fetch 실패")
+                #endif
+                continue
+            }
+            ChannelDownloadCache.markFetchDate(channelId: key)
+
+            let downloadedIDs = ChannelDownloadCache.loadDownloadedIDs(channelName: playlist.title)
+            let seenIDs = Set(ChannelDownloadCache.loadSeenVideoIds(channelId: key))
+            let newVideos = result.videos.filter {
+                !downloadedIDs.contains($0.id) && !seenIDs.contains($0.id)
+            }
+            if !newVideos.isEmpty {
+                hasChanges = true
+                let videoIds = newVideos.map { $0.id }
+                newVideosByChannel.append((key, playlist.title, newVideos.count, videoIds))
+                ChannelDownloadCache.saveNewVideoIds(channelId: key, videoIds: videoIds)
+                #if DEBUG
+                logManager?.append("    ✅ 재생목록 새 영상 \(newVideos.count)개 발견")
+                #endif
+                if ChannelDownloadCache.isAutoDownloadEnabled(channelId: key) {
+                    enqueueAutoDownload(channelId: playlist.id, channelName: playlist.title, videos: newVideos, presetKey: key)
+                    #if DEBUG
+                    logManager?.append("    📥 재생목록 자동 다운로드 enqueue \(newVideos.count)개")
+                    #endif
+                }
+            } else {
+                #if DEBUG
+                logManager?.append("    ➖ 재생목록 새 영상 없음")
+                #endif
+            }
+        }
+
         let updatedChannels = ChannelDownloadCache.allChannelsWithNewVideos
         let notifyHasChanges = hasChanges
         let notifyTotal = newVideosByChannel.reduce(0) { $0 + $1.count }
@@ -185,8 +239,9 @@ final class ChannelUpdateService {
         #endif
     }
 
-    private func enqueueAutoDownload(channelId: String, channelName: String, videos: [ChannelVideoItem]) {
-        let preset = ChannelDownloadCache.loadAutoSettings(channelId: channelId)
+    private func enqueueAutoDownload(channelId: String, channelName: String, videos: [ChannelVideoItem], presetKey: String? = nil) {
+        let key = presetKey ?? channelId
+        let preset = ChannelDownloadCache.loadAutoSettings(channelId: key)
         guard preset.enabled else { return }
         let resolution = preset.resolution
         let includeSubtitles = preset.includeSubtitles && !preset.audioOnly
@@ -194,7 +249,7 @@ final class ChannelUpdateService {
 
         var candidates = videos
         if preset.dailyLimit > 0 {
-            let todayCount = ChannelDownloadCache.dailyDownloadCount(channelId: channelId)
+            let todayCount = ChannelDownloadCache.dailyDownloadCount(channelId: key)
             let remaining = max(0, preset.dailyLimit - todayCount)
             guard remaining > 0 else {
                 #if DEBUG
@@ -242,7 +297,7 @@ final class ChannelUpdateService {
         }
         store.send(.downloadQueue(.addItems(items)))
         if preset.dailyLimit > 0 {
-            ChannelDownloadCache.incrementDailyDownloadCount(channelId: channelId, by: items.count)
+            ChannelDownloadCache.incrementDailyDownloadCount(channelId: key, by: items.count)
         }
         #if DEBUG
         logManager?.append("  [AutoDL] \(channelName): \(items.count)개 큐에 추가")

@@ -75,10 +75,11 @@ F 큐 재정렬: DownloadQueueState.queue 배열 순서 변경 액션 + UserDefa
 - `HomeView`: 제목 아래 "이미 받은 영상입니다" 주황 배지
 - `DownloadQueueReducer.addItems`: 완료 이력(`status == "completed"`) 영상도 중복 스킵 + "중복된 항목이 제외되었습니다" 토스트
 
-### T-1075 재생목록 감시
-- `ChannelModels`: `SubscribedPlaylist` (id/title) + UserDefaults 저장
-- `ChannelUpdateService`: 재생목록도 감시 대상에 포함 (playlist ID로 `--flat-playlist`)
-- `ChannelContentView` 또는 별도 뷰: 재생목록 구독 UI
+### T-1075 재생목록 감시 ✅
+- `ChannelModels`: `SubscribedPlaylist` (id/title/url) + UserDefaults `subscribedPlaylists` CRUD, `playlistID(from:)` URL 파싱, `storageKey(for:)` = `playlist:<id>`
+- `ChannelFetchService.fetchAllVideos`: `isPlaylist` 옵션 → `https://www.youtube.com/playlist?list=<id>` fetch
+- `ChannelUpdateService`: 채널 루프 후 재생목록 루프 — 1시간 주기 fetch → newVideos 저장(`playlist:` 키) → 자동 다운로드(`enqueueAutoDownload`에 `presetKey` 파라미터, 일일 한도도 `playlist:` 키로 집계)
+- `ChannelListView`: 사이드바 하단 "재생목록" 섹션 — NSAlert URL 추가/삭제/자동 다운로드 토글/신규 배지
 
 ### T-1076 큐 재정렬
 - `DownloadQueueState`: queue 배열 순서 (이미 배열) → `moveQueueItem(from:to:)` 액션

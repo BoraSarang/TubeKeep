@@ -95,11 +95,14 @@ actor ChannelFetchService {
     func fetchAllVideos(
         channelId: String,
         handle: String? = nil,
+        isPlaylist: Bool = false,
         progressHandler: (@Sendable (Int) -> Void)? = nil
     ) async throws -> (videos: [ChannelVideoItem], totalCount: Int) {
         // Use /videos page to exclude Shorts; fall back to UU playlist for member-only exclusion
         let url: String
-        if let handle = handle, !handle.isEmpty {
+        if isPlaylist {
+            url = "https://www.youtube.com/playlist?list=\(channelId)"
+        } else if let handle = handle, !handle.isEmpty {
             url = "https://www.youtube.com/\(handle)/videos"
         } else {
             let playlistId = "UU" + (channelId.hasPrefix("UC") ? String(channelId.dropFirst(2)) : channelId)
