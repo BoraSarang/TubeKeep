@@ -145,7 +145,8 @@ final class MPVClient: ObservableObject {
     private func renderFrame() {
         guard let ctx = renderContext, let view = renderView else { return }
         guard view.bounds.width > 0, view.bounds.height > 0 else { return }
-        // 창이동/리사이즈/레벨변경 등으로 NSOpenGLView의 context가 교체될 수 있으므로 매 프레임 현재 context를 동기화.
+        // 창이 사라진 뒤(윈도우 닫힘/재생성 중) GL 컨텍스트가 무효한 시점의 렌더링을 차단 — glBlit 크래시 방지
+        guard view.window != nil else { return }
         guard let glCtx = view.openGLContext else { return }
         glContext = glCtx
         let scale = view.window?.backingScaleFactor ?? 2
@@ -229,6 +230,7 @@ final class MPVClient: ObservableObject {
                 if let pendingSeekTime = self.pendingSeekTime {
                     self.seek(to: pendingSeekTime)
                     self.pendingSeekTime = nil
+                    self.play()
                 }
             }
         case MPV_EVENT_END_FILE:
@@ -286,7 +288,7 @@ final class MPVClient: ObservableObject {
 
     // MARK: - Public API
 
-    func loadFile(_ url: URL) {
+    func loadFile(_ url: URL, startTime: Double? = nil) {
         guard let mpv else { return }
         runOnMain { [self] in resetState() }
         playbackStart = Date()
@@ -294,10 +296,17 @@ final class MPVClient: ObservableObject {
         #if DEBUG
         DebugLogManager.shared?.append("[mpv] loadfile(file): \(url.lastPathComponent)")
         #endif
+        pendingSeekTime = nil
+        if let startTime, startTime > 0 {
+            // mpv 네이티브 start 옵션: 로드 시점부터 해당 위치에서 시작. "+NNN"은 상대시간으로 해석되므로 절대 초만 전달한다.
+            mpv_set_property_string(mpv, "start", "\(Int(startTime))")
+        } else {
+            mpv_set_property_string(mpv, "start", "0")
+        }
         mpvCommand(mpv, args: ["loadfile", url.path])
     }
 
-    func loadStream(_ url: URL) {
+    func loadStream(_ url: URL, startTime: Double? = nil) {
         guard let mpv else { return }
         runOnMain { [self] in resetState() }
         playbackStart = Date()
@@ -305,6 +314,12 @@ final class MPVClient: ObservableObject {
         #if DEBUG
         DebugLogManager.shared?.append("[mpv] loadfile(stream): \(url.absoluteString.prefix(80))")
         #endif
+        pendingSeekTime = nil
+        if let startTime, startTime > 0 {
+            mpv_set_property_string(mpv, "start", "\(Int(startTime))")
+        } else {
+            mpv_set_property_string(mpv, "start", "0")
+        }
         mpvCommand(mpv, args: ["loadfile", url.absoluteString])
     }
 

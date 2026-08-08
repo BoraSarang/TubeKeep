@@ -154,6 +154,20 @@ cleanupStaleChildProcesses()
         )
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 영상 플레이어 창이 활성일 때 스페이스바(49) → 재생/일시정지
+            if event.keyCode == 49 {
+                #if DEBUG
+                let cmd = event.modifierFlags.contains(.command)
+                Task { @MainActor in
+                    DebugLogManager.shared?.append("[Key] Space — cmd=\(cmd) playerWindow=\(String(describing: self.playerWindow != nil)) isKey=\(self.playerWindow?.isKeyWindow ?? false) keyWin=\(String(describing: NSApp.keyWindow?.identifier?.rawValue))")
+                }
+                #endif
+                if !event.modifierFlags.contains(.command),
+                   let player = self.playerWindow, player.isKeyWindow {
+                    NotificationCenter.default.post(name: Constants.playerTogglePlayPauseNotification, object: nil)
+                    return nil
+                }
+            }
             if event.modifierFlags.contains(.command) {
                 switch event.keyCode {
                 case 43: // , (settings)
@@ -243,6 +257,8 @@ cleanupStaleChildProcesses()
         statusBar.onToggleDebugPanel = { [weak self] in self?.toggleDebugLogWindow() }
         #endif
         statusManager = statusBar
+
+        IdleNotificationPresenter.shared.configure(statusItem: statusBar.statusItem)
 
         let clipboard = ClipboardMonitor()
         clipboard.onVideoDetected = { [weak self] url in

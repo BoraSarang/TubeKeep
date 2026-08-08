@@ -66,6 +66,11 @@ struct PlayerView: View {
                     let step = Settings.loadSettings().seekStepSeconds
                     mpv.seekRelative(direction * step)
                 }
+                .onReceive(NotificationCenter.default.publisher(for: Constants.playerTogglePlayPauseNotification)) { _ in
+                    if mpv.isLoaded || mpv.isPlaying {
+                        mpv.togglePlayPause()
+                    }
+                }
                 .onChange(of: store.showSubtitlePanel) { _, _ in setContentSize() }
                 .onChange(of: store.showQueue) { _, _ in setContentSize() }
                 .onChange(of: store.showSimilarVideos) { _, _ in setContentSize() }
@@ -622,14 +627,12 @@ struct PlayerView: View {
 
     private func setupPlayer() {
         guard mpv.isRenderReady else { return }
+        let seekTime = store.playerItem.initialSeekTime
         if let fileURL = store.playerItem.fileURL {
             guard FileManager.default.fileExists(atPath: fileURL.path) else { store.send(.fileMissing); return }
-            mpv.loadFile(fileURL)
+            mpv.loadFile(fileURL, startTime: seekTime)
         } else if let streamURL = store.streamURL {
-            mpv.loadStream(streamURL)
-        }
-        if let seekTime = store.playerItem.initialSeekTime, seekTime > 0 {
-            mpv.seekAfterLoad(seekTime)
+            mpv.loadStream(streamURL, startTime: seekTime)
         }
     }
 

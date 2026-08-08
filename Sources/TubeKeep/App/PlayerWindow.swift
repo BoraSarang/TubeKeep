@@ -11,6 +11,8 @@ final class PlayerWindow: NSWindow {
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
+        case 49: // Space (macOS virtual keycode)
+            postTogglePlayPause()
         case 123: // ←
             postSeek(direction: -1)
         case 124: // →
@@ -18,6 +20,13 @@ final class PlayerWindow: NSWindow {
         default:
             super.keyDown(with: event)
         }
+    }
+
+    private func postTogglePlayPause() {
+        NotificationCenter.default.post(
+            name: Constants.playerTogglePlayPauseNotification,
+            object: nil
+        )
     }
 
     private func postSeek(direction: Double) {

@@ -38,6 +38,7 @@ enum Constants {
     static let openAIWindowNotification = Notification.Name("com.tubekeep.openAIWindow")
     static let openPlayerWindowNotification = Notification.Name("com.tubekeep.openPlayerWindow")
     static let playerSeekNotification = Notification.Name("com.tubekeep.playerSeek")
+    static let playerTogglePlayPauseNotification = Notification.Name("com.tubekeep.playerTogglePlayPause")
     static let downloadHistoryDidChangeNotification = Notification.Name("com.tubekeep.downloadHistoryDidChange")
     static let openWhisperSettingsNotification = Notification.Name("com.tubekeep.openWhisperSettings")
     static let videoAIDidChangeNotification = Notification.Name("com.tubekeep.videoAIDidChange")
