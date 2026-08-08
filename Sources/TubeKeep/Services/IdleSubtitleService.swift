@@ -266,7 +266,7 @@ final class IdleSubtitleService {
                 progressHandler: { _ in }
             )
             guard !Task.isCancelled else { return false }
-            let text = cues.map(\.text).joined(separator: " ")
+            let text = cues.map(\.text).joined(separator: "\n")
             guard !text.isEmpty else {
                 #if DEBUG
                 DebugLogManager.shared?.append("[IdleSub] ⚠️ Whisper 자막이 비어 있음 — \(item.title)")
@@ -277,7 +277,8 @@ final class IdleSubtitleService {
                 videoId: item.id,
                 transcript: text,
                 language: LanguageService.systemLanguageCode,
-                source: "whisper"
+                source: "whisper",
+                subtitlesJson: try? JSONEncoder().encode(cues)
             )
             NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
             #if DEBUG

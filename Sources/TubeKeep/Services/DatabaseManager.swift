@@ -264,11 +264,11 @@ let sql = """
         }
     }
 
-    func updateTranscript(videoId: String, transcript: String, language: String, source: String? = nil) {
+    func updateTranscript(videoId: String, transcript: String, language: String, source: String? = nil, subtitlesJson: Data? = nil) {
         sync {
             let sql = """
             UPDATE video_ai_data
-            SET transcript = ?, transcript_language = ?, subtitle_source = COALESCE(?, subtitle_source), updated_at = CURRENT_TIMESTAMP
+            SET transcript = ?, transcript_language = ?, subtitle_source = COALESCE(?, subtitle_source), subtitles_json = COALESCE(?, subtitles_json), updated_at = CURRENT_TIMESTAMP
             WHERE video_id = ?;
             """
 
@@ -284,7 +284,8 @@ let sql = """
             sqlite3_bind_text(stmt, 1, transcript, -1, Self.transient)
             sqlite3_bind_text(stmt, 2, language, -1, Self.transient)
             bindOptionalText(stmt, 3, source)
-            sqlite3_bind_text(stmt, 4, videoId, -1, Self.transient)
+            bindOptionalText(stmt, 4, subtitlesJson.flatMap { String(data: $0, encoding: .utf8) })
+            sqlite3_bind_text(stmt, 5, videoId, -1, Self.transient)
 
             if sqlite3_step(stmt) != SQLITE_DONE {
                 log("[DB] updateTranscript 실행 실패")
