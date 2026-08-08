@@ -1,5 +1,21 @@
 # TODO — 작업 추적 목록
 
+## v3.5 — 휴지통(soft delete) + 사이드바 채널 전체 삭제 + 용어 정리 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-350 | **PLAN_v3.5 + TODO 등록** | high | done | docs/plans/PLAN_v3.5_macos.md |
+| T-351 | **LibraryItem.trashedAt 추가** | high | 진행중 | nil=보관함,값=휴지통 |
+| T-352 | **LibraryCacheService 휴지통 서비스(이동/복원/영구삭제/비움/30일정리)** | high | pending | .Trash 폴더 + sidecar |
+| T-353 | **LibraryReducer 액션/State/로드 필터** | high | pending | trashItems/restore/emptyTrash |
+| T-354 | **사이드바 채널 "채널 영상 모두 삭제" + download_history 정리** | high | pending | removeItemsByChannel 배선 |
+| T-355 | **보관함 메뉴 명칭 "휴지통으로 이동" + SelectionBar 전환** | medium | pending | 용어 통일 |
+| T-356 | **휴지통 뷰 + 사이드바 진입** | medium | pending | 복원/영구삭제/비우기 |
+| T-357 | **자동 정리(AppDelegate 시작 시)** | low | pending | 30일 경과 |
+| T-358 | **빌드 + 수동 검증 + doc/session 업데이트** | high | pending | build_and_run debug macos |
+
+---
+
 ## v3.0 — 신규 기능 (검색/플레이어/위젯/브라우저) 🚧
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |

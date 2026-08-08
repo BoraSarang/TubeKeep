@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## v3.5 — 휴지통 + 사이드바 채널 전체 삭제 + 용어 정리 (macOS, T-350~T-358) 🚧
+
+### 기능 추가
+- **휴지통 (soft delete)** — 기존 물리 삭제(복원 불가)를 앱 내장 휴지통으로 전환
+  - `LibraryItem.trashedAt` 필드(v3.5), 보관함은 `trashedAt == nil`만 표시
+  - 삭제 = 원본 미디어 파일을 `{저장폴더}/.Trash/{videoId}/`로 이동 + sidecar(`original_path.json`)로 원위치 기록 (`LibraryCacheService` 휴지통 서비스 T-352)
+  - 복원: 원본 채널 폴더로 되돌림(transcript/AI 데이터 유지), 영구 삭제: 기존 `purgeAssociatedData`+`download_history` 정리
+  - 사이드바에 **"휴지통"** 진입(`TrashView`) — 항목별 복원/영구 삭제, 전체 비우기, 30일 경과 자동 정리(AppDelegate 시작 시, T-357)
+  - 디스크 사용량 계산은 `.Trash`(히든 폴더) 제외
+- **사이드바 채널 우클릭 "채널 영상 모두 삭제"** (T-354) — 확인 Alert 후 휴지통 이동 + 해당 채널 `download_history` 정리 (`trashChannelItems`)
+  - 단, 채널 다운로더의 기존 "채널 삭제"는 영구 삭제 유지
+- **용어 통일** — 보관함 메뉴 "라이브러리에서 삭제" → **"휴지통으로 이동"**, 선택 삭제(SelectionBar)도 휴지통 이동으로 전환 (T-355)
+- `DatabaseManager.deleteDownloadHistory(videoId:)` 추가 (영구 삭제/채널 삭제 시 히스토리 정합성 개선)
+
+### 검증
+- `./build_and_run.sh debug macos` ✅ (빌드 성공, 앱 실행 정상)
+
 ## 개발 중 — 비슷한 영상 검색 (macOS, T-1084~1087)
 
 ### 기능 추가

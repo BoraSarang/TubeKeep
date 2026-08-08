@@ -9,6 +9,7 @@ struct LibrarySidebarView: View {
     @State private var dropTargetIndex: Int?
     @AppStorage(Constants.channelOrderKey) private var channelOrderData: Data = Data()
     @State private var historyItems: [DownloadHistoryItem] = []
+    @State private var pendingTrashChannel: (id: String, name: String)?
 
     private var channelOrder: [String] {
         get { (try? JSONDecoder().decode([String].self, from: channelOrderData)) ?? [] }
@@ -69,6 +70,8 @@ struct LibrarySidebarView: View {
                 } else if store.library.sidebarMode == .clips {
                     Color.clear
                 } else if store.library.sidebarMode == .diskCleanup {
+                    Color.clear
+                } else if store.library.sidebarMode == .trash {
                     Color.clear
                 } else {
                     VStack(spacing: 0) {
@@ -145,6 +148,22 @@ struct LibrarySidebarView: View {
             updateLibraryCategoryRows(store.library.items)
             store.send(.library(.calculateDiskUsage))
         }
+        .alert("채널 영상 모두 삭제", isPresented: Binding(
+            get: { pendingTrashChannel != nil },
+            set: { if !$0 { pendingTrashChannel = nil } }
+        )) {
+            Button("취소", role: .cancel) {
+                pendingTrashChannel = nil
+            }
+            Button("휴지통으로 이동", role: .destructive) {
+                guard let ch = pendingTrashChannel else { return }
+                store.send(.library(.trashChannelItems(channelId: ch.id, channelName: ch.name)))
+                pendingTrashChannel = nil
+                store.send(.library(.setSelectedChannel(nil)))
+            }
+        } message: {
+            Text("'\(pendingTrashChannel?.name ?? "")' 채널의 다운로드 영상 \(pendingTrashChannel.flatMap { c in store.library.items.filter { $0.channelId == c.id || $0.channelName == c.name }.count } ?? 0)개가 휴지통으로 이동합니다. 복원 가능합니다.")
+        }
     }
 
     // MARK: - Navigation
@@ -158,7 +177,9 @@ struct LibrarySidebarView: View {
             navRow(title: "디스크 정리", icon: "externaldrive.badge.checkmark", mode: .diskCleanup)
             navRow(title: "내 프로필", icon: "person.text.rectangle", mode: .profile)
             navRow(title: "리포트", icon: "chart.bar.xaxis", mode: .report)
+            navRow(title: "휴지통", icon: "trash", mode: .trash)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func navRow(title: String, icon: String, mode: LibrarySidebarMode) -> some View {
@@ -674,6 +695,10 @@ struct LibrarySidebarView: View {
                 moveChannel(from: index, to: index + 1)
             }
             .disabled(index == channelNames.count - 1)
+            Divider()
+            Button("채널 영상 모두 삭제", role: .destructive) {
+                pendingTrashChannel = (channel.id, channel.name)
+            }
         }
         .onDrag {
             draggedChannelId = channel.id

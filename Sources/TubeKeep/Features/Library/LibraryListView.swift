@@ -95,7 +95,7 @@ struct LibraryListView: View {
                         hasPodcast: store.library.podcast.availableIds.contains(item.id),
                         onOpen: { store.send(.library(.openFile(item.id))) },
                         onReveal: { store.send(.library(.revealInFinder(item.id))) },
-                        onDelete: { store.send(.library(.removeItem(item.id))) },
+                        onDelete: { store.send(.library(.trashItem(item.id))) },
                         onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                         onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
                         onOpenAI: { store.send(.library(.showSummary(item.id))) },
@@ -245,7 +245,7 @@ private struct LibraryListRow: View {
             .separator,
             .action(title: "Finder에서 보기", icon: "folder", action: onReveal),
             .separator,
-            .action(title: "라이브러리에서 삭제", icon: "trash", action: onDelete, destructive: true)
+            .action(title: "휴지통으로 이동", icon: "trash", action: onDelete, destructive: true)
         ], onToggleSelection: onToggleSelection)
     }
 
