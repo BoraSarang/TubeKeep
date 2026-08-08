@@ -3,6 +3,7 @@ import ComposableArchitecture
 
 struct SettingsAutomationTab: View {
     @ObservedObject var store: StoreOf<SettingsReducer>
+    @State private var activityLogs: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,7 +74,71 @@ struct SettingsAutomationTab: View {
             }
 
             SettingsComponents.divider()
+
+            activityLogSection
         }
+        .onAppear {
+            refreshLogs()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ActivityLogStore.activityLogDidChangeNotification)) { _ in
+            refreshLogs()
+        }
+    }
+
+    private var activityLogSection: some View {
+        VStack(spacing: 0) {
+            SettingsComponents.sectionHeader(
+                title: "행동 로그",
+                subtitle: "유휴 자동화가 실행한 작업을 순서대로 기록합니다"
+            )
+
+            SettingsComponents.divider()
+
+            HStack {
+                Text(activityLogs.isEmpty ? "아직 기록이 없습니다" : "최근 \(activityLogs.count)건")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("로그 지우기") {
+                    ActivityLogStore.shared.clear()
+                }
+                .font(.system(size: 11))
+                .disabled(activityLogs.isEmpty)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+
+            if activityLogs.isEmpty {
+                EmptyView()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(activityLogs.enumerated()), id: \.offset) { _, line in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(String(line.prefix(19)))
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 130, alignment: .leading)
+                                Text(String(line.dropFirst(21)))
+                                    .font(.system(size: 11))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                            Divider()
+                                .opacity(0.4)
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            }
+
+            SettingsComponents.divider()
+        }
+    }
+
+    private func refreshLogs() {
+        activityLogs = ActivityLogStore.shared.loadRecent(limit: 500)
     }
 
     private var idleSubtitleRow: some View {
