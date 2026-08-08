@@ -10,6 +10,7 @@ final class IdleSubtitleService {
     private var downloadTask: Task<Void, Never>?
     private var currentProcess: Process?
     private var isDownloading = false
+    private var skippedIds: Set<String> = []
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
@@ -49,36 +50,83 @@ final class IdleSubtitleService {
             cancelIfDownloading()
             return
         }
-        if systemIdleSeconds() >= Double(threshold) * 60 {
+        let isSystemIdle = systemIdleSeconds() >= Double(threshold) * 60
+        if isSystemIdle || isTubeKeepIdle() {
             startIfNeeded()
         } else {
             cancelIfDownloading()
         }
     }
 
+    private func isTubeKeepIdle() -> Bool {
+        if store.state.downloadQueue.hasActiveDownloads { return false }
+        if AppDelegate.shared?.isPlayerPlaying ?? false { return false }
+        if ChannelUpdateService.shared?.isRunning ?? false { return false }
+        if AITaskTracker.shared.isBusy { return false }
+        return true
+    }
+
     private func startIfNeeded() {
         guard !isDownloading else { return }
         let items = LibraryCacheService.shared.loadItems()
-            .sorted { $0.downloadDate > $1.downloadDate }
-        guard let first = items.first(where: { !LibraryReducer.hasSubtitles(for: $0.id) }) else { return }
+            .filter { !LibraryReducer.hasSubtitles(for: $0.id) && !skippedIds.contains($0.id) }
+            .sorted(by: Self.subtitleSortPredicate)
+        guard let first = items.first else { return }
         isDownloading = true
         downloadTask = Task { [weak self] in
             guard let self else { return }
-            await self.downloadSubtitle(for: first)
-            guard !Task.isCancelled else {
-                self.isDownloading = false
-                self.downloadTask = nil
-                return
-            }
-            await self.runAutoAI(for: first)
-            guard !Task.isCancelled else {
-                self.isDownloading = false
-                self.downloadTask = nil
-                return
-            }
+            await self.process(video: first)
             self.isDownloading = false
             self.downloadTask = nil
+            guard !Task.isCancelled else { return }
             self.checkIdle()
+        }
+    }
+
+    static func subtitleSortPredicate(_ a: LibraryItem, _ b: LibraryItem) -> Bool {
+        switch Settings.loadSettings().idleSubtitleSort {
+        case "upload":
+            let au = a.uploadDate ?? .distantPast
+            let bu = b.uploadDate ?? .distantPast
+            return au > bu
+        case "oldest":
+            return a.downloadDate < b.downloadDate
+        default:
+            return a.downloadDate > b.downloadDate
+        }
+    }
+
+    private func process(video: LibraryItem) async {
+        let mode = Settings.loadSettings().idleSubtitleMode
+        var hasSubtitle = false
+        switch mode {
+        case "download":
+            hasSubtitle = await downloadSubtitle(for: video)
+        case "whisper":
+            hasSubtitle = await generateWithWhisper(for: video)
+            if !hasSubtitle {
+                hasSubtitle = await downloadSubtitle(for: video)
+            }
+        default:
+            hasSubtitle = await downloadSubtitle(for: video)
+            if !hasSubtitle {
+                hasSubtitle = await generateWithWhisper(for: video)
+            }
+        }
+        guard !Task.isCancelled else { return }
+        if hasSubtitle {
+            await runAutoAI(for: video)
+        } else {
+            skippedIds.insert(video.id)
+            DatabaseManager.shared.markSubtitleFailed(videoId: video.id)
+            store.send(.statusBar(.updateStatusText("자막 처리 실패")))
+            store.send(.statusBar(.updateStatusDetail(video.title)))
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] ❌ 자막 획득 실패 — \(video.title)")
+            #endif
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            store.send(.statusBar(.updateStatusText("")))
+            store.send(.statusBar(.updateStatusDetail("")))
         }
     }
 
@@ -89,13 +137,14 @@ final class IdleSubtitleService {
         downloadTask?.cancel()
         downloadTask = nil
         isDownloading = false
+        skippedIds.removeAll()
         store.send(.statusBar(.updateStatusText("")))
         store.send(.statusBar(.updateStatusDetail("")))
     }
 
     // MARK: - Subtitle download
 
-    private func downloadSubtitle(for item: LibraryItem) async {
+    private func downloadSubtitle(for item: LibraryItem) async -> Bool {
         let videoURL = "https://www.youtube.com/watch?v=\(item.id)"
         store.send(.statusBar(.updateStatusText("자막 자동 다운로드")))
         store.send(.statusBar(.updateStatusDetail(item.title)))
@@ -111,7 +160,7 @@ final class IdleSubtitleService {
         let process = Process()
         let outputTemplate = tmpDir.appendingPathComponent("%(id)s.%(ext)s").path
         var args = [
-            "--write-subs", "--write-auto-subs",
+            "--write-subs",
             "--sub-langs", subLangs,
             "--skip-download",
             "--no-warnings",
@@ -147,7 +196,7 @@ final class IdleSubtitleService {
             #endif
         }
         currentProcess = nil
-        if Task.isCancelled { return }
+        if Task.isCancelled { return false }
 
         let files = (try? fm.contentsOfDirectory(atPath: tmpDir.path)) ?? []
         var saved = false
@@ -167,7 +216,7 @@ final class IdleSubtitleService {
                 continue
             }
             if !text.isEmpty {
-                DatabaseManager.shared.updateTranscript(videoId: item.id, transcript: text, language: lang)
+                DatabaseManager.shared.updateTranscript(videoId: item.id, transcript: text, language: lang, source: "downloaded")
                 saved = true
             }
         }
@@ -181,6 +230,66 @@ final class IdleSubtitleService {
         }
         store.send(.statusBar(.updateStatusText("")))
         store.send(.statusBar(.updateStatusDetail("")))
+        return saved
+    }
+
+    // MARK: - Whisper fallback
+
+    private func generateWithWhisper(for item: LibraryItem) async -> Bool {
+        let settings = Settings.loadSettings()
+        let whisperService = WhisperService.shared
+        let modelSize = settings.whisperModelSize
+        guard whisperService.isModelDownloaded(modelSize) else {
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] Whisper 모델 미설치 — \(modelSize)")
+            #endif
+            return false
+        }
+        guard FileManager.default.fileExists(atPath: item.filePath) else {
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] 로컬 파일 없음: \(item.filePath)")
+            #endif
+            return false
+        }
+        store.send(.statusBar(.updateStatusText("Whisper 자막 생성")))
+        store.send(.statusBar(.updateStatusDetail(item.title)))
+        #if DEBUG
+        DebugLogManager.shared?.append("[IdleSub] Whisper 자막 생성: \(item.title)")
+        #endif
+        do {
+            let audioPath = try await whisperService.extractAudio(videoPath: item.filePath)
+            defer { try? FileManager.default.removeItem(atPath: audioPath) }
+            guard !Task.isCancelled else { return false }
+            let cues = try await whisperService.transcribe(
+                audioPath: audioPath,
+                modelSize: modelSize,
+                progressHandler: { _ in }
+            )
+            guard !Task.isCancelled else { return false }
+            let text = cues.map(\.text).joined(separator: " ")
+            guard !text.isEmpty else {
+                #if DEBUG
+                DebugLogManager.shared?.append("[IdleSub] ⚠️ Whisper 자막이 비어 있음 — \(item.title)")
+                #endif
+                return false
+            }
+            DatabaseManager.shared.updateTranscript(
+                videoId: item.id,
+                transcript: text,
+                language: LanguageService.systemLanguageCode,
+                source: "whisper"
+            )
+            NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] ✅ Whisper 자막 생성 완료 — \(item.title) (\(text.count)자)")
+            #endif
+            return true
+        } catch {
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] ❌ Whisper 실패 — \(item.title): \(error.localizedDescription)")
+            #endif
+            return false
+        }
     }
 
     // MARK: - Auto AI batch

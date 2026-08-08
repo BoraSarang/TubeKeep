@@ -840,7 +840,7 @@ extension YouTubeDLService {
         process.arguments = [
             Constants.ytDlpPath,
             "--skip-download",
-            "--write-subs", "--write-auto-subs",
+            "--write-subs",
             "--sub-langs", subLangs,
             "--convert-subs", "srt",
             "-o", tmpDir.appendingPathComponent("%(id)s.%(ext)s").path,

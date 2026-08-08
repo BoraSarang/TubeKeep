@@ -111,6 +111,9 @@ final class DatabaseManager {
         if !columnExists("subtitles_json", in: "video_ai_data") {
             execute("ALTER TABLE video_ai_data ADD COLUMN subtitles_json TEXT;")
         }
+        if !columnExists("subtitle_source", in: "video_ai_data") {
+            execute("ALTER TABLE video_ai_data ADD COLUMN subtitle_source TEXT;")
+        }
         execute(createQnAHistory)
         execute(createDownloadHistory)
         execute(createVideoFTS)
@@ -161,30 +164,31 @@ final class DatabaseManager {
 
     func saveVideoAIData(_ data: VideoAIData) {
         sync {
-            let sql = """
-            INSERT OR REPLACE INTO video_ai_data
-            (video_id, transcript, transcript_language, summary, chapters, mindmap, podcast_path, tags, subtitles_json, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP);
-            """
+let sql = """
+        INSERT OR REPLACE INTO video_ai_data
+        (video_id, transcript, transcript_language, summary, chapters, mindmap, podcast_path, tags, subtitles_json, subtitle_source, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP);
+        """
 
-            guard let db = _db else { return }
-            var stmt: OpaquePointer?
+        guard let db = _db else { return }
+        var stmt: OpaquePointer?
 
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                log("[DB] saveVideoAIData prepare 실패")
-                return
-            }
-            defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            log("[DB] saveVideoAIData prepare 실패")
+            return
+        }
+        defer { sqlite3_finalize(stmt) }
 
-            sqlite3_bind_text(stmt, 1, data.videoId, -1, Self.transient)
-            bindOptionalText(stmt, 2, data.transcript)
-            bindOptionalText(stmt, 3, data.transcriptLanguage)
-            bindOptionalText(stmt, 4, data.summary)
-            bindOptionalData(stmt, 5, data.chapters)
-            bindOptionalData(stmt, 6, data.mindmap)
-            bindOptionalText(stmt, 7, data.podcastPath)
-            bindOptionalData(stmt, 8, data.tags)
-            bindOptionalText(stmt, 9, data.subtitlesData.flatMap { String(data: $0, encoding: .utf8) })
+        sqlite3_bind_text(stmt, 1, data.videoId, -1, Self.transient)
+        bindOptionalText(stmt, 2, data.transcript)
+        bindOptionalText(stmt, 3, data.transcriptLanguage)
+        bindOptionalText(stmt, 4, data.summary)
+        bindOptionalData(stmt, 5, data.chapters)
+        bindOptionalData(stmt, 6, data.mindmap)
+        bindOptionalText(stmt, 7, data.podcastPath)
+        bindOptionalData(stmt, 8, data.tags)
+        bindOptionalText(stmt, 9, data.subtitlesData.flatMap { String(data: $0, encoding: .utf8) })
+        bindOptionalText(stmt, 10, data.subtitleSource)
 
             if sqlite3_step(stmt) != SQLITE_DONE {
                 log("[DB] saveVideoAIData 실행 실패")
@@ -227,7 +231,8 @@ final class DatabaseManager {
                 mindmap: columnData(stmt, 5),
                 podcastPath: columnText(stmt, 6),
                 tags: columnData(stmt, 7),
-                subtitlesData: columnText(stmt, 8).flatMap { $0.data(using: .utf8) }
+                subtitlesData: columnText(stmt, 8).flatMap { $0.data(using: .utf8) },
+                subtitleSource: columnText(stmt, 9)
             )
         }
     }
@@ -259,11 +264,11 @@ final class DatabaseManager {
         }
     }
 
-    func updateTranscript(videoId: String, transcript: String, language: String) {
+    func updateTranscript(videoId: String, transcript: String, language: String, source: String? = nil) {
         sync {
             let sql = """
             UPDATE video_ai_data
-            SET transcript = ?, transcript_language = ?, updated_at = CURRENT_TIMESTAMP
+            SET transcript = ?, transcript_language = ?, subtitle_source = COALESCE(?, subtitle_source), updated_at = CURRENT_TIMESTAMP
             WHERE video_id = ?;
             """
 
@@ -278,11 +283,110 @@ final class DatabaseManager {
 
             sqlite3_bind_text(stmt, 1, transcript, -1, Self.transient)
             sqlite3_bind_text(stmt, 2, language, -1, Self.transient)
-            sqlite3_bind_text(stmt, 3, videoId, -1, Self.transient)
+            bindOptionalText(stmt, 3, source)
+            sqlite3_bind_text(stmt, 4, videoId, -1, Self.transient)
 
             if sqlite3_step(stmt) != SQLITE_DONE {
                 log("[DB] updateTranscript 실행 실패")
             }
+        }
+    }
+
+    func markSubtitleFailed(videoId: String) {
+        sync {
+            let sql = "UPDATE video_ai_data SET subtitle_source = 'failed', updated_at = CURRENT_TIMESTAMP WHERE video_id = ?;"
+            guard let db = _db else { return }
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
+            sqlite3_step(stmt)
+        }
+    }
+
+    func clearAllSubtitles() -> Int {
+        sync {
+            let sql = "UPDATE video_ai_data SET transcript = NULL, transcript_language = NULL, subtitle_source = NULL, updated_at = CURRENT_TIMESTAMP;"
+            guard let db = _db else { return 0 }
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+            defer { sqlite3_finalize(stmt) }
+            if sqlite3_step(stmt) != SQLITE_DONE { return 0 }
+            return Int(sqlite3_changes(db))
+        }
+    }
+
+    func clearDerivedAIData() {
+        sync {
+            guard let db = _db else { return }
+            let sql = """
+            UPDATE video_ai_data
+            SET transcript = NULL, transcript_language = NULL, subtitle_source = NULL,
+                summary = NULL, chapters = NULL, mindmap = NULL, tags = NULL,
+                subtitles_json = NULL, podcast_path = NULL, updated_at = CURRENT_TIMESTAMP;
+            """
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                sqlite3_step(stmt)
+            }
+            sqlite3_finalize(stmt)
+
+            let qaSql = "DELETE FROM qna_history;"
+            var qaStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, qaSql, -1, &qaStmt, nil) == SQLITE_OK {
+                sqlite3_step(qaStmt)
+            }
+            sqlite3_finalize(qaStmt)
+
+            let ftsSql = "UPDATE video_fts SET transcript = '', summary = '';"
+            var ftsStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, ftsSql, -1, &ftsStmt, nil) == SQLITE_OK {
+                sqlite3_step(ftsStmt)
+            }
+            sqlite3_finalize(ftsStmt)
+        }
+    }
+
+    struct DerivedDataCounts {
+        var summary = 0
+        var chapters = 0
+        var mindmap = 0
+        var tags = 0
+        var subtitles = 0
+        var transcripts = 0
+        var qna = 0
+    }
+
+    func snapshotDerivedDataCounts() -> DerivedDataCounts {
+        sync {
+            var counts = DerivedDataCounts()
+            guard let db = _db else { return counts }
+            let pairs: [(key: WritableKeyPath<DerivedDataCounts, Int>, col: String)] = [
+                (\.summary, "summary"),
+                (\.chapters, "chapters"),
+                (\.mindmap, "mindmap"),
+                (\.tags, "tags"),
+                (\.subtitles, "subtitles_json"),
+                (\.transcripts, "transcript")
+            ]
+            for pair in pairs {
+                let sql = "SELECT COUNT(*) FROM video_ai_data WHERE \(pair.col) IS NOT NULL AND \(pair.col) != '';"
+                var stmt: OpaquePointer?
+                guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { continue }
+                defer { sqlite3_finalize(stmt) }
+                if sqlite3_step(stmt) == SQLITE_ROW {
+                    counts[keyPath: pair.key] = Int(sqlite3_column_int(stmt, 0))
+                }
+            }
+            let qaSql = "SELECT COUNT(*) FROM qna_history;"
+            var qaStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, qaSql, -1, &qaStmt, nil) == SQLITE_OK {
+                if sqlite3_step(qaStmt) == SQLITE_ROW {
+                    counts.qna = Int(sqlite3_column_int(qaStmt, 0))
+                }
+            }
+            sqlite3_finalize(qaStmt)
+            return counts
         }
     }
 
@@ -600,6 +704,19 @@ final class DatabaseManager {
         }
     }
 
+    func deleteDownloadHistory(videoId: String) {
+        sync {
+            guard let db = _db else { return }
+            var stmt: OpaquePointer?
+            let sql = "DELETE FROM download_history WHERE video_id = ?;"
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            sqlite3_bind_text(stmt, 1, (videoId as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+            sqlite3_finalize(stmt)
+            log("[DB] deleteDownloadHistory — videoId: \(videoId)")
+        }
+    }
+
     func deleteAllDownloadHistory() {
         sync {
             guard let db = _db else { return }
@@ -735,4 +852,5 @@ struct VideoAIData {
     var podcastPath: String?
     var tags: Data?
     var subtitlesData: Data?
+    var subtitleSource: String? = nil
 }

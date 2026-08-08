@@ -47,6 +47,8 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         openRouterAPIKey: String,
         progress: (@MainActor @Sendable (String) -> Void)?
     ) async throws -> PodcastResult {
+        AITaskTracker.shared.begin()
+        defer { AITaskTracker.shared.end() }
         log("[Podcast] 팟캐스트 생성 시작 — videoId: \(videoId)")
 
         // 1. 대화 스크립트 생성
@@ -156,6 +158,43 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         }
         databaseManager.updatePodcastPath(videoId: videoId, podcastPath: nil)
         log("[Podcast] DB 업데이트 완료 — podcastPath: nil")
+    }
+
+    func clearAllPodcastFiles() {
+        if let id = currentVideoId {
+            stopPodcast()
+        }
+        let root = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents/TubeKeep/Podcasts")
+            .path
+        if FileManager.default.fileExists(atPath: root) {
+            try? FileManager.default.removeItem(atPath: root)
+            log("[Podcast] 전체 팟캐스트 폴더 삭제 — \(root)")
+        }
+    }
+
+    func podcastFilesInfo() -> (files: Int, bytes: Int64) {
+        let root = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents/TubeKeep/Podcasts")
+            .path
+        var fileCount = 0
+        var totalBytes: Int64 = 0
+        guard let enumerator = FileManager.default.enumerator(atPath: root) else {
+            return (0, 0)
+        }
+        while let entry = enumerator.nextObject() as? String {
+            let fullPath = (root as NSString).appendingPathComponent(entry)
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDirectory) else { continue }
+            if !isDirectory.boolValue {
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                   let size = attrs[.size] as? NSNumber {
+                    fileCount += 1
+                    totalBytes += size.int64Value
+                }
+            }
+        }
+        return (fileCount, totalBytes)
     }
 
     nonisolated func getPodcastPath(videoId: String) -> String? {

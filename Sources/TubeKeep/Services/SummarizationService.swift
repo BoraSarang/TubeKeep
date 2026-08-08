@@ -52,6 +52,8 @@ actor SummarizationService {
     }
 
     func summarizeVideo(videoId: String, title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
+        AITaskTracker.shared.begin()
+        defer { AITaskTracker.shared.end() }
         log("[AI Fallback] 요약 시작 — videoId: \(videoId), title: \(title)")
 
         // DB 캐시 확인 — 기존 요약이 있으면 바로 반환
@@ -134,11 +136,12 @@ actor SummarizationService {
         #endif
     }
 
-    private func saveTranscriptToDB(videoId: String, transcript: String, language: String) {
+    private func saveTranscriptToDB(videoId: String, transcript: String, language: String, source: String? = nil) {
         log("[Subtitle] DB 저장 시작 — videoId: \(videoId), 언어: \(language), 길이: \(transcript.count)자")
         var data = DatabaseManager.shared.loadVideoAIData(videoId: videoId) ?? VideoAIData(videoId: videoId)
         data.transcript = transcript
         data.transcriptLanguage = language
+        data.subtitleSource = source
         DatabaseManager.shared.saveVideoAIData(data)
         log("[Subtitle] ✅ 자막 DB 저장 완료 — videoId: \(videoId)")
     }
@@ -239,7 +242,7 @@ actor SummarizationService {
         let exitCode = try await Self.runProcess(
             arguments: [
                 Constants.ytDlpPath,
-                "--write-subs", "--write-auto-subs",
+                "--write-subs",
                 "--sub-langs", subLangs,
                 "--skip-download",
                 "--no-warnings",
@@ -267,7 +270,7 @@ actor SummarizationService {
                 log("[Subtitle] VTT 파싱 완료 — 추출된 텍스트 길이: \(text.count)자")
                 if !text.isEmpty {
                     log("[Subtitle] ✅ 자막 추출 성공 (VTT) — videoId: \(videoId), 언어: en")
-                    saveTranscriptToDB(videoId: videoId, transcript: text, language: "en")
+                    saveTranscriptToDB(videoId: videoId, transcript: text, language: "en", source: "downloaded")
                     return text
                 }
                 log("[Subtitle] ⚠️ VTT에서 유효한 텍스트 없음")
@@ -278,7 +281,7 @@ actor SummarizationService {
                 log("[Subtitle] SRT 파싱 완료 — 추출된 텍스트 길이: \(text.count)자")
                 if !text.isEmpty {
                     log("[Subtitle] ✅ 자막 추출 성공 (SRT) — videoId: \(videoId), 언어: en")
-                    saveTranscriptToDB(videoId: videoId, transcript: text, language: "en")
+                    saveTranscriptToDB(videoId: videoId, transcript: text, language: "en", source: "downloaded")
                     return text
                 }
                 log("[Subtitle] ⚠️ SRT에서 유효한 텍스트 없음")
@@ -309,7 +312,7 @@ actor SummarizationService {
 
                     if !transcriptText.isEmpty {
                         log("[Subtitle] ✅ Whisper 자막 생성 성공 — videoId: \(videoId), 길이: \(transcriptText.count)자")
-                        saveTranscriptToDB(videoId: videoId, transcript: transcriptText, language: LanguageService.systemLanguageCode)
+                        saveTranscriptToDB(videoId: videoId, transcript: transcriptText, language: LanguageService.systemLanguageCode, source: "whisper")
                         return transcriptText
                     }
                     log("[Subtitle] ⚠️ Whisper 자막이 비어 있음 — videoId: \(videoId)")

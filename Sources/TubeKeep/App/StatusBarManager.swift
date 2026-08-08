@@ -143,14 +143,22 @@ final class StatusBarManager {
 
     private func updateStatusBarText() {
         let s = store.statusBar
+        let showsStatus = !s.statusText.isEmpty && s.statusText != "대기 중"
         if s.hasActiveDownloads, !s.downloadSpeed.isEmpty {
-            statusLabel1.alignment = .right
-            statusLabel1.stringValue = s.downloadSpeed
-            statusLabel2.alignment = .right
-            statusLabel2.stringValue = s.downloadETA.isEmpty
-                ? "완\(s.completedCount)/\(s.totalCount)"
-                : "완\(s.completedCount)/\(s.totalCount) \(s.downloadETA)"
-        } else if !s.statusText.isEmpty, s.statusText != "대기 중" {
+            if showsStatus {
+                statusLabel1.alignment = .left
+                statusLabel1.stringValue = s.statusText
+                statusLabel2.alignment = .right
+                statusLabel2.stringValue = s.downloadSpeed + "  완\(s.completedCount)/\(s.totalCount)"
+            } else {
+                statusLabel1.alignment = .right
+                statusLabel1.stringValue = s.downloadSpeed
+                statusLabel2.alignment = .right
+                statusLabel2.stringValue = s.downloadETA.isEmpty
+                    ? "완\(s.completedCount)/\(s.totalCount)"
+                    : "완\(s.completedCount)/\(s.totalCount) \(s.downloadETA)"
+            }
+        } else if showsStatus {
             statusLabel1.alignment = .right
             statusLabel1.stringValue = s.statusText
             statusLabel2.alignment = .right

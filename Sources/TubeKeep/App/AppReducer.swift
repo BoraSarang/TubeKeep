@@ -172,6 +172,12 @@ struct AppReducer {
                         if let activeId = settings.activePresetId {
                             await send(.settings(.setActivePreset(activeId)))
                         }
+                        if settings.idleSubtitleMode != "auto" {
+                            await send(.settings(.setIdleSubtitleMode(settings.idleSubtitleMode)))
+                        }
+                        if settings.idleSubtitleSort != "recent" {
+                            await send(.settings(.setIdleSubtitleSort(settings.idleSubtitleSort)))
+                        }
                     }
                 )
 

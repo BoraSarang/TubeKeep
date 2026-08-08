@@ -280,7 +280,7 @@ final class DownloadManager: @unchecked Sendable {
 
         if item.includeSubtitles {
             let subLangs = LanguageService.subtitleLanguages
-            args += ["--write-subs", "--write-auto-subs", "--sub-langs", subLangs]
+            args += ["--write-subs", "--sub-langs", subLangs]
             #if DEBUG
             Task { @MainActor in DebugLogManager.shared?.append("[DownloadManager] --sub-langs: \(subLangs)") }
             #endif
@@ -353,7 +353,7 @@ final class DownloadManager: @unchecked Sendable {
             }
 
             if !text.isEmpty {
-                DatabaseManager.shared.updateTranscript(videoId: videoId, transcript: text, language: lang)
+                DatabaseManager.shared.updateTranscript(videoId: videoId, transcript: text, language: lang, source: "downloaded")
             }
             try? fm.removeItem(atPath: path)
         }

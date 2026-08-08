@@ -5,11 +5,45 @@ import ComposableArchitecture
 
 private struct WhisperDownloadCancelID: Hashable {}
 
+struct DerivedDataReport: Equatable {
+    var summary = 0
+    var chapters = 0
+    var mindmap = 0
+    var tags = 0
+    var subtitles = 0
+    var transcripts = 0
+    var qna = 0
+    var podcastFiles = 0
+    var podcastBytes: Int64 = 0
+
+    var message: String {
+        var parts: [String] = []
+        func add(_ count: Int, _ label: String) {
+            if count > 0 { parts.append("\(label) \(count)개") }
+        }
+        add(summary, "요약")
+        add(chapters, "챕터")
+        add(mindmap, "마인드맵")
+        add(tags, "태그")
+        add(subtitles, "자막")
+        add(transcripts, "대본")
+        add(qna, "자주 묻는 질문")
+        if podcastFiles > 0 {
+            let mb = Float(podcastBytes) / 1_048_576.0
+            parts.append("팟캐스트 \(podcastFiles)개(\(String(format: "%.1f", mb))MB)")
+        }
+        return parts.isEmpty
+            ? "삭제할 AI 파생 데이터가 없었습니다."
+            : "다음 항목이 삭제되었습니다.\n" + parts.joined(separator: " · ")
+    }
+}
+
 @Reducer
 struct SettingsReducer {
     @ObservableState
     struct State: Equatable {
         var selectedTab: SettingsTab = .downloads
+        var clearReport: DerivedDataReport?
         var concurrentDownloads: Int = Constants.defaultConcurrentDownloads
         var storageDirectory: String = Constants.defaultStorageDirectory
         var filenameTemplate: String = Constants.defaultFilenameTemplate
@@ -43,6 +77,8 @@ struct SettingsReducer {
         var seekStepSeconds: Double = 5.0
         var idleAutoSummary: Bool = true
         var idleAutoPodcast: Bool = false
+        var idleSubtitleMode: String = "auto"
+        var idleSubtitleSort: String = "recent"
         var openRouterAPIKey: String {
             get { UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "openRouterAPIKey") }
@@ -92,7 +128,9 @@ struct SettingsReducer {
                 smartMode: smartMode,
                 seekStepSeconds: seekStepSeconds,
                 idleAutoSummary: idleAutoSummary,
-                idleAutoPodcast: idleAutoPodcast
+                idleAutoPodcast: idleAutoPodcast,
+                idleSubtitleMode: idleSubtitleMode,
+                idleSubtitleSort: idleSubtitleSort
             )
         }
     }
@@ -139,12 +177,17 @@ struct SettingsReducer {
         case setSeekStepSeconds(Double)
         case toggleIdleAutoSummary
         case toggleIdleAutoPodcast
+        case setIdleSubtitleMode(String)
+        case setIdleSubtitleSort(String)
         case toggleShowMenuBarNotifications
         case setMenuBarNotificationDuration(Int)
         case setOpenRouterAPIKey(String)
         case setOpenRouterModel(String)
         case setGeminiAPIKey(String)
         case setAX4APIKey(String)
+        case clearDerivedAIData
+        case clearDerivedAIDataReported(DerivedDataReport?)
+        case dismissClearReport
         case saveSettings
     }
 
@@ -394,6 +437,14 @@ struct SettingsReducer {
                 state.idleAutoPodcast.toggle()
                 return .send(.saveSettings)
 
+            case let .setIdleSubtitleMode(mode):
+                state.idleSubtitleMode = mode
+                return .send(.saveSettings)
+
+            case let .setIdleSubtitleSort(sort):
+                state.idleSubtitleSort = sort
+                return .send(.saveSettings)
+
             case let .setOpenRouterAPIKey(key):
                 state.openRouterAPIKey = key
                 return .none
@@ -408,6 +459,41 @@ struct SettingsReducer {
 
             case let .setAX4APIKey(key):
                 state.ax4APIKey = key
+                return .none
+
+            case .clearDerivedAIData:
+                return .run { send in
+                    await MainActor.run {
+                        let before = DatabaseManager.shared.snapshotDerivedDataCounts()
+                        let podBefore = PodcastService.shared.podcastFilesInfo()
+                        DatabaseManager.shared.clearDerivedAIData()
+                        PodcastService.shared.clearAllPodcastFiles()
+                        LibraryCacheService.shared.clearDerivedAI()
+                        NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Settings] AI 파생 데이터 초기화 완료")
+                        #endif
+                        let report = DerivedDataReport(
+                            summary: before.summary,
+                            chapters: before.chapters,
+                            mindmap: before.mindmap,
+                            tags: before.tags,
+                            subtitles: before.subtitles,
+                            transcripts: before.transcripts,
+                            qna: before.qna,
+                            podcastFiles: podBefore.files,
+                            podcastBytes: podBefore.bytes
+                        )
+                        send(.clearDerivedAIDataReported(report))
+                    }
+                }
+
+            case let .clearDerivedAIDataReported(report):
+                state.clearReport = report
+                return .none
+
+            case .dismissClearReport:
+                state.clearReport = nil
                 return .none
 
             case .saveSettings:

@@ -8,6 +8,7 @@ import Darwin
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    static weak var shared: AppDelegate?
     let store = Store(initialState: AppReducer.State()) {
         AppReducer()
     }
@@ -22,6 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var channelDownloaderWindow: NSWindow?
     private var playerWindow: NSWindow?
     private var playerStore: Store<PlayerReducer.State, PlayerReducer.Action>?
+
+    var isPlayerPlaying: Bool {
+        guard let playerStore else { return false }
+        return playerStore.withState { $0.isPlaying }
+    }
     private var pendingChannelId: String?
     private var pendingChannelData: [String: Any]?
     private var keyMonitor: Any?
@@ -61,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
         ProcessInfo.processInfo.disableSuddenTermination()
         store.send(.appDidFinishLaunching)
 
@@ -75,6 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         #endif
 
         setupManagers()
+
+cleanupStaleChildProcesses()
+
+        LibraryCacheService.shared.autoPurgeTrash(olderThan: 30)
 
         Task { await BundledLibraryManager.shared.warmUp() }
 
@@ -754,6 +765,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - Process Cleanup
+
+    /// 강제 종료(SIGKILL)로 `terminateCleanup`이 실행되지 못해 남은 이전 인스턴스의
+    /// yt-dlp/yt_dlp 하위 프로세스를 앱 시작 시 정리한다.
+    private func cleanupStaleChildProcesses() {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        // 고아가 된 yt-dlp/yt_dlp(강제 종료로 부모와 연결이 끊긴 것)를 먼저 정리.
+        // 부모 관점(-P)으로는 강제 종료 후 남은 고아(PPID=1)는 잡히지 않으므로 -f 매칭을 사용한다.
+        let cmd = "pkill -9 -f 'yt_dlp' 2>/dev/null; pkill -9 -f 'yt-dlp' 2>/dev/null; pkill -9 -P \(pid) 2>/dev/null"
+        let bash = Process()
+        bash.executableURL = URL(fileURLWithPath: "/bin/bash")
+        bash.arguments = ["-c", cmd]
+        do {
+            try bash.run()
+            bash.waitUntilExit()
+            DebugLogManager.shared?.append("[App] 시작 시 잔여 프로세스 정리 완료")
+        } catch {
+            DebugLogManager.shared?.append("[App] 시작 시 잔여 프로세스 정리 실패: \(error)")
+        }
+    }
 
     private func killAllChildProcesses() {
         let pid = ProcessInfo.processInfo.processIdentifier

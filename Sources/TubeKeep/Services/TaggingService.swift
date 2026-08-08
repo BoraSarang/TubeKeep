@@ -8,6 +8,8 @@ actor TaggingService {
     ]
 
     func classify(title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String) async -> String {
+        AITaskTracker.shared.begin()
+        defer { AITaskTracker.shared.end() }
         // 1순위: OpenRouter (무료)
         if !openRouterAPIKey.isEmpty {
             do {

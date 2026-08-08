@@ -5,18 +5,21 @@ import UserNotifications
 
 @MainActor
 final class ChannelUpdateService {
+    static weak var shared: ChannelUpdateService?
     private let store: StoreOf<AppReducer>
     private var timer: Timer?
     private var pendingCheck: DispatchWorkItem?
     private var updateTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private let fetchService = ChannelFetchService()
+    private(set) var isRunning = false
     #if DEBUG
     private var logManager: DebugLogManager?
     #endif
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
+        ChannelUpdateService.shared = self
         observeSettingChanges()
     }
 
@@ -85,6 +88,8 @@ final class ChannelUpdateService {
     #endif
 
     func checkForUpdates() async {
+        isRunning = true
+        defer { isRunning = false }
         guard store.state.settings.showChannelBadge else { return }
         let channels = SubscribedChannel.loadAll()
         guard !channels.isEmpty else {

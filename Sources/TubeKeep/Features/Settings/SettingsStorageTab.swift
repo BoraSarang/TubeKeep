@@ -3,6 +3,7 @@ import ComposableArchitecture
 
 struct SettingsStorageTab: View {
     @ObservedObject var store: StoreOf<SettingsReducer>
+    @State private var showClearConfirm = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +51,38 @@ struct SettingsStorageTab: View {
             }
 
             SettingsComponents.divider()
+
+            SettingsComponents.sectionSubHeader()
+
+            SettingsComponents.sectionHeader(
+                title: "데이터 초기화",
+                subtitle: "생성된 AI 파생 데이터를 삭제합니다"
+            )
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "AI 파생 데이터 초기화", description: "요약·챕터·태그·마인드맵·자막큐·팟캐스트·질문답을 모두 삭제하고, 팟캐스트 파일도 제거합니다. 이후 자막부터 다시 생성됩니다") {
+                Button("초기화") { showClearConfirm = true }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(.red)
+            }
+
+            SettingsComponents.divider()
+        }
+        .alert("AI 파생 데이터 초기화", isPresented: $showClearConfirm) {
+            Button("취소", role: .cancel) {}
+            Button("초기화", role: .destructive) { store.send(.clearDerivedAIData) }
+        } message: {
+            Text("요약·챕터·태그·마인드맵·자막큐·팟캐스트·질문답과 팟캐스트 파일이 삭제됩니다. 되돌릴 수 없습니다.")
+        }
+        .alert("초기화 완료", isPresented: Binding(
+            get: { store.clearReport != nil },
+            set: { if !$0 { store.send(.dismissClearReport) } }
+        )) {
+            Button("확인", role: .cancel) { store.send(.dismissClearReport) }
+        } message: {
+            Text(store.clearReport?.message ?? "")
         }
     }
 }

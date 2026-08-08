@@ -39,6 +39,14 @@ struct SettingsAutomationTab: View {
             if UserDefaults.standard.integer(forKey: IdleSubtitleService.settingKey) != 0 {
                 SettingsComponents.divider()
 
+                idleSubtitleModeRow
+
+                SettingsComponents.divider()
+
+                idleSubtitleSortRow
+
+                SettingsComponents.divider()
+
                 SettingsRow(title: "요약·태그 자동 생성", description: "유휴 자막 다운로드 후 요약과 태그를 자동으로 생성합니다") {
                     Toggle(
                         "",
@@ -78,6 +86,38 @@ struct SettingsAutomationTab: View {
                 Text("5분").tag(5)
                 Text("10분").tag(10)
                 Text("30분").tag(30)
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+        }
+    }
+
+    private var idleSubtitleModeRow: some View {
+        SettingsRow(title: "유휴 자막 방식", description: "정식 자막이 없으면 선택한 방식으로 자막을 만듭니다. 자동은 정식 다운로드 후 없으면 Whisper로 생성합니다") {
+            Picker("", selection: Binding(
+                get: { store.idleSubtitleMode },
+                set: { store.send(.setIdleSubtitleMode($0)) }
+            )) {
+                Text("자동").tag("auto")
+                Text("다운로드만").tag("download")
+                Text("Whisper로 생성").tag("whisper")
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+        }
+    }
+
+    private var idleSubtitleSortRow: some View {
+        SettingsRow(title: "자막 처리 순서", description: "보관함에서 자막 없는 영상을 어떤 순서로 처리할지 선택합니다") {
+            Picker("", selection: Binding(
+                get: { store.idleSubtitleSort },
+                set: { store.send(.setIdleSubtitleSort($0)) }
+            )) {
+                Text("최근 다운로드순").tag("recent")
+                Text("업로드 최신순").tag("upload")
+                Text("오래된 다운로드순").tag("oldest")
             }
             .pickerStyle(.menu)
             .controlSize(.small)
