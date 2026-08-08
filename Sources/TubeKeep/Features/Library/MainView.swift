@@ -45,6 +45,9 @@ struct MainView: View {
             case .diskCleanup:
                 DiskCleanupView(store: store)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .trash:
+                TrashView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onAppear {

@@ -25,7 +25,10 @@ final class LibraryItem: Identifiable {
     var lastPlaybackPosition: Double?
     var lastPlayedAt: Date?
 
-    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil, transcript: String? = nil, chapters: Data? = nil, subtitleLanguage: String? = nil, lastPlaybackPosition: Double? = nil, lastPlayedAt: Date? = nil) {
+    // v3.5: 휴지통 (nil=보관함, 값 있음=휴지통)
+    var trashedAt: Date?
+
+    init(id: String, title: String, channelId: String, channelName: String, thumbnailURL: String, filePath: String, downloadDate: Date, uploadDate: Date?, duration: Int?, channelUploadIndex: Int?, tags: [String] = [], summary: String? = nil, transcript: String? = nil, chapters: Data? = nil, subtitleLanguage: String? = nil, lastPlaybackPosition: Double? = nil, lastPlayedAt: Date? = nil, trashedAt: Date? = nil) {
         self.id = id
         self.title = title
         self.channelId = channelId
@@ -43,6 +46,7 @@ final class LibraryItem: Identifiable {
         self.subtitleLanguage = subtitleLanguage
         self.lastPlaybackPosition = lastPlaybackPosition
         self.lastPlayedAt = lastPlayedAt
+        self.trashedAt = trashedAt
     }
 
     func withChannelUploadIndex(_ index: Int) -> LibraryItem {
@@ -51,7 +55,8 @@ final class LibraryItem: Identifiable {
             thumbnailURL: thumbnailURL, filePath: filePath, downloadDate: downloadDate,
             uploadDate: uploadDate, duration: duration, channelUploadIndex: index,
             tags: tags, summary: summary, transcript: transcript, chapters: chapters,
-            subtitleLanguage: subtitleLanguage, lastPlaybackPosition: lastPlaybackPosition, lastPlayedAt: lastPlayedAt
+            subtitleLanguage: subtitleLanguage, lastPlaybackPosition: lastPlaybackPosition, lastPlayedAt: lastPlayedAt,
+            trashedAt: trashedAt
         )
         return item
     }

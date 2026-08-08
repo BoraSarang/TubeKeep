@@ -93,6 +93,19 @@ final class LibraryCacheService {
         try? context.save()
     }
 
+    func clearDerivedAI() {
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
+        guard let items = try? context.fetch(descriptor) else { return }
+        for item in items {
+            item.tags = []
+            item.summary = nil
+            item.transcript = nil
+            item.chapters = nil
+            item.subtitleLanguage = nil
+        }
+        try? context.save()
+    }
+
     func updateChannelUploadIndices(channelId: String, _ updates: [(videoId: String, uploadIndex: Int)]) {
         let descriptor = FetchDescriptor<LibraryItem>(sortBy: [])
         guard let items = try? context.fetch(descriptor) else { return }
@@ -140,6 +153,124 @@ final class LibraryCacheService {
         }
         for id in removed {
             purgeAssociatedData(for: id)
+        }
+    }
+
+    // MARK: - Trash (v3.5 휴지통)
+
+    private struct TrashOriginalPath: Codable {
+        let originalPath: String
+    }
+
+    var trashDirectory: String {
+        "\(Constants.channelStorageDirectory)/.Trash"
+    }
+
+    func trashedItems() -> [LibraryItem] {
+        let descriptor = FetchDescriptor<LibraryItem>(sortBy: [SortDescriptor(\.trashedAt, order: .reverse)])
+        guard let items = try? context.fetch(descriptor) else { return [] }
+        return items.filter { $0.trashedAt != nil }
+    }
+
+    func trashItem(id: String) -> Bool {
+        guard let item = findItem(id: id) else { return false }
+        BookmarkManager.ensureAccess()
+        let fm = FileManager.default
+        let trashDir = (trashDirectory as NSString).appendingPathComponent(item.id)
+        guard fm.fileExists(atPath: item.filePath), !fm.fileExists(atPath: trashDir) else {
+            item.trashedAt = Date()
+            try? context.save()
+            return true
+        }
+        do {
+            try fm.createDirectory(atPath: trashDir, withIntermediateDirectories: true)
+            let fileName = (item.filePath as NSString).lastPathComponent
+            let dest = (trashDir as NSString).appendingPathComponent(fileName)
+            let sidecar = try JSONEncoder().encode(TrashOriginalPath(originalPath: item.filePath))
+            try sidecar.write(to: URL(fileURLWithPath: (trashDir as NSString).appendingPathComponent("original_path.json")))
+            try fm.moveItem(atPath: item.filePath, toPath: dest)
+            item.filePath = dest
+        } catch {
+            DebugLogManager.shared?.append("[Library] 휴지통 이동 실패: \(error)")
+            return false
+        }
+        item.trashedAt = Date()
+        try? context.save()
+        ChannelDownloadCache.removeDownloadedID(channelName: item.channelName, videoId: item.id)
+        return true
+    }
+
+    func trashItems(ids: [String]) -> [String] {
+        var moved: [String] = []
+        for id in ids where trashItem(id: id) {
+            moved.append(id)
+        }
+        return moved
+    }
+
+    func restoreItem(id: String) -> Bool {
+        guard let item = findItem(id: id), item.trashedAt != nil else { return false }
+        BookmarkManager.ensureAccess()
+        let fm = FileManager.default
+        let trashDir = (trashDirectory as NSString).appendingPathComponent(item.id)
+        let sidecarPath = (trashDir as NSString).appendingPathComponent("original_path.json")
+        var original = item.filePath
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: sidecarPath)),
+           let decoded = try? JSONDecoder().decode(TrashOriginalPath.self, from: data) {
+            original = decoded.originalPath
+        }
+        do {
+            let parent = (original as NSString).deletingLastPathComponent
+            try fm.createDirectory(atPath: parent, withIntermediateDirectories: true)
+            if fm.fileExists(atPath: item.filePath) {
+                try fm.moveItem(atPath: item.filePath, toPath: original)
+            }
+        } catch {
+            DebugLogManager.shared?.append("[Library] 휴지통 복원 실패: \(error)")
+            return false
+        }
+        item.filePath = original
+        item.trashedAt = nil
+        try? context.save()
+        ChannelDownloadCache.addDownloadedID(channelName: item.channelName, videoId: item.id)
+        return true
+    }
+
+    func restoreItems(ids: [String]) -> [String] {
+        var restored: [String] = []
+        for id in ids where restoreItem(id: id) {
+            restored.append(id)
+        }
+        return restored
+    }
+
+    func permanentlyDeleteItem(id: String) {
+        guard findItem(id: id) != nil else { return }
+        DatabaseManager.shared.deleteDownloadHistory(videoId: id)
+        removeItem(id: id)
+    }
+
+    func emptyTrash() {
+        let items = trashedItems()
+        for item in items {
+            DatabaseManager.shared.deleteDownloadHistory(videoId: item.id)
+            removeItem(id: item.id)
+        }
+    }
+
+    func autoPurgeTrash(olderThan days: Int = 30) {
+        let cutoff = Date().addingTimeInterval(-TimeInterval(days * 24 * 3600))
+        let items = trashedItems()
+        var purged = 0
+        for item in items {
+            if let trashedAt = item.trashedAt, trashedAt < cutoff {
+                DatabaseManager.shared.deleteDownloadHistory(videoId: item.id)
+                removeItem(id: item.id)
+                purged += 1
+            }
+        }
+        if purged > 0 {
+            DebugLogManager.shared?.append("[Trash] \(days)일 경과 휴지통 \(purged)개 자동 정리")
         }
     }
 

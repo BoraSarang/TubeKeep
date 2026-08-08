@@ -10,6 +10,7 @@ enum LibrarySidebarMode: String, Equatable {
     case report = "Report"
     case clips = "Clips"
     case diskCleanup = "Disk Cleanup"
+    case trash = "Trash"
 }
 
 @Reducer
@@ -17,6 +18,8 @@ struct LibraryReducer {
     @ObservableState
     struct State: Equatable {
         var items: [LibraryItem] = []
+        var trashItems: [LibraryItem] = []
+        var showTrash = false
         var searchText = ""
         var selectedChannel: String? = nil
         var selectedCategory: String? = nil
@@ -164,6 +167,17 @@ struct LibraryReducer {
         case removeItems([String])
         case removeItemsByChannel(channelId: String, channelName: String)
         case removeSelected
+        // v3.5 휴지통
+        case trashItem(String)
+        case trashItems([String])
+        case trashChannelItems(channelId: String, channelName: String)
+        case loadTrash
+        case trashLoaded([LibraryItem])
+        case setShowTrash(Bool)
+        case restoreItem(String)
+        case deletePermanently(String)
+        case deleteTrashItems([String])
+        case emptyTrash
         case revealSelectedInFinder
         case openSelected
         case checkDigest
@@ -265,12 +279,13 @@ struct LibraryReducer {
             case .loadFromDisk:
                 return .run { send in
                     let items = await LibraryCacheService.shared.loadItems()
-                    SearchService.rebuildIndex(items: items)
+                    SearchService.rebuildIndex(items: items.filter { $0.trashedAt == nil })
                     await send(.itemsLoaded(items))
                 }
 
             case .itemsLoaded(let items):
-                state.items = items
+                state.items = items.filter { $0.trashedAt == nil }
+                state.trashItems = items.filter { $0.trashedAt != nil }
                 state.subtitleAvailableIds = Set(items.filter { Self.hasSubtitles(for: $0.id) }.map(\.id))
                 state.summaryAvailableIds = Set(items.filter { $0.summary != nil && !($0.summary?.isEmpty ?? true) }.map(\.id))
                 let podcastIds = Set(items.filter { Self.hasPodcast(for: $0.id) }.map(\.id))
@@ -306,6 +321,85 @@ struct LibraryReducer {
                     },
                     .send(.calculateDiskUsage)
                 )
+
+case .trashItem(let id):
+                state.items.removeAll { $0.id == id }
+                state.subtitleAvailableIds.remove(id)
+                return .run { send in
+                    await LibraryCacheService.shared.trashItem(id: id)
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .trashItems(let ids):
+                state.items.removeAll { ids.contains($0.id) }
+                state.subtitleAvailableIds.subtract(ids)
+                return .run { send in
+                    await LibraryCacheService.shared.trashItems(ids: ids)
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .trashChannelItems(let channelId, let channelName):
+                let ids = state.items.filter { $0.channelId == channelId || $0.channelName == channelName }.map(\.id)
+                state.items.removeAll { ids.contains($0.id) }
+                state.subtitleAvailableIds.subtract(ids)
+                return .run { send in
+                    await LibraryCacheService.shared.trashItems(ids: ids)
+                    DatabaseManager.shared.deleteDownloadHistory(channel: channelName)
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .loadTrash:
+                return .run { send in
+                    let items = await LibraryCacheService.shared.trashedItems()
+                    await send(.trashLoaded(items))
+                }
+
+            case .trashLoaded(let items):
+                state.trashItems = items
+                return .none
+
+            case .setShowTrash(let show):
+                state.showTrash = show
+                if show {
+                    return .send(.loadTrash)
+                }
+                return .none
+
+            case .restoreItem(let id):
+                return .run { send in
+                    await LibraryCacheService.shared.restoreItem(id: id)
+                    await send(.loadFromDisk)
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .deletePermanently(let id):
+                state.trashItems.removeAll { $0.id == id }
+                return .run { send in
+                    await LibraryCacheService.shared.permanentlyDeleteItem(id: id)
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .deleteTrashItems(let ids):
+                state.trashItems.removeAll { ids.contains($0.id) }
+                return .run { send in
+                    for id in ids {
+                        await LibraryCacheService.shared.permanentlyDeleteItem(id: id)
+                    }
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
+
+            case .emptyTrash:
+                return .run { send in
+                    await LibraryCacheService.shared.emptyTrash()
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
 
             case .setSearchText(let text):
                 state.searchText = text
@@ -398,12 +492,11 @@ struct LibraryReducer {
                 state.items.removeAll { ids.contains($0.id) }
                 state.selectedIds = []
                 state.subtitleAvailableIds.subtract(ids)
-                return .merge(
-                    .run { _ in
-                        await LibraryCacheService.shared.removeItems(ids: Array(ids))
-                    },
-                    .send(.calculateDiskUsage)
-                )
+                return .run { send in
+                    await LibraryCacheService.shared.trashItems(ids: Array(ids))
+                    await send(.loadTrash)
+                    await send(.calculateDiskUsage)
+                }
 
             case .revealSelectedInFinder:
                 let urls = state.items
@@ -502,7 +595,7 @@ struct LibraryReducer {
                         let process = Process()
                         let outputTemplate = tmpDir.appendingPathComponent("%(id)s.%(ext)s").path
                         var args = [
-                            "--write-subs", "--write-auto-subs",
+                            "--write-subs",
                             "--sub-langs", subLangs,
                             "--skip-download",
                             "--no-warnings",
@@ -539,7 +632,7 @@ struct LibraryReducer {
                                 continue
                             }
                             if !text.isEmpty {
-                                DatabaseManager.shared.updateTranscript(videoId: id, transcript: text, language: lang)
+                                DatabaseManager.shared.updateTranscript(videoId: id, transcript: text, language: lang, source: "downloaded")
                                 saved = true
                             }
                         }
