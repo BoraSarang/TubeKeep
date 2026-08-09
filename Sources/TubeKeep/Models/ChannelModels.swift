@@ -97,6 +97,7 @@ struct ChannelDownloadCache {
     private static let autoDownloadKey = "channelAutoDownload"
     private static let autoSettingsKey = "channelAutoSettings"
     private static let dailyCountKey = "channelDailyDownloadCount"
+    private static let notificationEnabledKey = "channelNotificationEnabled"
 
     private nonisolated(unsafe) static var videoCache: [String: [ChannelVideoItem]] = [:]
 
@@ -370,7 +371,7 @@ struct ChannelDownloadCache {
         }
         return ChannelAutoSettings(
             enabled: isAutoDownloadEnabled(channelId: channelId),
-            resolution: 1080,
+            resolution: Settings.loadSettings().defaultResolution,
             includeSubtitles: false,
             audioOnly: false,
             dailyLimit: 0
@@ -386,6 +387,26 @@ struct ChannelDownloadCache {
         dict[channelId] = settings
         guard let data = try? JSONEncoder().encode(dict) else { return }
         UserDefaults.standard.set(data, forKey: autoSettingsKey)
+    }
+
+    // MARK: - Channel New Video Notification (default ON)
+
+    static func isNotificationEnabled(channelId: String) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: notificationEnabledKey),
+              let dict = try? JSONDecoder().decode([String: Bool].self, from: data)
+        else { return true }
+        return dict[channelId] ?? true
+    }
+
+    static func setNotificationEnabled(channelId: String, enabled: Bool) {
+        var dict: [String: Bool] = [:]
+        if let data = UserDefaults.standard.data(forKey: notificationEnabledKey),
+           let d = try? JSONDecoder().decode([String: Bool].self, from: data) {
+            dict = d
+        }
+        dict[channelId] = enabled
+        guard let data = try? JSONEncoder().encode(dict) else { return }
+        UserDefaults.standard.set(data, forKey: notificationEnabledKey)
     }
 
     static func dailyDownloadCount(channelId: String) -> Int {

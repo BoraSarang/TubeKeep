@@ -96,6 +96,7 @@ actor ChannelFetchService {
         channelId: String,
         handle: String? = nil,
         isPlaylist: Bool = false,
+        limit: Int? = nil,
         progressHandler: (@Sendable (Int) -> Void)? = nil
     ) async throws -> (videos: [ChannelVideoItem], totalCount: Int) {
         // Use /videos page to exclude Shorts; fall back to UU playlist for member-only exclusion
@@ -109,16 +110,22 @@ actor ChannelFetchService {
             url = "https://www.youtube.com/playlist?list=\(playlistId)"
         }
 
+        var arguments: [String] = [
+            "--flat-playlist",
+            "--dump-json",
+            "--extractor-args", Constants.youtubeExtractorArgs,
+            "--ignore-errors",
+            "--no-warnings",
+        ]
+        if let limit {
+            arguments.append("--playlist-end")
+            arguments.append("\(limit)")
+        }
+        arguments.append(url)
+
         let stream = await runner.runStreamingStdout(
             executable: Constants.ytDlpPath,
-            arguments: [
-                "--flat-playlist",
-                "--dump-json",
-                "--extractor-args", Constants.youtubeExtractorArgs,
-                "--ignore-errors",
-                "--no-warnings",
-                url,
-            ],
+            arguments: arguments,
             environment: ["PYTHONUNBUFFERED": "1"]
         )
 

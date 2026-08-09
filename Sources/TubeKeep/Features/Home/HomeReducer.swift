@@ -18,7 +18,6 @@ struct HomeReducer {
         var urlString: String = ""
         var isFetching: Bool = false
         var fetchStartTime: Date?
-        var fetchLogs: [String] = []
         var videoInfo: VideoInfo?
         var isDuplicate: Bool = false
         var availableFormats: [Format] = []
@@ -28,11 +27,7 @@ struct HomeReducer {
         var errorMessage: String?
         var lastAutoFetchedURL: String = ""
         var clipboardMonitoring: Bool = true
-        var summaryText: String?
-        var summaryProvider: String?
-        var summaryLoading = false
-        var showSummaryPopover = false
-        var showGeminiKeyAlert = false
+        var showNoResUnderLimit = false
 
         var selectedFormat: Format? {
             guard let id = selectedFormatId else { return nil }
@@ -67,13 +62,7 @@ struct HomeReducer {
         case addToQueueTapped
         case addToQueueResponse(DownloadItem)
         case playlistSelection(PresentationAction<PlaylistSelectionReducer.Action>)
-        case requestSummary
-        case summaryLoaded(videoId: String, text: String, provider: String)
-        case summaryFailed(videoId: String, error: String)
-        case toggleSummaryPopover
-        case dismissSummary
-        case setGeminiKeyAlert(Bool)
-        case openSettingsForGeminiKey
+        case dismissNoResUnderLimit
         case clearError
         case resetInfo
         case toggleClipboardMonitoring
@@ -122,7 +111,6 @@ struct HomeReducer {
                 state.selectedFormatId = nil
                 state.errorMessage = nil
                 state.fetchStartTime = nil
-                state.fetchLogs = []
                 state.urlString = ""
                 state.lastAutoFetchedURL = ""
                 return .cancel(id: CancelID.fetch)
@@ -131,9 +119,7 @@ struct HomeReducer {
                 for line in log.components(separatedBy: .newlines) {
                     let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { continue }
-                    if state.fetchLogs.last != trimmed {
-                        state.fetchLogs.append(trimmed)
-                    }
+                    DebugLogManager.shared?.append("[VideoInfo] \(trimmed)")
                 }
                 return .none
 
@@ -151,18 +137,15 @@ struct HomeReducer {
                 }
 
                 state.videoInfo = info
-                state.summaryText = nil
-                state.summaryProvider = nil
-                state.showSummaryPopover = false
-                state.summaryLoading = false
                 state.availableFormats = formats
                 state.audioOnly = false
                 state.includeSubtitles = false
                 state.urlString = ""
                 state.lastAutoFetchedURL = ""
 
-                let defaultFormat = Format.best(forHeight: Constants.defaultResolution, from: formats)
+                let defaultFormat = Format.bestForDownload(upTo: Constants.defaultResolution, from: formats)
                 state.selectedFormatId = defaultFormat?.id
+                state.showNoResUnderLimit = defaultFormat == nil && !formats.isEmpty
 
                 if formats.isEmpty {
                     state.errorMessage = "다운로드 가능한 포맷이 없습니다"
@@ -198,10 +181,6 @@ struct HomeReducer {
                 state.errorMessage = error
                 state.urlString = ""
                 state.lastAutoFetchedURL = ""
-                state.summaryText = nil
-                state.summaryProvider = nil
-                state.showSummaryPopover = false
-                state.summaryLoading = false
                 return .run { send in
                     try? await Task.sleep(for: .seconds(5))
                     await send(.clearError)
@@ -249,62 +228,9 @@ struct HomeReducer {
             case .playlistSelection:
                 return .none
 
-            case .requestSummary:
-                guard let info = state.videoInfo else { return .none }
-                state.summaryLoading = true
-                state.summaryText = nil
-                state.showSummaryPopover = true
-                let videoId = info.id
-                return .run { send in
-                    let service = SummarizationService()
-                    let keys = Settings.loadAPIKeys()
-                    do {
-                        let result = try await service.summarizeVideo(videoId: videoId, title: info.title, channel: info.channel, openRouterAPIKey: keys.openRouter, ax4APIKey: keys.ax4, geminiAPIKey: keys.gemini)
-                        await send(.summaryLoaded(videoId: videoId, text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n"), provider: result.provider))
-                    } catch let error as SummarizationService.SummaryError {
-                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
-                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                    } catch {
-                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                    }
-                }
-
-            case let .summaryLoaded(videoId, text, provider):
-                guard videoId == state.videoInfo?.id else { return .none }
-                state.summaryLoading = false
-                state.summaryText = text
-                state.summaryProvider = provider
+            case .dismissNoResUnderLimit:
+                state.showNoResUnderLimit = false
                 return .none
-
-            case let .summaryFailed(videoId, error):
-                guard videoId == state.videoInfo?.id else { return .none }
-                state.summaryLoading = false
-                state.summaryText = "요약 실패\n\n\(error)"
-                return .none
-
-            case .toggleSummaryPopover:
-                if state.summaryText == nil && !state.summaryLoading {
-                    return .send(.requestSummary)
-                }
-                state.showSummaryPopover.toggle()
-                return .none
-
-            case .dismissSummary:
-                state.showSummaryPopover = false
-                state.summaryText = nil
-                state.summaryProvider = nil
-                state.summaryLoading = false
-                return .none
-
-            case let .setGeminiKeyAlert(show):
-                state.showGeminiKeyAlert = show
-                return .none
-
-            case .openSettingsForGeminiKey:
-                state.showGeminiKeyAlert = false
-                return .run { _ in await MainActor.run {
-                    NotificationCenter.default.post(name: Constants.openSettingsWindowNotification, object: nil)
-                }}
 
             case .clearError:
                 state.errorMessage = nil
@@ -317,12 +243,7 @@ struct HomeReducer {
                 state.errorMessage = nil
                 state.isFetching = false
                 state.fetchStartTime = nil
-                state.fetchLogs = []
                 state.playlistSelection = nil
-                state.summaryText = nil
-                state.summaryProvider = nil
-                state.showSummaryPopover = false
-                state.summaryLoading = false
                 return .cancel(id: CancelID.fetch)
 
             case .toggleClipboardMonitoring:
@@ -345,11 +266,7 @@ struct HomeReducer {
         state.errorMessage = nil
         state.videoInfo = nil
         state.availableFormats = []
-        state.fetchLogs = ["진행상태: 정보 조회 시작..."]
-        state.summaryText = nil
-        state.summaryProvider = nil
-        state.showSummaryPopover = false
-        state.summaryLoading = false
+        DebugLogManager.shared?.append("[VideoInfo] 진행상태: 정보 조회 시작...")
 
         return .run { send in
             let service = YouTubeDLService()

@@ -6,6 +6,8 @@ import ComposableArchitecture
 final class IdleSubtitleService {
     static let settingKey = "idleSubtitleMinutes"
 
+    private var launchDate = Date()
+
     private let store: StoreOf<AppReducer>
     private var timer: Timer?
     private var downloadTask: Task<Void, Never>?
@@ -14,6 +16,13 @@ final class IdleSubtitleService {
     private var skippedIds: Set<String> = []
     private var processedCount = 0
     private var sessionCompletedNotified = false
+    private var sessionActive = false
+    private var deactivationGraceStartDate: Date?
+    private var lastStartNotificationDate: Date?
+    private var lastStopNotificationDate: Date?
+
+    private static let deactivationGraceSeconds: TimeInterval = 60
+    private static let popupDebounceSeconds: TimeInterval = 120
 
     init(store: StoreOf<AppReducer>) {
         self.store = store
@@ -22,6 +31,16 @@ final class IdleSubtitleService {
     private func logAndNotify(_ message: String, title: String? = nil, systemImage: String? = nil, tint: Color? = nil) {
         ActivityLogStore.shared.append(message)
         if let title {
+            // 시작/중단 팝업은 디바운스 창 내 반복을 방지
+            if let lastPopup = lastPopupDate(for: title) {
+                if Date().timeIntervalSince(lastPopup) < Self.popupDebounceSeconds {
+                    #if DEBUG
+                    DebugLogManager.shared?.append("[IdleSub] ⏱ 팝업 디바운스 스킵 — \(title)")
+                    #endif
+                    return
+                }
+            }
+            setLastPopupDate(for: title, date: Date())
             IdleNotificationPresenter.shared.show(
                 title: title,
                 message: message,
@@ -35,11 +54,23 @@ final class IdleSubtitleService {
         }
     }
 
+    private func lastPopupDate(for title: String) -> Date? {
+        if title == "자동화 시작" { return lastStartNotificationDate }
+        if title == "자동화 중단" { return lastStopNotificationDate }
+        return nil
+    }
+
+    private func setLastPopupDate(for title: String, date: Date) {
+        if title == "자동화 시작" { lastStartNotificationDate = date }
+        if title == "자동화 중단" { lastStopNotificationDate = date }
+    }
+
     func start() {
+        launchDate = Date()
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.checkIdle() }
         }
-        Task { @MainActor [weak self] in self?.checkIdle() }
+        checkIdle()
     }
 
     func stop() {
@@ -69,11 +100,29 @@ final class IdleSubtitleService {
             cancelIfDownloading()
             return
         }
+        let elapsed = Date().timeIntervalSince(launchDate)
+        guard elapsed >= Double(threshold) * 60 else {
+            #if DEBUG
+            DebugLogManager.shared?.append("[IdleSub] 앱 시작 대기 중 (경과 \(Int(elapsed / 60))분 / 임계 \(threshold)분)")
+            #endif
+            return
+        }
         let isSystemIdle = systemIdleSeconds() >= Double(threshold) * 60
         if isSystemIdle || isTubeKeepIdle() {
+            deactivationGraceStartDate = nil
             startIfNeeded()
         } else {
-            cancelIfDownloading()
+            if let graceStart = deactivationGraceStartDate,
+               Date().timeIntervalSince(graceStart) >= Self.deactivationGraceSeconds {
+                deactivationGraceStartDate = nil
+                cancelIfDownloading()
+            } else if deactivationGraceStartDate == nil {
+                deactivationGraceStartDate = Date()
+                #if DEBUG
+                let idleSecs = systemIdleSeconds()
+                DebugLogManager.shared?.append("[IdleSub] 유휴 해제 감지 - \(Int(Self.deactivationGraceSeconds))초 유예 시작 (시스템 idle \(Int(idleSecs))초 / 임계 \(threshold)분)")
+                #endif
+            }
         }
     }
 
@@ -91,7 +140,8 @@ final class IdleSubtitleService {
             .filter { !LibraryReducer.hasSubtitles(for: $0.id) && !skippedIds.contains($0.id) }
             .sorted(by: Self.subtitleSortPredicate)
         guard let first = items.first else {
-            if processedCount > 0, !sessionCompletedNotified {
+            if sessionActive, processedCount > 0, !sessionCompletedNotified {
+                sessionActive = false
                 sessionCompletedNotified = true
                 logAndNotify(
                     "총 \(processedCount)개 처리 완료. 유휴 시 다시 실행됩니다",
@@ -103,14 +153,17 @@ final class IdleSubtitleService {
             return
         }
         isDownloading = true
-        processedCount = 0
-        sessionCompletedNotified = false
-        logAndNotify(
-            "유휴 자동화 시작 - 총 \(items.count)개 영상 대기",
-            title: "자동화 시작",
-            systemImage: "play.circle.fill",
-            tint: .green
-        )
+        if !sessionActive {
+            sessionActive = true
+            processedCount = 0
+            sessionCompletedNotified = false
+            logAndNotify(
+                "유휴 자동화 시작 - 총 \(items.count)개 영상 대기",
+                title: "자동화 시작",
+                systemImage: "play.circle.fill",
+                tint: .green
+            )
+        }
         downloadTask = Task { [weak self] in
             guard let self else { return }
             await self.process(video: first)
@@ -168,18 +221,24 @@ final class IdleSubtitleService {
     }
 
     private func cancelIfDownloading() {
-        guard isDownloading else { return }
+        if !isDownloading {
+            sessionActive = false
+            deactivationGraceStartDate = nil
+            return
+        }
         currentProcess?.terminate()
         currentProcess = nil
         downloadTask?.cancel()
         downloadTask = nil
         isDownloading = false
         skippedIds.removeAll()
+        deactivationGraceStartDate = nil
         store.send(.statusBar(.updateStatusText("")))
         store.send(.statusBar(.updateStatusDetail("")))
 
         guard !Task.isCancelled else { return }
-        if processedCount > 0 {
+        if sessionActive, processedCount > 0 {
+            sessionActive = false
             logAndNotify(
                 "사용 재개로 유휴 자동화 중단 - 완료 \(processedCount)개",
                 title: "자동화 중단",

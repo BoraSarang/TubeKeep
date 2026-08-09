@@ -18,7 +18,8 @@ struct ChannelHeaderView: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
             avatarView
                 .frame(width: 48, height: 48)
 
@@ -84,10 +85,16 @@ struct ChannelHeaderView: View {
             }
 
             channelButtons
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.windowBackgroundColor))
+
+            ChannelInsightCardView(channelId: channelId, channelName: channelName, items: items)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(.windowBackgroundColor))
+        .id(channelId)
         .onAppear { loadChannelInfo() }
     }
 

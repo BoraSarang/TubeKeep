@@ -371,7 +371,7 @@ struct BatchDownloadView: View {
                         progressText = "\(index + 1)/\(rawURLs.count) 추가됨: \(info.title)"
                     }
 
-                    let format = Format.best(forHeight: presetRes, from: formats)
+                    let format = Format.bestForDownload(upTo: presetRes, from: formats)
 
                     guard let selectedFormat = format else {
                         await MainActor.run {

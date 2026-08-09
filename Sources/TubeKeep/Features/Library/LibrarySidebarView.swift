@@ -10,6 +10,7 @@ struct LibrarySidebarView: View {
     @AppStorage(Constants.channelOrderKey) private var channelOrderData: Data = Data()
     @State private var historyItems: [DownloadHistoryItem] = []
     @State private var pendingTrashChannel: (id: String, name: String)?
+    @AppStorage(Constants.sidebarNavExpandedKey) private var isNavExpanded = false
 
     private var channelOrder: [String] {
         get { (try? JSONDecoder().decode([String].self, from: channelOrderData)) ?? [] }
@@ -173,13 +174,57 @@ struct LibrarySidebarView: View {
             navRow(title: "보관함", icon: "square.grid.2x2", mode: .library)
             navRow(title: "트랜드", icon: "flame", mode: .discover)
             navRow(title: "다운로드 히스토리", icon: "clock.arrow.circlepath", mode: .history)
-            navRow(title: "클립", icon: "scissors", mode: .clips)
-            navRow(title: "디스크 정리", icon: "externaldrive.badge.checkmark", mode: .diskCleanup)
-            navRow(title: "내 프로필", icon: "person.text.rectangle", mode: .profile)
-            navRow(title: "리포트", icon: "chart.bar.xaxis", mode: .report)
-            navRow(title: "휴지통", icon: "trash", mode: .trash)
+
+            if isNavExpanded {
+                navRow(title: "클립", icon: "scissors", mode: .clips)
+                navRow(title: "디스크 정리", icon: "externaldrive.badge.checkmark", mode: .diskCleanup)
+                navRow(title: "내 프로필", icon: "person.text.rectangle", mode: .profile)
+                navRow(title: "리포트", icon: "chart.bar.xaxis", mode: .report)
+                navRow(title: "휴지통", icon: "trash", mode: .trash)
+                toggleNavSheetButton(expanded: false)
+            } else {
+                toggleNavSheetButton(expanded: true)
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
+        .onChange(of: store.library.sidebarMode) { _, mode in
+            if hiddenModes.contains(mode) && !isNavExpanded {
+                isNavExpanded = true
+            }
+        }
+        .onAppear {
+            if hiddenModes.contains(store.library.sidebarMode) {
+                isNavExpanded = true
+            }
+        }
+    }
+
+    private var hiddenModes: Set<LibrarySidebarMode> {
+        [.clips, .diskCleanup, .profile, .report, .trash]
+    }
+
+    private func toggleNavSheetButton(expanded: Bool) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isNavExpanded = expanded
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text(expanded ? "더 보기" : "접기")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
     }
 
     private func navRow(title: String, icon: String, mode: LibrarySidebarMode) -> some View {

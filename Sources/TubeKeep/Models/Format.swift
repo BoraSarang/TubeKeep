@@ -74,4 +74,26 @@ struct Format: Identifiable, Equatable, Codable {
         if let f = closest(to: targetHeight, in: anyVideo) { return f }
         return formats.first
     }
+
+    /// 다운로드 기본 선택: `maxHeight` 이하 포맷만 후보로, 이하가 없으면 nil.
+    /// 설정 해상도를 "최대 상한"으로 간주하고 더 높은 해상도로 자동 올라가지 않는다.
+    static func bestForDownload(upTo maxHeight: Int, from formats: [Format]) -> Format? {
+        let candidates = formats.filter { $0.height > 0 && $0.height <= maxHeight && !$0.isAudioOnly }
+        guard !candidates.isEmpty else { return nil }
+
+        // 1: 최대 해상도 이하 combined (mp4 선호)
+        let combinedMP4 = candidates.filter { $0.isCombined && $0.isMP4 }
+        if let f = combinedMP4.max(by: { $0.height < $1.height }) { return f }
+        let combined = candidates.filter { $0.isCombined }
+        if let f = combined.max(by: { $0.height < $1.height }) { return f }
+
+        // 2: video-only (mp4 선호)
+        let videoMP4 = candidates.filter { $0.isVideoOnly && $0.isMP4 }
+        if let f = videoMP4.max(by: { $0.height < $1.height }) { return f }
+        let videoOnly = candidates.filter { $0.isVideoOnly }
+        if let f = videoOnly.max(by: { $0.height < $1.height }) { return f }
+
+        // 3: any
+        return candidates.max(by: { $0.height < $1.height })
+    }
 }

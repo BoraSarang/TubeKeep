@@ -97,6 +97,10 @@ struct ChannelListView: View {
                             .contentShape(Rectangle())
                             .onTapGesture { onSelect(channel) }
                         .contextMenu {
+                            Toggle("새 영상 알림", isOn: Binding(
+                                get: { ChannelDownloadCache.isNotificationEnabled(channelId: channel.id) },
+                                set: { ChannelDownloadCache.setNotificationEnabled(channelId: channel.id, enabled: $0) }
+                            ))
                             Button("Finder에서 채널 폴더 열기") {
                                 let folder = Constants.sanitizeFolderName(channel.name)
                                 let path = "\(Constants.channelStorageDirectory)/\(folder)"
@@ -226,6 +230,13 @@ struct ChannelListView: View {
                     .fill(Color.red)
                     .frame(width: 7, height: 7)
             }
+            Toggle("", isOn: Binding(
+                get: { ChannelDownloadCache.isNotificationEnabled(channelId: key) },
+                set: { ChannelDownloadCache.setNotificationEnabled(channelId: key, enabled: $0) }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .help("새 영상 알림")
             Toggle("", isOn: Binding(
                 get: { ChannelDownloadCache.isAutoDownloadEnabled(channelId: key) },
                 set: { enabled in

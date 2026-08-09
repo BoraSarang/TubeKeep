@@ -120,6 +120,15 @@ final class ChannelUpdateService {
             logManager?.append("  채널 체크: \(channel.name) (\(i+1)/\(channels.count))")
             #endif
 
+            let notifyEnabled = ChannelDownloadCache.isNotificationEnabled(channelId: channel.id)
+            let autoDownloadEnabled = ChannelDownloadCache.isAutoDownloadEnabled(channelId: channel.id)
+            guard notifyEnabled || autoDownloadEnabled else {
+                #if DEBUG
+                logManager?.append("    ⏭ 알림/자동다운로드 OFF, 감시 제외")
+                #endif
+                continue
+            }
+
             let lastFetch = ChannelDownloadCache.lastFetchDate(channelId: channel.id)
             let minInterval: TimeInterval = 3600
             guard Date().timeIntervalSince(lastFetch) >= minInterval else {
@@ -130,7 +139,7 @@ final class ChannelUpdateService {
             }
 
             guard let result = try? await fetchService.fetchAllVideos(
-                channelId: channel.id, handle: channel.handle
+                channelId: channel.id, handle: channel.handle, limit: 5
             ) else {
                 #if DEBUG
                 logManager?.append("    ❌ fetch 실패")
@@ -145,19 +154,21 @@ final class ChannelUpdateService {
                 !downloadedIDs.contains($0.id) && !seenIDs.contains($0.id)
             }
             if !newVideos.isEmpty {
-                hasChanges = true
-                let videoIds = newVideos.map { $0.id }
-                newVideosByChannel.append((channel.id, channel.name, newVideos.count, videoIds))
-                ChannelDownloadCache.saveNewVideoIds(channelId: channel.id, videoIds: videoIds)
-                #if DEBUG
-                logManager?.append("    ✅ 새 영상 \(newVideos.count)개 발견")
-                #endif
-                if ChannelDownloadCache.isAutoDownloadEnabled(channelId: channel.id) {
+                if autoDownloadEnabled {
                     enqueueAutoDownload(channelId: channel.id, channelName: channel.name, videos: newVideos)
                     #if DEBUG
                     logManager?.append("    📥 자동 다운로드 enqueue \(newVideos.count)개")
                     #endif
                 }
+                if notifyEnabled {
+                    hasChanges = true
+                    let videoIds = newVideos.map { $0.id }
+                    newVideosByChannel.append((channel.id, channel.name, newVideos.count, videoIds))
+                    ChannelDownloadCache.saveNewVideoIds(channelId: channel.id, videoIds: videoIds)
+                }
+                #if DEBUG
+                logManager?.append("    ✅ 새 영상 \(newVideos.count)개 발견")
+                #endif
             } else {
                 #if DEBUG
                 logManager?.append("    ➖ 새 영상 없음")
@@ -174,6 +185,15 @@ final class ChannelUpdateService {
             logManager?.append("  재생목록 체크: \(playlist.title)")
             #endif
 
+            let notifyEnabled = ChannelDownloadCache.isNotificationEnabled(channelId: key)
+            let autoDownloadEnabled = ChannelDownloadCache.isAutoDownloadEnabled(channelId: key)
+            guard notifyEnabled || autoDownloadEnabled else {
+                #if DEBUG
+                logManager?.append("    ⏭ 알림/자동다운로드 OFF, 감시 제외")
+                #endif
+                continue
+            }
+
             let lastFetch = ChannelDownloadCache.lastFetchDate(channelId: key)
             let minInterval: TimeInterval = 3600
             guard Date().timeIntervalSince(lastFetch) >= minInterval else {
@@ -184,7 +204,7 @@ final class ChannelUpdateService {
             }
 
             guard let result = try? await fetchService.fetchAllVideos(
-                channelId: playlist.id, isPlaylist: true
+                channelId: playlist.id, isPlaylist: true, limit: 5
             ) else {
                 #if DEBUG
                 logManager?.append("    ❌ 재생목록 fetch 실패")
@@ -199,19 +219,21 @@ final class ChannelUpdateService {
                 !downloadedIDs.contains($0.id) && !seenIDs.contains($0.id)
             }
             if !newVideos.isEmpty {
-                hasChanges = true
-                let videoIds = newVideos.map { $0.id }
-                newVideosByChannel.append((key, playlist.title, newVideos.count, videoIds))
-                ChannelDownloadCache.saveNewVideoIds(channelId: key, videoIds: videoIds)
-                #if DEBUG
-                logManager?.append("    ✅ 재생목록 새 영상 \(newVideos.count)개 발견")
-                #endif
-                if ChannelDownloadCache.isAutoDownloadEnabled(channelId: key) {
+                if autoDownloadEnabled {
                     enqueueAutoDownload(channelId: playlist.id, channelName: playlist.title, videos: newVideos, presetKey: key)
                     #if DEBUG
                     logManager?.append("    📥 재생목록 자동 다운로드 enqueue \(newVideos.count)개")
                     #endif
                 }
+                if notifyEnabled {
+                    hasChanges = true
+                    let videoIds = newVideos.map { $0.id }
+                    newVideosByChannel.append((key, playlist.title, newVideos.count, videoIds))
+                    ChannelDownloadCache.saveNewVideoIds(channelId: key, videoIds: videoIds)
+                }
+                #if DEBUG
+                logManager?.append("    ✅ 재생목록 새 영상 \(newVideos.count)개 발견")
+                #endif
             } else {
                 #if DEBUG
                 logManager?.append("    ➖ 재생목록 새 영상 없음")

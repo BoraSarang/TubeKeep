@@ -48,6 +48,7 @@ enum Constants {
     static let librarySaveKey = "downloadLibrary"
     static let libraryViewModeKey = "libraryViewMode"
     static let channelOrderKey = "channelOrder"
+    static let sidebarNavExpandedKey = "sidebarNavExpanded"
     static let downloadQueueKey = "downloadQueue"
     static let showMainWindowOnLaunchKey = "showMainWindowOnLaunch"
     static let sponsorBlockKey = "sponsorBlock"
