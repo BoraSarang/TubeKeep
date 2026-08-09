@@ -56,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func terminateCleanup() {
         DebugLogManager.shared?.append("[App] terminateCleanup 시작 PID=\(ProcessInfo.processInfo.processIdentifier)")
+        store.send(.downloadQueue(.saveQueue))
         DebugLogManager.shared?.append("[App] ProcessRegistry.killAll: \(ProcessRegistry.killAll())개")
         DebugLogManager.shared?.append("[App] DownloadManager.cancelAll: \(DownloadManager.shared.cancelAll())개")
         DebugLogManager.shared?.append("[App] 1차 killAllChildProcesses")
@@ -66,14 +67,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DebugLogManager.shared?.append("[App] terminateCleanup 완료")
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
         ProcessInfo.processInfo.disableSuddenTermination()
-        store.send(.appDidFinishLaunching)
-
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error { DebugLogManager.shared?.append("[App] 알림 권한 요청 실패: \(error)") }
-        }
 
         #if DEBUG
         let logManager = DebugLogManager()
@@ -81,9 +77,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         logManager.append("[App] TubeKeep 시작")
         #endif
 
-        setupManagers()
+        // 이전 인스턴스(강제 종료)가 남긴 고아 yt-dlp/yt_dlp를 먼저 정리한 뒤
+        // 큐 로드/자동 재개가 수행되도록 순서를 앞당긴다.
+        // (기존: .appDidFinishLaunching 실행으로 큐 자동 재개가 yt-dlp를 띄운 뒤
+        //  cleanupStaleChildProcesses가 pkill로 방금 시작한 yt-dlp까지 kill → 다운로드 정지 버그 수정)
+        cleanupStaleChildProcesses()
 
-cleanupStaleChildProcesses()
+        store.send(.appDidFinishLaunching)
+
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error { DebugLogManager.shared?.append("[App] 알림 권한 요청 실패: \(error)") }
+        }
+
+        setupManagers()
 
         LibraryCacheService.shared.autoPurgeTrash(olderThan: 30)
 
@@ -252,7 +258,6 @@ cleanupStaleChildProcesses()
         statusBar.onOpenChannelDownloader = { [weak self] in self?.openChannelDownloaderWindow() }
         statusBar.onOpenSettings = { [weak self] in self?.openSettingsWindow() }
         statusBar.onOpenAbout = { [weak self] in self?.openAboutWindow() }
-        statusBar.onOpenBuyMeACoffee = { [weak self] in self?.openBuyMeACoffee() }
         #if DEBUG
         statusBar.onToggleDebugPanel = { [weak self] in self?.toggleDebugLogWindow() }
         #endif
@@ -568,11 +573,6 @@ cleanupStaleChildProcesses()
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    @objc private func openBuyMeACoffee() {
-        guard let url = URL(string: "https://buymeacoffee.com/borasarang") else { return }
-        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Settings Window

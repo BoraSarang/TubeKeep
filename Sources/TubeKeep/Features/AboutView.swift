@@ -18,7 +18,11 @@ struct AboutView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("문의: borasarang@gmail.com")
+                    Text("제작자: BoRaSaRang")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("문의 이메일: leeborasarang@gmail.com")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
