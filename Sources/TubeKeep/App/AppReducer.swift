@@ -183,8 +183,9 @@ struct AppReducer {
 
             case .home(.infoResponse(_, let formats)):
                 let defaultRes = state.settings.defaultResolution
-                let defaultFormat = Format.best(forHeight: defaultRes, from: formats)
+                let defaultFormat = Format.bestForDownload(upTo: defaultRes, from: formats)
                 state.home.selectedFormatId = defaultFormat?.id
+                state.home.showNoResUnderLimit = defaultFormat == nil && !formats.isEmpty
 
                 if state.settings.smartMode,
                    let presetId = state.settings.activePresetId,
@@ -323,6 +324,11 @@ struct AppReducer {
             case .downloadQueue(.updateProgress(_, _, _)):
                 Self.syncStatusBar(&state)
                 return .none
+
+            case .downloadQueue(.itemsLoaded):
+                // itemsLoaded 보정 등록(B)은 downloadCompleted의 loadFromDisk를 거치지 않으므로
+                // 보관함 UI 갱신을 별도로 수행한다.
+                return .send(.library(.loadFromDisk))
 
             case let .downloadQueue(.downloadCompleted(id, success, outputPath, _)):
                 let completed = state.downloadQueue.recentlyCompletedCount

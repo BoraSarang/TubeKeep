@@ -85,6 +85,11 @@ final class DownloadManager: @unchecked Sendable {
             }
 
             do {
+                #if DEBUG
+                Task { @MainActor in
+                    DebugLogManager.shared?.append("[DownloadManager] 프로세스 시작 pid=\(process.processIdentifier)")
+                }
+                #endif
                 try process.run()
 
                 let stdoutHandle = stdoutPipe.fileHandleForReading
@@ -98,13 +103,25 @@ final class DownloadManager: @unchecked Sendable {
 
                 stdoutHandle.readabilityHandler = { handle in
                     let data = handle.availableData
+                    #if DEBUG
+                    if !data.isEmpty {
+                        let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
+                        Task { @MainActor in
+                            DebugLogManager.shared?.append("[DownloadManager] stdout RAW[\(data.count)]: \(preview)")
+                        }
+                    }
+                    #endif
                     guard !data.isEmpty else { return }
                     guard let output = String(data: data, encoding: .utf8) else { return }
 
                     for line in output.components(separatedBy: .newlines) {
                         let trimmed = line.trimmingCharacters(in: .whitespaces)
                         guard !trimmed.isEmpty else { continue }
-                        let parts = trimmed.components(separatedBy: "|")
+                        let cleaned = trimmed.replacingOccurrences(
+                            of: "[download]",
+                            with: ""
+                        ).trimmingCharacters(in: .whitespaces)
+                        let parts = cleaned.components(separatedBy: "|")
                         guard parts.count >= 2 else { continue }
 
                         let pctRaw = parts[0].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "%", with: "")
@@ -114,6 +131,11 @@ final class DownloadManager: @unchecked Sendable {
                         if pct != box.lastPercent || !spdStr.isEmpty {
                             box.lastPercent = pct
                             box.lastSpeed = spdStr
+                            #if DEBUG
+                            Task { @MainActor in
+                                DebugLogManager.shared?.append("[DownloadManager] 진행률 \(pct)%")
+                            }
+                            #endif
                             progressHandler(item.id, pct / 100.0, spdStr)
                         }
                     }
@@ -152,6 +174,12 @@ final class DownloadManager: @unchecked Sendable {
                     $0.canceledItems.contains(item.id) || $0.pausedItems.contains(item.id)
                 }
 
+                #if DEBUG
+                Task { @MainActor in
+                    DebugLogManager.shared?.append("[DownloadManager] 루프 종료 isCancelled=\(Task.isCancelled) suppressed=\(suppressed) terminationStatus=\(process.terminationStatus)")
+                }
+                #endif
+
                 if !Task.isCancelled && !suppressed {
                     let actualPath: String? = {
                         let fm = FileManager.default
@@ -164,8 +192,8 @@ final class DownloadManager: @unchecked Sendable {
                             try? fm.removeItem(atPath: outputPathFile)
                             return path
                         }()
-                        // 2) Validate: file must exist
-                        if let path = afterMovePath, fm.fileExists(atPath: path) {
+                        // 2) Validate: file must exist and be a real media file (ignore .part/.webp/.jpg/.png)
+                        if let path = afterMovePath, Self.isValidMediaFile(path) {
                             return path
                         }
                         // 3) Fallback: scan output directory for videoId
@@ -174,12 +202,18 @@ final class DownloadManager: @unchecked Sendable {
                         let videoId = item.videoInfo.id
                         guard let files = try? fm.contentsOfDirectory(atPath: channelDir) else { return nil }
                         for file in files where file.contains(videoId) {
-                            return "\(channelDir)/\(file)"
+                            let path = "\(channelDir)/\(file)"
+                            if Self.isValidMediaFile(path) { return path }
                         }
                         return nil
                     }()
 
                     if process.terminationStatus == 0 || (actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false) {
+                        #if DEBUG
+                        Task { @MainActor in
+                            DebugLogManager.shared?.append("[DownloadManager] 완료 처리: status=\(process.terminationStatus) path=\(actualPath ?? "nil")")
+                        }
+                        #endif
                         if item.includeSubtitles, let path = actualPath {
                             Self.saveSubtitlesToDB(videoPath: path)
                         }
@@ -229,16 +263,22 @@ final class DownloadManager: @unchecked Sendable {
 
     @discardableResult
     func cancelAll() -> Int {
-        let processes = activeLock.withLock {
+        let terminated = activeLock.withLock {
+            let keys = Array($0.keys)
             let values = Array($0.values)
             $0.removeAll()
-            return values
+            return (keys: keys, processes: values)
         }
-        for p in processes where p.isRunning {
+        for p in terminated.processes where p.isRunning {
             p.terminate()
         }
-        stateLock.withLock { $0.pausedItems.removeAll() }
-        return processes.count
+        // 종료 대상 항목을 canceledItems에 등록해 강제 종료된 프로세스가 success 콜백을
+        // 발화하지 못하게 차단한다 (suppressed=true 유도).
+        stateLock.withLock {
+            $0.canceledItems.formUnion(terminated.keys)
+            $0.pausedItems.removeAll()
+        }
+        return terminated.processes.count
     }
 
     var activeCount: Int {
@@ -249,13 +289,15 @@ final class DownloadManager: @unchecked Sendable {
 
     private func buildDownloadArgs(item: DownloadItem, outputDir: String, settings: Settings, filenameTemplate: String) -> [String] {
         let formatId: String = {
+            let id = item.selectedFormat.id
+            if id.contains("/") || id.contains("+") {
+                return id
+            }
             if item.selectedFormat.isVideoOnly {
                 let height = item.selectedFormat.height
-                let fallback = "\(item.selectedFormat.id)+bestaudio/best[height<=\(height)]"
-                return "\(item.selectedFormat.id)+bestaudio/\(fallback)"
+                return "\(id)+bestaudio/bestvideo[height<=\(height)]+bestaudio/best[height<=\(height)]+bestaudio/best"
             }
-            let id = item.selectedFormat.id
-            if id.hasPrefix("best") && !id.contains("/") && !id.contains("+") {
+            if id.hasPrefix("best") {
                 let bracket = id.firstIndex(of: "[") ?? id.endIndex
                 let filter = id[bracket...]
                 return "bestvideo\(filter)+bestaudio/\(id)"
@@ -322,6 +364,17 @@ final class DownloadManager: @unchecked Sendable {
         ytdlTemplate = ytdlTemplate.trimmingCharacters(in: CharacterSet(charactersIn: ".- "))
 
         return "\(channelDir)/\(ytdlTemplate).%(id)s.%(ext)s"
+    }
+
+    /// 실미디어 파일인지 검증한다. (.part/.webp/.jpg/.png 등 임시·썸네일은 제외)
+    static func isValidMediaFile(_ path: String) -> Bool {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path),
+              let attrs = try? fm.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? Int64, size > 0
+        else { return false }
+        let ext = (path as NSString).pathExtension.lowercased()
+        return DownloadItem.mediaFileExtensions.contains(ext)
     }
 
     private static func saveSubtitlesToDB(videoPath: String) {

@@ -1,6 +1,56 @@
 # TODO — 작업 추적 목록
 
-## v3.5 — 휴지통(soft delete) + 사이드바 채널 전체 삭제 + 용어 정리 🚧
+## v3.9 — 다운로드 유령 완료 방지 + 보관함·히스토리 보정 (macOS) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1093 | **유령 완료 검증(isValidMediaFile 확장자·크기) 포팅** | high | done | DownloadItem.isRealMediaFile + DownloadManager/checkExistingFile/채널 폴백 |
+| T-1094 | **완료 재검증(revalidation) completed→pending 전환 + invalidated 분리** | high | done | itemsLoaded 시 ghost만 pending, 히스토리에서 제거 |
+| T-1095 | **cleanupTempFiles `.part`·썸네일 보존** | high | done | 실미디어 없는 미리보기 프레임임·임시물 삭제 방지 |
+| T-1096 | **보관함·히스토리 누락 보정(B) + loadFromDisk UI 갱신** | high | done | itemsLoaded → library loadFromDisk 연계 |
+| T-1097 | **saveDownloadHistory video_id 중복 방지** | high | done | download_history INSERT 중복 skip |
+| T-1098 | **빌드 + 실다운로드/재개 검증 + CHANGELOG/session** | high | done | build_and_run debug macos ✅ / jpgW5 완료·7B862 재개 확인 |
+
+---
+
+## v3.8 — 홈 다운로더 로그 통합 + AI 요약 제거 + 형식 버그 수정 (macOS) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1088 | **PLAN_v3.8 + TODO 등록** | high | done | docs/plans/PLAN_v3.8_home-downloader-macos.md |
+| T-1089 | **HomeReducer 로그 통합 + 요약 제거** | high | done | fetchLogs→DebugLog, summary* 상태/액션 제거 |
+| T-1090 | **HomeView 로그 박스/요약 UI 제거** | high | done | fetchingIndicator + AI 요약 버튼/팝오버/알림 |
+| T-1091 | **DownloadManager `-f` 이중 반복 수정** | high | done | `/`·`+` 포함 id 그대로, 진행률 `[download]` 접두 보정 |
+| T-1092 | **빌드 + 검증 + CHANGELOG/session** | high | done | build_and_run debug macos ✅ / swift test 76 ✅ |
+
+---
+
+## v3.7 — 채널 인사이트 (macOS) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-370 | **PLAN_v3.7 + TODO 등록** | high | done | docs/plans/PLAN_v3.7_channel-insights-macos.md |
+| T-371 | **ChannelInsights 모델 + compute 통계 서비스** | high | pending | tags/duration/조회수 집계 |
+| T-372 | **summarize 체인 + UserDefaults 캐시(30일) + 최소 10개 가드** | high | pending | OpenRouter→AX4→Gemini |
+| T-373 | **ChannelInsightCardView UI (카드+막대+요약 문단)** | high | pending | Features/Library |
+| T-374 | **ChannelHeaderView 하단 통합** | high | pending | grid/list 공통 |
+| T-375 | **빌드 + 채널 선택 검증 + doc/session** | high | pending | build_and_run debug macos |
+
+---
+
+## v3.6 — 유휴 자동화 반복 처리·팝업 안정화 (macOS) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-360 | **PLAN_v3.6 + TODO 등록** | high | done | docs/plans/PLAN_v3.6_idle-macos.md |
+| T-360 | **PLAN_v3.6 + TODO 등록** | high | done | docs/plans/PLAN_v3.6_idle-macos.md |
+| T-361 | **updateTranscript UPSERT** | high | done | 순수 UPDATE→ON CONFLICT DO UPDATE, 자막 휘발 방지 |
+| T-362 | **팝업 디바운스 + 유예 60초 + 디버그 로그** | high | done | IdleSubtitleService |
+| T-363 | **빌드 + idle_activity.log 재확인 + doc/session** | high | done | build_and_run debug macos + 로그 검증 완료 |
+
+---
+
+## v3.5 — 휴지통(백업) + 사이드바 채널 전체 삭제 + 용어 정리 🚧
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
 |----|------|---------|------|------|

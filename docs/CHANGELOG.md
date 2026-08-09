@@ -1,5 +1,53 @@
 # CHANGELOG
 
+## v3.9 — 다운로드 유령 완료 방지 + 재개/임시물 보존 + 보관함·히스토리 누락 보정 (macOS, T-1093~T-1098) 🚧
+
+### 버그 수정
+- **유령 완료(ghost-complete) 방지**: 종료·실패 시 일부 항목이 `completed 100% + 실파일 없음`으로 잘못 기록되던 문제 수정
+  - 확장자·크기 검증: `.webp`(썸네일)·`.jpg`·`.png`·`.part`(임시)를 완료 미디어로 착각하지 않도록 `isValidMediaFile`(확장자+크기>0) 검증 추가 — `DownloadManager.resolveActualPath`, `checkExistingFile`, 채널 폴백 모두 적용
+  - ID 폴백 `contains(videoId)` → 검증된 실제 미디어 파일(썸네일/임시 제외)만 인정
+  - 완료 판정 후 미디어가 없으면 `completed` → `pending`으로 자동 전환(revalidation) — 재다운로드 대기
+- **`.part`·임시물 보존**: 앱 종료 시 `cleanupTempFiles`가 실제 미디어가 없는 항목의 `.part`/`.webp`를 삭제해 재개를 막던 것을, 확장자 검증으로 보존 — `7B862YcjxsA` 116MB `.part` → 실제 170MB `.mp4` 완료 재개 성공
+- **`isComplete(revalidation:true)` 재검증 경로 보정**: `findAndReplaceFile` 내 파일 실존 확인 + 미디어 검증으로 신뢰성 상승
+
+### 기능
+- **히스토리·보관함 누락 보정(B)**: 앱 시작 `itemsLoaded`에서 `downloaded.contains(id)` 만으로 완료 처리하던 것을 실제 미디어 검증으로 교체, 보관함 등록(`LibraryItem`) 및 다운로드 히스토리(`download_history`) 기록이 누락된 사례를 교차 보정
+- **완료된 항목 재검증**: 로드 시 `completed` 항목에 대해 실미디어가 없으면 `pending` 전환 → `invalidated` 목록 분리 → `checkExistingFile` 없으면 히스토리에서 제거(hidden)
+- **`saveDownloadHistory` UUID 중복 방지**: `download_history` 등록 시 `video_id` 기반 중복 검사 (INSERT 불필요 시 skip) + `download status = completed`인 항목 파일 검증 필터
+
+### 검증
+- `./build_and_run.sh debug macos` ✅ (빌드 성공, 앱 실행 정상)
+- 실제 다운로드 검증: `jpgW5UBPbtQ`(빵빵사운드 PLAYLIST) 79.5%→88.4% 진행 후 `completed` 전환 확인, `.part`→`mp4`(265MB) 완성. 다음 항목(`auVCvCdK4_4`) 자동 시작 확인
+- 유령 3건(`jpgW5/auVC/Ux5s`) 재검증 → pending 전환 + 재다운로드 확인
+- 보함함 7B862 항목 표시(UI 갱신 로드) 확인
+
+## v3.8 — 홈 다운로더 로그 통합 + AI 요약 제거 + 형식 버그 수정 (macOS, T-1088~T-1092) 🚧
+
+### 변경
+- **홈(영상 다운로더) 동작 로그 → 디버그 로그 통합**: 영상 정보 조회 시 화면 하단에 렌더링되던 동작 로그 박스(`fetchLogs`, 펼치기/접기)를 제거하고, 동일 내용을 `DebugLogManager`에서 `[VideoInfo]` 카테고리로 출력. 다른 화면들은 이미 디버그 로그로 통합되어 있었는데 Home만 누락된 것을 정리
+- **Home AI 요약 제거**: 홈 영상 조회 후 "AI 요약" 버튼/팝오버 및 "Gemini API 키 필요" 알림 제거. `Summary` 관련 State(`summaryText`/`summaryProvider`/`summaryLoading`/`showSummaryPopover`/`showGeminiKeyAlert`)와 Action 7종(`requestSummary` 등)을 `HomeReducer`에서 삭제. `SummarizationService`는 보관함(Library)/AI Window/유휴 자동화에서 계속 사용하므로 **그대로 유지** (다른 곳 영향 없음)
+
+### 버그 수정
+- **`-f` 형식 문자열 이중 반복**: `DownloadManager.buildDownloadArgs`의 formatId 로직에서 `/` 또는 `+`를 포함한 formatId(예: 채널 다운로더의 `best[height<=360]/best`)가 `"\(id)/\(id)"` 분기에 걸려 `best[height<=360]/best/best[height<=360]/best`로 이중 반복되던 것 수정. 이제 `/`·`+` 포함 id는 그대로 전달. 비디오/오디오 분리는 단일 폴백 체인으로 구성
+- **진행률 파싱 오류**: `--progress-template` 출력이 `[download] 45.2%|...` 형태일 때 `Double("[download] 45.2")` 파싱 실패로 진행률이 뜨지 않던 것 → `[download]` 접두 제거 후 파싱하도록 보정
+
+### 검증
+- `./build_and_run.sh debug macos` ✅ (Build complete 10.69s, 앱 실행 정상)
+- `swift test` ✅ 76개 테스트 통과
+
+## v3.6 — 유휴 자동화 반복 처리·팝업 안정화 (macOS, T-360~T-363) 🚧
+
+### 버그 수정
+- **유휴 자동화 무한 반복(같은 영상 재작업) 해결**: `DatabaseManager.updateTranscript`가 순수 `UPDATE`라서 `video_ai_data`에 해당 `video_id` 행이 없으면 Whisper/다운로드로 생성한 자막이 저장되지 않고 휘발됨 → 매 사이클 같은 영상(cU1rgvWwSas 등)을 80초 Whisper로 반복 생성 → "총 84개"가 줄지 않는 문제. `INSERT ... ON CONFLICT(video_id) DO UPDATE`(UPSERT)로 변경해 최초 등록/갱신 모두 처리 (기존 summary/chapters는 `COALESCE`로 보존, `INSERT OR REPLACE` 사용 안 함)
+- `markSubtitleFailed`도 동일한 순수 UPDATE 버그 → UPSERT로 변경 (실패 마킹 휘발 방지)
+- **시작/중단 팝업 디바운스 120초** — 유휴가 잠깐 풀릴 때 `시작→중단→재시작` 반복 시 중복 알림 억제 (`IdleSubtitleService.logAndNotify`), ActivityLog는 항상 기록
+- **유휴 해제 유예 30초 → 60초** — whisper 중 짧은 마우스 이벤트로 인한 불필요한 중단 감소
+- 유휴 이탈 시 디버그 로그에 실제 시스템 idle 초/임계값 포함
+
+### 검증
+- `./build_and_run.sh debug macos` ✅ (빌드 성공, 앱 실행 정상)
+- **21:45 idle_activity.log 검증 완료**: Whisper 성공 영상은 AI 단계에서 `DB에서 캐시된 자막 로드 성공(14814자)` → 요약·태그 정상 완료 → 다음 영상 3개 연속 처리 (기존엔 같은 영상 무한 재작업). 시작 팝업 1회, 중단 팝업 0회. 유휴 해제가 2회 발생했으나 60초 유예 중 재유휴로 중단 없이 진행 — **반복 루프 해결 확인**
+
 ## v3.5 — 휴지통 + 사이드바 채널 전체 삭제 + 용어 정리 (macOS, T-350~T-358) 🚧
 
 ### 기능 추가

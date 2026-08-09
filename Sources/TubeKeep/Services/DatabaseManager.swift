@@ -267,9 +267,15 @@ let sql = """
     func updateTranscript(videoId: String, transcript: String, language: String, source: String? = nil, subtitlesJson: Data? = nil) {
         sync {
             let sql = """
-            UPDATE video_ai_data
-            SET transcript = ?, transcript_language = ?, subtitle_source = COALESCE(?, subtitle_source), subtitles_json = COALESCE(?, subtitles_json), updated_at = CURRENT_TIMESTAMP
-            WHERE video_id = ?;
+            INSERT INTO video_ai_data
+                (video_id, transcript, transcript_language, subtitle_source, subtitles_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(video_id) DO UPDATE SET
+                transcript = excluded.transcript,
+                transcript_language = excluded.transcript_language,
+                subtitle_source = COALESCE(excluded.subtitle_source, video_ai_data.subtitle_source),
+                subtitles_json = COALESCE(excluded.subtitles_json, video_ai_data.subtitles_json),
+                updated_at = CURRENT_TIMESTAMP;
             """
 
             guard let db = _db else { return }
@@ -281,11 +287,11 @@ let sql = """
             }
             defer { sqlite3_finalize(stmt) }
 
-            sqlite3_bind_text(stmt, 1, transcript, -1, Self.transient)
-            sqlite3_bind_text(stmt, 2, language, -1, Self.transient)
-            bindOptionalText(stmt, 3, source)
-            bindOptionalText(stmt, 4, subtitlesJson.flatMap { String(data: $0, encoding: .utf8) })
-            sqlite3_bind_text(stmt, 5, videoId, -1, Self.transient)
+            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
+            sqlite3_bind_text(stmt, 2, transcript, -1, Self.transient)
+            sqlite3_bind_text(stmt, 3, language, -1, Self.transient)
+            bindOptionalText(stmt, 4, source)
+            bindOptionalText(stmt, 5, subtitlesJson.flatMap { String(data: $0, encoding: .utf8) })
 
             if sqlite3_step(stmt) != SQLITE_DONE {
                 log("[DB] updateTranscript 실행 실패")
@@ -295,7 +301,11 @@ let sql = """
 
     func markSubtitleFailed(videoId: String) {
         sync {
-            let sql = "UPDATE video_ai_data SET subtitle_source = 'failed', updated_at = CURRENT_TIMESTAMP WHERE video_id = ?;"
+            let sql = """
+            INSERT INTO video_ai_data (video_id, subtitle_source, updated_at)
+            VALUES (?, 'failed', CURRENT_TIMESTAMP)
+            ON CONFLICT(video_id) DO UPDATE SET subtitle_source = 'failed', updated_at = CURRENT_TIMESTAMP;
+            """
             guard let db = _db else { return }
             var stmt: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
@@ -611,35 +621,83 @@ let sql = """
 
     func saveDownloadHistory(_ item: DownloadHistoryItem) {
         sync {
-            let sql = """
-            INSERT INTO download_history
-            (video_id, title, channel_name, url, format_label, resolution, file_size, file_path, status, downloaded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """
-            guard let db = _db else { return }
-            var stmt: OpaquePointer?
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                log("[DB] saveDownloadHistory prepare 실패")
-                return
-            }
-            defer { sqlite3_finalize(stmt) }
-            bindOptionalText(stmt, 1, item.videoId)
-            sqlite3_bind_text(stmt, 2, item.title, -1, Self.transient)
-            bindOptionalText(stmt, 3, item.channelName)
-            sqlite3_bind_text(stmt, 4, item.url, -1, Self.transient)
-            bindOptionalText(stmt, 5, item.formatLabel)
-            if let res = item.resolution { sqlite3_bind_int(stmt, 6, Int32(res)) }
-            else { sqlite3_bind_null(stmt, 6) }
-            if let size = item.fileSize { sqlite3_bind_int64(stmt, 7, size) }
-            else { sqlite3_bind_null(stmt, 7) }
-            bindOptionalText(stmt, 8, item.filePath)
-            sqlite3_bind_text(stmt, 9, item.status, -1, Self.transient)
-            let dateStr = ISO8601DateFormatter().string(from: item.downloadedAt)
-            sqlite3_bind_text(stmt, 10, dateStr, -1, Self.transient)
-            if sqlite3_step(stmt) != SQLITE_DONE {
-                log("[DB] saveDownloadHistory 실행 실패")
+            // 같은 video_id의 기존 기록이 있으면 UPDATE (재다운로드 시 중복 삽입 방지),
+            // 없으면 INSERT한다. 실패/재시도/재다운로드가 한 video_id에 남는 것을 방지.
+            let existingID: Int64? = {
+                let sql = "SELECT id FROM download_history WHERE video_id = ? ORDER BY id DESC LIMIT 1;"
+                guard let db = _db else { return nil }
+                var stmt: OpaquePointer?
+                guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+                defer { sqlite3_finalize(stmt) }
+                bindOptionalText(stmt, 1, item.videoId)
+                if sqlite3_step(stmt) == SQLITE_ROW {
+                    return Int64(sqlite3_column_int64(stmt, 0))
+                }
+                return nil
+            }()
+
+            if let rowID = existingID {
+                let sql = """
+                UPDATE download_history
+                SET title=?, channel_name=?, url=?, format_label=?, resolution=?, file_size=?, file_path=?, status=?, downloaded_at=?
+                WHERE id=?;
+                """
+                guard let db = _db else { return }
+                var stmt: OpaquePointer?
+                guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                    log("[DB] saveDownloadHistory UPDATE prepare 실패")
+                    return
+                }
+                defer { sqlite3_finalize(stmt) }
+                sqlite3_bind_text(stmt, 1, item.title, -1, Self.transient)
+                bindOptionalText(stmt, 2, item.channelName)
+                sqlite3_bind_text(stmt, 3, item.url, -1, Self.transient)
+                bindOptionalText(stmt, 4, item.formatLabel)
+                if let res = item.resolution { sqlite3_bind_int(stmt, 5, Int32(res)) }
+                else { sqlite3_bind_null(stmt, 5) }
+                if let size = item.fileSize { sqlite3_bind_int64(stmt, 6, size) }
+                else { sqlite3_bind_null(stmt, 6) }
+                bindOptionalText(stmt, 7, item.filePath)
+                sqlite3_bind_text(stmt, 8, item.status, -1, Self.transient)
+                let dateStr = ISO8601DateFormatter().string(from: item.downloadedAt)
+                sqlite3_bind_text(stmt, 9, dateStr, -1, Self.transient)
+                sqlite3_bind_int64(stmt, 10, rowID)
+                if sqlite3_step(stmt) != SQLITE_DONE {
+                    log("[DB] saveDownloadHistory UPDATE 실행 실패")
+                } else {
+                    log("[DB] saveDownloadHistory UPDATE 성공 — \(item.title)")
+                }
             } else {
-                log("[DB] saveDownloadHistory 성공 — \(item.title)")
+                let sql = """
+                INSERT INTO download_history
+                (video_id, title, channel_name, url, format_label, resolution, file_size, file_path, status, downloaded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """
+                guard let db = _db else { return }
+                var stmt: OpaquePointer?
+                guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                    log("[DB] saveDownloadHistory prepare 실패")
+                    return
+                }
+                defer { sqlite3_finalize(stmt) }
+                bindOptionalText(stmt, 1, item.videoId)
+                sqlite3_bind_text(stmt, 2, item.title, -1, Self.transient)
+                bindOptionalText(stmt, 3, item.channelName)
+                sqlite3_bind_text(stmt, 4, item.url, -1, Self.transient)
+                bindOptionalText(stmt, 5, item.formatLabel)
+                if let res = item.resolution { sqlite3_bind_int(stmt, 6, Int32(res)) }
+                else { sqlite3_bind_null(stmt, 6) }
+                if let size = item.fileSize { sqlite3_bind_int64(stmt, 7, size) }
+                else { sqlite3_bind_null(stmt, 7) }
+                bindOptionalText(stmt, 8, item.filePath)
+                sqlite3_bind_text(stmt, 9, item.status, -1, Self.transient)
+                let dateStr = ISO8601DateFormatter().string(from: item.downloadedAt)
+                sqlite3_bind_text(stmt, 10, dateStr, -1, Self.transient)
+                if sqlite3_step(stmt) != SQLITE_DONE {
+                    log("[DB] saveDownloadHistory 실행 실패")
+                } else {
+                    log("[DB] saveDownloadHistory 성공 — \(item.title)")
+                }
             }
         }
     }

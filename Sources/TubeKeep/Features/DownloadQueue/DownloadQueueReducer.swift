@@ -4,6 +4,43 @@ import ComposableArchitecture
 import os
 import WidgetKit
 
+enum QueueStore {
+    static var fileURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("com.borasarang.tubekeep")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("downloadQueue.json")
+    }
+
+    static func loadItems() -> [DownloadItem]? {
+        if let data = try? Data(contentsOf: fileURL),
+           let items = try? JSONDecoder().decode([DownloadItem].self, from: data) {
+            return items
+        }
+        if let data = UserDefaults.standard.data(forKey: Constants.downloadQueueKey),
+           let items = try? JSONDecoder().decode([DownloadItem].self, from: data) {
+            saveItems(items)
+            return items
+        }
+        return nil
+    }
+
+    static func saveItems(_ items: [DownloadItem]) {
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder().encode(items)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            if let data = try? JSONEncoder().encode(items) {
+                UserDefaults.standard.set(data, forKey: Constants.downloadQueueKey)
+            }
+        }
+    }
+}
+
 @Reducer
 struct DownloadQueueReducer {
     @ObservableState
@@ -14,6 +51,7 @@ struct DownloadQueueReducer {
         var storageDirectory: String = Constants.defaultStorageDirectory
         var filenameTemplate: String = Constants.defaultFilenameTemplate
         var toastMessage: ToastMessage?
+        var lastQueueSaveDate: Date?
 
         var activeCount: Int {
             items.filter { $0.status == .downloading }.count
@@ -102,9 +140,12 @@ struct DownloadQueueReducer {
             switch action {
             case .loadQueue:
                 return .run { send in
-                    guard let data = UserDefaults.standard.data(forKey: Constants.downloadQueueKey),
-                          let items = try? JSONDecoder().decode([DownloadItem].self, from: data)
-                    else { return }
+                    guard let items = QueueStore.loadItems() else {
+                        #if DEBUG
+                        DebugLogManager.shared?.append("[Download] 큐 로드 실패 (파일/UserDefaults 없음)")
+                        #endif
+                        return
+                    }
                     let resetItems = items.map { item -> DownloadItem in
                         var item = item
                         if item.status == .downloading || item.status == .paused || item.status == .retrying {
@@ -114,18 +155,117 @@ struct DownloadQueueReducer {
                         }
                         return item
                     }
+                    #if DEBUG
+                    DebugLogManager.shared?.append("[Download] 큐 로드: \(resetItems.count)개 (진행/일시중지를 대기로 리셋)")
+                    #endif
                     await send(.itemsLoaded(resetItems))
                 }
 
             case .saveQueue:
                 return .run { [items = Array(state.items)] _ in
-                    guard let data = try? JSONEncoder().encode(items) else { return }
-                    UserDefaults.standard.set(data, forKey: Constants.downloadQueueKey)
+                    QueueStore.saveItems(items)
                 }
 
             case let .itemsLoaded(items):
-                state.items = IdentifiedArray(uniqueElements: items)
-                return tryStartNextDownloads(state: &state)
+                var mapped = items
+                var completedNew: [DownloadItem] = []
+                var invalidated: [String] = []
+                for idx in mapped.indices {
+                    switch mapped[idx].status {
+                    case .pending:
+                        if let path = mapped[idx].checkExistingFile(
+                            storageDirectory: state.storageDirectory,
+                            template: state.filenameTemplate
+                        ) {
+                            mapped[idx].status = .completed
+                            mapped[idx].outputPath = path
+                            mapped[idx].progress = 1.0
+                            completedNew.append(mapped[idx])
+                            #if DEBUG
+                            DebugLogManager.shared?.append("[Download] 이미 다운로드된 파일 감지 → 완료 처리: \(mapped[idx].videoInfo.id)")
+                            #endif
+                        }
+                    case .completed:
+                        // 과거 버그(.part/.webp를 완료로 오인)로 남은 유령 완료를 재검증한다.
+                        if let path = mapped[idx].checkExistingFile(
+                            storageDirectory: state.storageDirectory,
+                            template: state.filenameTemplate
+                        ) {
+                            mapped[idx].outputPath = path
+                            completedNew.append(mapped[idx])
+                        } else {
+                            invalidated.append(mapped[idx].videoInfo.id)
+                            mapped[idx].status = .pending
+                            mapped[idx].outputPath = nil
+                            mapped[idx].progress = 0
+                            mapped[idx].downloadSpeed = ""
+                            #if DEBUG
+                            DebugLogManager.shared?.append("[Download] 유령 완료 재검증 → 대기로 되돌림: \(mapped[idx].videoInfo.id)")
+                            #endif
+                        }
+                    default:
+                        break
+                    }
+                }
+                state.items = IdentifiedArray(uniqueElements: mapped)
+                var effects: [Effect<Action>] = [tryStartNextDownloads(state: &state), .send(.saveQueue)]
+                // 유령 완료(실미디어 없음)로 되돌린 항목은 히스토리의 잘못된 completed 기록도 정리한다.
+                if !invalidated.isEmpty {
+                    effects.append(.run { _ in
+                        for videoId in invalidated {
+                            let history = DatabaseManager.shared.loadDownloadHistory()
+                            if let rec = history.first(where: { $0.videoId == videoId && $0.status == "completed" }) {
+                                DatabaseManager.shared.deleteDownloadHistory(id: rec.id)
+                                DebugLogManager.shared?.append("[Download] 히스토리 유령 완료 제거: \(videoId)")
+                            }
+                        }
+                        NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                    })
+                }
+                // 이전 크래시/강제 종료로 완료 처리됐지만 보관함·히스토리에 누락된 항목을 보정 등록한다.
+                for item in completedNew {
+                    effects.append(.run { send in
+                        let videoId = item.videoInfo.id
+                        guard let outputPath = item.outputPath else { return }
+                        let alreadyInHistory = DatabaseManager.shared.loadDownloadHistory()
+                            .contains { $0.videoId == videoId }
+                        if !alreadyInHistory {
+                            let hi = DownloadHistoryItem(
+                                id: 0,
+                                videoId: videoId,
+                                title: item.videoInfo.title,
+                                channelName: item.videoInfo.channel,
+                                url: item.videoInfo.webpageURL,
+                                formatLabel: item.selectedFormat.label,
+                                resolution: item.selectedFormat.height,
+                                fileSize: (try? FileManager.default.attributesOfItem(atPath: outputPath)[.size] as? Int64) ?? nil,
+                                filePath: outputPath,
+                                downloadedAt: Date(),
+                                status: "completed"
+                            )
+                            DatabaseManager.shared.saveDownloadHistory(hi)
+                            NotificationCenter.default.post(name: Constants.downloadHistoryDidChangeNotification, object: nil)
+                        }
+                        ChannelDownloadCache.addDownloadedID(channelName: item.videoInfo.channel, videoId: videoId)
+                        await MainActor.run {
+                            guard LibraryCacheService.shared.findItem(id: videoId) == nil else { return }
+                            let li = LibraryItem(
+                                id: videoId,
+                                title: item.videoInfo.title,
+                                channelId: item.videoInfo.channelId,
+                                channelName: item.videoInfo.channel,
+                                thumbnailURL: item.videoInfo.thumbnailURL,
+                                filePath: outputPath,
+                                downloadDate: Date(),
+                                uploadDate: LibraryItem.parseUploadDate(item.videoInfo.uploadDate),
+                                duration: item.videoInfo.duration > 0 ? Int(item.videoInfo.duration) : nil,
+                                channelUploadIndex: item.channelUploadIndex > 0 ? item.channelUploadIndex : nil
+                            )
+                            LibraryCacheService.shared.addItem(li)
+                        }
+                    })
+                }
+                return .merge(effects)
 
             case let .setItems(items):
                 state.items = IdentifiedArray(uniqueElements: items)
@@ -193,29 +333,38 @@ struct DownloadQueueReducer {
                 state.items[id: id]?.status = .downloading
                 state.items[id: id]?.downloadStartTime = Date()
                 let downloadItem = item
-                return .run { send in
-                    let settings: Settings = Settings.loadSettings()
-                    DownloadManager.shared.updateSettings(settings)
-                    #if DEBUG
-                    await send(.debugLog("▶️ 시작: \(item.videoInfo.title)"))
-                    #endif
-                    var logHandler: (@Sendable (UUID, String) -> Void)?
-                    #if DEBUG
-                    logHandler = { id, message in
-                        Task { await send(.debugLog(message)) }
+                return .merge(
+                    .send(.saveQueue),
+                    .run { send in
+                        let settings: Settings = Settings.loadSettings()
+                        DownloadManager.shared.updateSettings(settings)
+                        #if DEBUG
+                        await send(.debugLog("▶️ 시작: \(item.videoInfo.title)"))
+                        #endif
+                        let stream = AsyncStream<Action> { continuation in
+                            var logHandler: (@Sendable (UUID, String) -> Void)?
+                            #if DEBUG
+                            logHandler = { id, message in
+                                continuation.yield(.debugLog(message))
+                            }
+                            #endif
+                            DownloadManager.shared.startDownload(
+                                item: downloadItem,
+                                progressHandler: { id, progress, speed in
+                                    continuation.yield(.updateProgress(id, progress, speed))
+                                },
+                                completionHandler: { id, success, outputPath, error in
+                                    continuation.yield(.downloadCompleted(id, success, outputPath, error))
+                                    continuation.finish()
+                                },
+                                logHandler: logHandler
+                            )
+                        }
+                        for await action in stream {
+                            await send(action)
+                        }
                     }
-                    #endif
-                    DownloadManager.shared.startDownload(
-                        item: downloadItem,
-                        progressHandler: { id, progress, speed in
-                            Task { await send(.updateProgress(id, progress, speed)) }
-                        },
-                        completionHandler: { id, success, outputPath, error in
-                            Task { await send(.downloadCompleted(id, success, outputPath, error)) }
-                        },
-                        logHandler: logHandler
-                    )
-                }
+                )
 
             case let .updateUploadIndex(id, index):
                 state.items[id: id]?.channelUploadIndex = index
@@ -226,7 +375,7 @@ struct DownloadQueueReducer {
                 else { return .none }
                 state.items[id: id]?.status = .paused
                 state.items[id: id]?.downloadStartTime = nil
-                return tryStartNextDownloads(state: &state)
+                return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .resumeDownload(id):
                 guard state.items[id: id]?.status == .paused
@@ -234,7 +383,7 @@ struct DownloadQueueReducer {
                 state.items[id: id]?.status = .pending
                 state.items[id: id]?.downloadStartTime = nil
                 state.items[id: id]?.retryCount = 0
-                return tryStartNextDownloads(state: &state)
+                return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .retryDownload(id):
                 guard state.items[id: id]?.status == .failed || state.items[id: id]?.status == .retrying
@@ -243,19 +392,25 @@ struct DownloadQueueReducer {
                 state.items[id: id]?.progress = 0
                 state.items[id: id]?.errorMessage = nil
                 state.items[id: id]?.retryCount = 0
-                return tryStartNextDownloads(state: &state)
+                return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .retryAttempt(id):
                 guard state.items[id: id]?.status == .retrying else { return .none }
                 state.items[id: id]?.status = .pending
                 state.items[id: id]?.downloadStartTime = nil
-                return tryStartNextDownloads(state: &state)
+                state.items[id: id]?.retryCount = 0
+                return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .updateProgress(id, progress, speed):
                 state.items[id: id]?.progress = progress
                 state.items[id: id]?.downloadSpeed = speed
                 state.saveWidgetSnapshot()
-                return .none
+                if let last = state.lastQueueSaveDate,
+                   Date().timeIntervalSince(last) < 15 {
+                    return .none
+                }
+                state.lastQueueSaveDate = Date()
+                return .send(.saveQueue)
 
             case let .downloadCompleted(id, success, outputPath, error):
                 if success {
@@ -499,6 +654,13 @@ private func cleanupTempFiles(for item: DownloadItem, storageDirectory: String) 
     let fm = FileManager.default
 
     guard let files = try? fm.contentsOfDirectory(atPath: channelDir) else { return }
+    // 살아있는 실제 미디어 파일이 있어야만 그 videoId의 temp(.part/.webp 등)를 정리한다.
+    // 미디어가 없으면 강제 종료로 남은 .part를 보존해 재시작 시 재개할 수 있게 한다.
+    let hasMedia = files.contains {
+        let path = "\(channelDir)/\($0)"
+        return DownloadItem.isRealMediaFile(at: path)
+    }
+    guard hasMedia else { return }
     for file in files {
         let path = "\(channelDir)/\(file)"
         guard file.contains(videoId) else { continue }

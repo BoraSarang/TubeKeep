@@ -10,6 +10,8 @@ enum DownloadStatus: String, Equatable, Codable {
 }
 
 struct DownloadItem: Identifiable, Equatable, Codable {
+    static let mediaFileExtensions: Set<String> = ["mp4", "m4a", "mkv", "webm", "mp3", "aac"]
+
     let id: UUID
     let videoInfo: VideoInfo
     let selectedFormat: Format
@@ -92,17 +94,53 @@ struct DownloadItem: Identifiable, Equatable, Codable {
         let channelDir = "\(storageDirectory)/\(folder)"
         if isChannelDownload {
             let downloaded = ChannelDownloadCache.loadDownloadedIDs(channelName: videoInfo.channel)
-            guard downloaded.contains(videoInfo.id) else { return nil }
-            return "\(channelDir)/\(String(format: "%03d", channelUploadIndex)) - \(videoInfo.title).\(videoInfo.id).mp4"
+            if downloaded.contains(videoInfo.id) {
+                // 캐시에 있다고 해서 무조건 완료로 치지 않는다.
+                // 실제 미디어 파일이 존재해야만 완료 처리한다 (유령 완료 방지).
+                if let path = Self.isRealMediaPath(
+                    at: "\(channelDir)/\(String(format: "%03d", channelUploadIndex)) - \(videoInfo.title).\(videoInfo.id).mp4"
+                ) {
+                    return path
+                }
+            }
+            // 캐시에 없어도 실제 미디어 파일이 존재하면 완료 처리한다 (재다운로드 방지).
+            // .part/.webp 등 임시·썸네일은 제외.
+            guard let files = try? FileManager.default.contentsOfDirectory(atPath: channelDir) else { return nil }
+            for file in files where file.contains(videoInfo.id) {
+                let path = "\(channelDir)/\(file)"
+                if let mediaPath = Self.isRealMediaPath(at: path) { return mediaPath }
+            }
+            return nil
         }
         let name = formatFilename(template: template)
         let base = (name as NSString).deletingPathExtension
         let extensions: [String] = audioOnly ? ["m4a", "mp3", "aac"] : ["mp4", "m4a", "mkv", "webm"]
         for ext in extensions {
             let path = "\(channelDir)/\(base).\(ext)"
-            if FileManager.default.fileExists(atPath: path) { return path }
+            if let mediaPath = Self.isRealMediaPath(at: path) { return mediaPath }
+        }
+        // ID 기반 폴백: 제목이 변경되어도 videoId가 포함된 실제 미디어 파일을 찾는다.
+        guard let files = try? FileManager.default.contentsOfDirectory(atPath: channelDir) else { return nil }
+        for file in files where file.contains(videoInfo.id) {
+            let path = "\(channelDir)/\(file)"
+            if let mediaPath = Self.isRealMediaPath(at: path) { return mediaPath }
         }
         return nil
+    }
+
+    /// 실제 미디어 파일(크기>0, 확장자 유효)이면 path를, 아니면 nil을 반환한다.
+    static func isRealMediaPath(at path: String) -> String? {
+        guard Self.isRealMediaFile(at: path) else { return nil }
+        return path
+    }
+
+    static func isRealMediaFile(at path: String) -> Bool {
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? Int64, size > 0
+        else { return false }
+        let ext = (path as NSString).pathExtension.lowercased()
+        return Self.mediaFileExtensions.contains(ext)
     }
 
     func formatFilename(template: String) -> String {
