@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install whisper-cpp mpv jq || true
+
+      - name: Build (debug)
+        run: |
+          SWIFT_VERSION=$(swift --version | head -1)
+          echo "🔨 $SWIFT_VERSION"
+          swift build -c debug
+
+      - name: Run tests
+        run: swift test
+
+      - name: Pack (a11y dump smoke)
+        run: |
+          ls -la .build/debug/TubeKeep

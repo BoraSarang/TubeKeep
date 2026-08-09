@@ -1,27 +1,42 @@
 name: Release macOS App
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 2.7.8)'
+        description: 'Release version (e.g., 3.9.0)'
         required: true
 
+permissions:
+  contents: write
+
 concurrency:
-  group: release-${{ inputs.version }}
+  group: release-${{ github.ref_name || inputs.version }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: macos-latest
-    permissions:
-      contents: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Determine version
+        id: version
+        run: |
+          if [[ -n "${{ github.ref_name }}" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "🔖 Release target: v$VERSION"
+
       - name: Install dependencies
-        run: brew install whisper-cpp
+        run: |
+          brew install whisper-cpp mpv || true
 
       - name: Build release bundle
         run: |
@@ -29,27 +44,44 @@ jobs:
           echo "🔨 $SWIFT_VERSION"
           CI=true ./scripts/build-macos.sh release
 
-      - name: Compress .app
+      - name: Create DMG
         run: |
-          VERSION="${{ inputs.version }}"
-          cd "$HOME/Applications"
-          zip -r "TubeKeep-$VERSION.zip" TubeKeep.app
-          echo "📦 $(pwd)/TubeKeep-$VERSION.zip ($(du -h "TubeKeep-$VERSION.zip" | cut -f1))"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ./scripts/create_dmg.sh || echo "⚠️ DMG 스크립트 실패 — zip 폴백 사용"
+
+      - name: Package .app (zip fallback)
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p Build
+          if ls Build/TubeKeep-*.dmg >/dev/null 2>&1; then
+            echo "dmg found"
+          else
+            cd /tmp/TubeKeep-build
+            zip -r "$GITHUB_WORKSPACE/Build/TubeKeep-$VERSION.zip" TubeKeep.app
+            echo "📦 zip 폴백: TubeKeep-$VERSION.zip"
+          fi
 
       - name: Create GitHub Release
-        run: |
-          VERSION="${{ inputs.version }}"
-          ASSET="$HOME/Applications/TubeKeep-$VERSION.zip"
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes \
-            "$ASSET"
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ARTIFACTS=""
+          if ls Build/TubeKeep-*.dmg >/dev/null 2>&1; then
+            ARTIFACTS="$(ls Build/TubeKeep-*.dmg | head -1)"
+          elif ls Build/TubeKeep-*.zip >/dev/null 2>&1; then
+            ARTIFACTS="$(ls Build/TubeKeep-*.zip | head -1)"
+          fi
+          if [[ -z "$ARTIFACTS" ]]; then
+            echo "❌ 아티팩트 없음"; exit 1
+          fi
+          gh release create "v$VERSION" "$ARTIFACTS" \
+            --title "v$VERSION" \
+            --generate-notes
 
       - name: Upload artifact (fallback)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: TubeKeep-${{ inputs.version }}
-          path: ${{ env.HOME }}/Applications/TubeKeep.app
+          name: TubeKeep-${{ steps.version.outputs.VERSION }}
+          path: /tmp/TubeKeep-build/TubeKeep.app
