@@ -62,7 +62,7 @@ swift test
 - **언어/UI**: Swift · SwiftUI · TCA(Composable Architecture)
 - **다운로드**: yt-dlp + ffmpeg(임베디드)
 - **플레이어**: libmpv 임베디드 (H.264 최적화)
-- **AI**: OpenRouter/AX4 · Gemini · Whisper (로컬)
+- **AI**: Gemini · OpenRouter · yTeaser 폴백 체인 · Whisper (로컬)
 
 ---
 
