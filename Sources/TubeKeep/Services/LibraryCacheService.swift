@@ -316,7 +316,7 @@ final class LibraryCacheService {
 
     // MARK: - Channel Names
 
-    func channelNames(from items: [LibraryItem]) -> [(id: String, name: String, count: Int)] {
+    func channelNames(from items: [LibraryItem]) -> [(id: String, name: String, count: Int, avatarURL: String)] {
         var dict: [String: (name: String, count: Int)] = [:]
         for item in items {
             if var existing = dict[item.channelId] {
@@ -326,8 +326,59 @@ final class LibraryCacheService {
                 dict[item.channelId] = (item.channelName, 1)
             }
         }
-        return dict.map { (id: $0.key, name: $0.value.name, count: $0.value.count) }
+
+        // 채널명 토큰 기반 병합 — 동일 채널이 실제 ID/핸들 형식으로 중복 저장된 경우를 하나로 합침
+        let entries = dict.map { (id: $0.key, name: $0.value.name, count: $0.value.count) }
+        var merged: [ChannelNameEntry] = []
+        for entry in entries {
+            if let idx = merged.firstIndex(where: { nameTokensMatch($0.name, entry.name) }) {
+                // 실제 UC ID(24자)가 있으면 그것을 우선 키로 사용
+                merged[idx].id = (entry.id.hasPrefix("UC") && entry.id.count == 24) ? entry.id : merged[idx].id
+                merged[idx].name = entry.name
+                merged[idx].count += entry.count
+            } else {
+                merged.append(ChannelNameEntry(id: entry.id, name: entry.name, count: entry.count))
+            }
+        }
+
+        let avatarURLs = Dictionary(uniqueKeysWithValues: SubscribedChannel.loadAll().map { ($0.id, $0.avatarURL) })
+        return merged.map { (id: $0.id, name: $0.name, count: $0.count, avatarURL: avatarURLs[$0.id] ?? "") }
             .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+    }
+
+    private struct ChannelNameEntry {
+        var id: String
+        var name: String
+        var count: Int
+    }
+
+    /// 두 채널 이름의 유효 토큰(한글/영문 단어) 공통 여부 확인 — 공통 토큰 2개 이상이거나 이름 동일 시 매칭
+    nonisolated static func nameTokensMatch(_ a: String, _ b: String) -> Bool {
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        if a == b { return true }
+        let tokensA = Set(nameTokens(a))
+        let tokensB = Set(nameTokens(b))
+        guard tokensA.count >= 2, tokensB.count >= 2 else {
+            return false
+        }
+        return tokensA.intersection(tokensB).count >= 2
+    }
+
+    /// 두 채널 이름의 유효 토큰(한글/영문 단어) 공통 여부 확인 — 공통 토큰 2개 이상이거나 이름 동일 시 매칭
+    func nameTokensMatch(_ a: String, _ b: String) -> Bool {
+        Self.nameTokensMatch(a, b)
+    }
+
+    private nonisolated static func nameTokens(_ name: String) -> [String] {
+        var tokens: Set<String> = []
+        let regex = try? NSRegularExpression(pattern: "[\\p{L}\\p{N}]{2,}")
+        if let regex {
+            let ns = name as NSString
+            for match in regex.matches(in: name, range: NSRange(location: 0, length: ns.length)) {
+                tokens.insert(ns.substring(with: match.range).lowercased())
+            }
+        }
+        return Array(tokens)
     }
 
     // MARK: - Thumbnail Cache

@@ -388,8 +388,10 @@ struct ChannelDownloaderView: View {
             do {
                 let service = ChannelFetchService()
                 let url: String
-                if let handle = channel.handle {
+                if let handle = channel.handle, !handle.isEmpty {
                     url = "https://www.youtube.com/\(handle)"
+                } else if channel.id.hasPrefix("UC"), channel.id.count == 24 {
+                    url = "https://www.youtube.com/channel/\(channel.id)"
                 } else {
                     url = "https://www.youtube.com/channel/\(channel.id)"
                 }
@@ -412,6 +414,22 @@ struct ChannelDownloaderView: View {
                         SubscribedChannel.saveAll(channels)
                     }
                     DebugLogManager.shared?.append("[Channel] ✅ 채널 정보 갱신 완료: \(updated.name)")
+                }
+                if !updated.avatarURL.isEmpty,
+                   let avatarURL = URL(string: updated.avatarURL),
+                   let (data, _) = try? await URLSession.shared.data(from: avatarURL),
+                   let img = NSImage(data: data) {
+                    LibraryCacheService.shared.cacheAvatar(for: updated.id, data: data)
+                    await MainActor.run {
+                        DebugLogManager.shared?.append("[Channel] 🖼️ 아바타 캐시 갱신 완료 (\(img.size.width)x\(img.size.height))")
+                    }
+                }
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: Constants.channelInfoDidUpdateNotification,
+                        object: nil,
+                        userInfo: ["channelId": updated.id]
+                    )
                 }
             } catch {
                 await MainActor.run {

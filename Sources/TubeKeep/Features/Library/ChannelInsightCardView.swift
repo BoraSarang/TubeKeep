@@ -53,6 +53,9 @@ struct ChannelInsightCardView: View {
                 .fill(Color.primary.opacity(0.04))
         )
         .onAppear { load() }
+        .onChange(of: items.map(\.id)) { _, _ in
+            load()
+        }
     }
 
     // MARK: - Stats
@@ -180,6 +183,10 @@ struct ChannelInsightCardView: View {
             if let cached = service.cachedSummary(channelId: channelId) {
                 summary = cached
             }
+        } else {
+            // 영상 수가 기준 미달로 줄어들면 기존 요약 제거
+            summary = nil
+            summaryError = nil
         }
     }
 

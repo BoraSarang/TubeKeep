@@ -194,20 +194,10 @@ struct ChannelContentView: View {
     private func channelHeader(_ channel: SubscribedChannel) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                if !channel.avatarURL.isEmpty {
-                    CachedAvatarView(channelId: channel.id, url: channel.avatarURL, size: 60)
-                        .clipShape(Circle())
-                        .onTapGesture { openChannel(channel) }
-                        .help("YouTube 채널 열기")
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-                        .foregroundStyle(.secondary)
-                        .onTapGesture { openChannel(channel) }
-                        .help("YouTube 채널 열기")
-                }
+                CachedAvatarView(channelId: channel.id, url: channel.avatarURL, size: 60)
+                    .clipShape(Circle())
+                    .onTapGesture { openChannel(channel) }
+                    .help("YouTube 채널 열기")
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {

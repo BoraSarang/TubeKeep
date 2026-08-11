@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## v3.10 — 채널 아바타 동기화 (macOS, T-1099~T-1102) ✅
+
+### 버그 수정
+- **보관함 사이드바 아바타 미갱신**: 채널 정보 갱신 시 콘텐츠 헤더 아바타만 갱신되고 사이드바는 그대로 남던 문제 — `CachedAvatarView`에 `.onChange(of: url)` + `channelInfoDidUpdateNotification` 구독을 추가해 모든 화면 자동 재로드
+- **채널 다운로더 아바타 미갱신**: `ChannelDownloaderView.refreshChannelInfo`가 avatarURL만 저장하고 이미지 캐시·통지 발행을 하지 않던 문제 — 아바타 다운로드→`cacheAvatar`→통지 발행 추가
+- **빈 아바타(사이드바/채널 목록)**: avatarURL이 빈 채널(예: `fetchAvatarURL` 실패로 `""` 저장)이 디스크 캐시(`avatar_<channelId>.jpg`)에 이미 이미지가 있어도 안 나오던 문제 — `loadAvatar`가 캐시를 url 검사보다 **먼저** 조회하도록 수정. url과 무관하게 channelId 키 공유 캐시가 있으면 표시
+- **양방향 동기화**: 어느 화면에서든 갱신하면 `channelInfoDidUpdateNotification` 하나로 사이드바/콘텐츠 헤더/채널 목록이 함께 갱신
+
+### 파일
+- `Sources/TubeKeep/Views/CachedImageViews.swift`
+- `Sources/TubeKeep/Features/Channel/ChannelDownloaderView.swift`
+- `Sources/TubeKeep/Features/Channel/ChannelContentView.swift`
+- `Sources/TubeKeep/Features/Channel/ChannelListView.swift`
+
+### 검증
+- `./build_and_run.sh debug macos` ✅
+- 실측: `~/Library/Caches/com.tubekeep/avatar_*.jpg` 38개 존재, 지무비(`UCaHGOzOyeYzLQeKsVkfLEGA`, avatarURL 비어있음)도 캐시 파일 존재
+
+---
+
 ## v3.9 — 다운로드 유령 완료 방지 + 재개/임시물 보존 + 보관함·히스토리 누락 보정 (macOS, T-1093~T-1098) 🚧
 
 ### 버그 수정

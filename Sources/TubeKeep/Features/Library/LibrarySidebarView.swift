@@ -3,8 +3,7 @@ import ComposableArchitecture
 
 struct LibrarySidebarView: View {
     let store: StoreOf<AppReducer>
-    @State private var channelNames: [(id: String, name: String, count: Int)] = []
-    @State private var avatarImages: [String: NSImage] = [:]
+    @State private var channelNames: [(id: String, name: String, count: Int, avatarURL: String)] = []
     @State private var draggedChannelId: String?
     @State private var dropTargetIndex: Int?
     @AppStorage(Constants.channelOrderKey) private var channelOrderData: Data = Data()
@@ -140,8 +139,7 @@ struct LibrarySidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: Constants.channelInfoDidUpdateNotification)) { note in
             if let channelId = note.userInfo?["channelId"] as? String {
                 LibraryCacheService.shared.clearAvatarCache(for: channelId)
-                avatarImages.removeValue(forKey: channelId)
-                loadAvatar(channelId: channelId)
+                updateAvatarURLs()
             }
         }
         .onAppear {
@@ -687,7 +685,7 @@ struct LibrarySidebarView: View {
         SectionHeader(title: "채널")
     }
 
-    private func channelRow(_ channel: (id: String, name: String, count: Int), index: Int) -> some View {
+    private func channelRow(_ channel: (id: String, name: String, count: Int, avatarURL: String), index: Int) -> some View {
         let isSelected = store.library.filterMode == .all && store.library.selectedChannel == channel.id
         let isDropTarget = dropTargetIndex == index
         return HStack(spacing: 6) {
@@ -696,8 +694,7 @@ struct LibrarySidebarView: View {
                 .foregroundStyle(.tertiary)
                 .help("드래그하여 순서 변경")
 
-            avatarView(for: channel.id)
-                .frame(width: 20, height: 20)
+            CachedAvatarView(channelId: channel.id, url: channel.avatarURL, size: 20)
 
             Text(channel.name)
                 .font(.system(size: 12))
@@ -765,44 +762,12 @@ struct LibrarySidebarView: View {
         NSWorkspace.shared.open(url)
     }
 
-    // MARK: - Avatar
-
-    private func avatarView(for channelId: String) -> some View {
-        Group {
-            if let img = avatarImages[channelId] {
-                Image(nsImage: img)
-                    .resizable()
-                    .clipShape(Circle())
-            } else {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .foregroundStyle(.secondary)
-                    .onAppear {
-                        loadAvatar(channelId: channelId)
-                    }
-            }
-        }
-        .frame(width: 20, height: 20)
-    }
-
-    private func loadAvatar(channelId: String) {
-        guard avatarImages[channelId] == nil else { return }
-        let service = LibraryCacheService.shared
-        Task {
-            if let cached = service.cachedAvatar(for: channelId) {
-                await MainActor.run { avatarImages[channelId] = cached }
-                return
-            }
-            await MainActor.run { avatarImages[channelId] = service.placeholderAvatar() }
-        }
-    }
-
 // MARK: - Drop Delegate
 
 private struct ChannelDropDelegate: DropDelegate {
-    let channel: (id: String, name: String, count: Int)
+    let channel: (id: String, name: String, count: Int, avatarURL: String)
     let currentIndex: Int
-    @Binding var channelNames: [(id: String, name: String, count: Int)]
+    @Binding var channelNames: [(id: String, name: String, count: Int, avatarURL: String)]
     @Binding var draggedChannelId: String?
     @Binding var dropTargetIndex: Int?
     let onMove: (Int, Int) -> Void
@@ -888,6 +853,13 @@ private struct CategoryDropDelegate: DropDelegate {
                     return ai < bi
                 }
             }
+        }
+    }
+
+    private func updateAvatarURLs() {
+        let avatarURLs = Dictionary(uniqueKeysWithValues: SubscribedChannel.loadAll().map { ($0.id, $0.avatarURL) })
+        channelNames = channelNames.map {
+            (id: $0.id, name: $0.name, count: $0.count, avatarURL: avatarURLs[$0.id] ?? $0.avatarURL)
         }
     }
 

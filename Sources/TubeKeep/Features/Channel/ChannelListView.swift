@@ -302,33 +302,18 @@ private struct ChannelRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if !channel.avatarURL.isEmpty {
-                CachedAvatarView(channelId: channel.id, url: channel.avatarURL, size: 28)
-                    .clipShape(Circle())
-                    .overlay(
-                        hasNewVideos
-                            ? Circle()
-                                .fill(Color.red)
-                                .frame(width: 10, height: 10)
-                                .offset(x: 10, y: -10)
-                            : nil,
-                        alignment: .topTrailing
-                    )
-            } else {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .frame(width: 28, height: 28)
-                    .foregroundStyle(.secondary)
-                    .overlay(
-                        hasNewVideos
-                            ? Circle()
-                                .fill(Color.red)
-                                .frame(width: 10, height: 10)
-                                .offset(x: 10, y: -10)
-                            : nil,
-                        alignment: .topTrailing
-                    )
-            }
+            CachedAvatarView(channelId: channel.id, url: channel.avatarURL, size: 28)
+                .clipShape(Circle())
+                .overlay(
+                    hasNewVideos
+                        ? Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 10, y: -10)
+                        : nil,
+                    alignment: .topTrailing
+                )
+                .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(channel.name)

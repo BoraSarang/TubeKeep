@@ -105,7 +105,13 @@ struct LibraryReducer {
             }
 
             if let channelId = selectedChannel {
-                result = result.filter { $0.channelId == channelId }
+                // 같은 채널이 실제 ID/핸들 형식으로 중복 저장된 경우 이름 토큰으로도 포함
+                let selectedName = items.first(where: { $0.channelId == channelId })?.channelName
+                result = result.filter { item in
+                    if item.channelId == channelId { return true }
+                    guard let name = selectedName else { return false }
+                    return LibraryCacheService.nameTokensMatch(item.channelName, name)
+                }
             }
 
             if let category = selectedCategory {

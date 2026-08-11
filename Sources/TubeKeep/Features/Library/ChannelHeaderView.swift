@@ -95,7 +95,16 @@ struct ChannelHeaderView: View {
                 .padding(.bottom, 12)
         }
         .id(channelId)
-        .onAppear { loadChannelInfo() }
+        .onAppear {
+            errorMessage = nil
+            loadChannelInfo()
+        }
+        .onChange(of: channelId) { _, _ in
+            errorMessage = nil
+            avatar = nil
+            isRefreshing = false
+            loadChannelInfo()
+        }
     }
 
     // MARK: - Avatar
@@ -179,37 +188,111 @@ struct ChannelHeaderView: View {
     // MARK: - Data
 
     private func loadChannelInfo() {
+        avatar = nil
         let chs = SubscribedChannel.loadAll()
         channel = chs.first(where: { $0.id == channelId })
 
-        if let url = channel?.avatarURL, !url.isEmpty {
-            if let cached = LibraryCacheService.shared.cachedAvatar(for: channelId) {
-                avatar = cached
-            } else {
-                Task {
-                    if let data = await LibraryCacheService.shared.loadAvatar(from: url, channelId: channelId),
-                       let img = NSImage(data: data) {
-                        await MainActor.run { avatar = img }
-                    }
-                }
+        // 캐시는 channelId 키로 공유 → url과 무관하게 우선 조회
+        if let cached = LibraryCacheService.shared.cachedAvatar(for: channelId) {
+            avatar = cached
+            DebugLogManager.shared?.append("[Channel] 📦 헤더 아바타 캐시 사용: \(channelId)")
+            return
+        }
+
+        guard let url = channel?.avatarURL, !url.isEmpty else { return }
+        DebugLogManager.shared?.append("[Channel] 🌐 헤더 아바타 다운로드 시작: \(channelId)")
+        Task {
+            if let data = await LibraryCacheService.shared.loadAvatar(from: url, channelId: channelId),
+               let img = NSImage(data: data) {
+                await MainActor.run { avatar = img }
+                DebugLogManager.shared?.append("[Channel] 🖼️ 헤더 아바타 다운로드 완료: \(channelId)")
             }
         }
+    }
+
+    private func channelInfoURL() async throws -> String {
+        // 1) 현재 채널 or DB에서 channelId로 찾아 handle 사용 — 핸들 형식(UC_..) 채널은 실제 채널로 교정
+        let ch = channel ?? SubscribedChannel.loadAll().first(where: { $0.id == channelId })
+        if let handle = ch?.handle, !handle.isEmpty {
+            return "https://www.youtube.com/\(handle)"
+        }
+
+        // 2) 같은 이름/토큰의 보관함 아이템에서 실제 UC 채널 ID(24자) 탐색 — 잘못 저장된 핸들 형식 교정
+        if let realId = items.first(where: {
+            $0.channelName != channelName
+                && $0.channelId.hasPrefix("UC")
+                && $0.channelId.count == 24
+                && $0.channelId != channelId
+                && nameTokensMatch($0.channelName, channelName)
+        })?.channelId ?? items.first(where: {
+            $0.channelName == channelName
+                && $0.channelId.hasPrefix("UC")
+                && $0.channelId.count == 24
+                && $0.channelId != channelId
+        })?.channelId {
+            return "https://www.youtube.com/channel/\(realId)"
+        }
+
+        // 3) 구독 채널 목록에서 이름/토큰 기반으로 handle/실제 ID 탐색
+        if let match = SubscribedChannel.loadAll().first(where: {
+            nameTokensMatch($0.name, channelName)
+        }) {
+            if let handle = match.handle, !handle.isEmpty {
+                return "https://www.youtube.com/\(handle)"
+            }
+            if match.id.hasPrefix("UC"), match.id.count == 24 {
+                return "https://www.youtube.com/channel/\(match.id)"
+            }
+        }
+
+        // 4) 실제 채널 ID(UC로 시작 + 22자)만 channel/ 경로로 구성
+        if channelId.hasPrefix("UC"), channelId.count == 24 {
+            return "https://www.youtube.com/channel/\(channelId)"
+        }
+        if channelId.hasPrefix("@") {
+            return "https://www.youtube.com/\(channelId)/videos"
+        }
+        // 5) 핸들/이름 기반 폴백
+        if let encoded = channelName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            return "https://www.youtube.com/@\(encoded)/videos"
+        }
+        return "https://www.youtube.com/@\(channelName)/videos"
+    }
+
+    /// 두 채널 이름의 유효 토큰(한글/영문 단어) 공통 여부 확인 — "지무비 G Movie" vs "지무비 : G Movie" 매칭
+    private func nameTokensMatch(_ a: String, _ b: String) -> Bool {
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        if a == b { return true }
+        let tokensA = Set(nameTokens(a))
+        let tokensB = Set(nameTokens(b))
+        guard tokensA.count >= 2, tokensB.count >= 2 else {
+            return false
+        }
+        return tokensA.intersection(tokensB).count >= 2
+    }
+
+    private func nameTokens(_ name: String) -> [String] {
+        var tokens: Set<String> = []
+        // 한글/알파벳/숫자 덩어리로 분리
+        let regex = try? NSRegularExpression(pattern: "[\\p{L}\\p{N}]{2,}")
+        if let regex {
+            let ns = name as NSString
+            for match in regex.matches(in: name, range: NSRange(location: 0, length: ns.length)) {
+                let token = ns.substring(with: match.range)
+                tokens.insert(token.lowercased())
+            }
+        }
+        return Array(tokens)
     }
 
     private func refreshChannelInfo() {
         isRefreshing = true
         errorMessage = nil
+        DebugLogManager.shared?.append("[Channel] ▶️ 채널 정보 갱신 시작: \(channelName) (\(channelId))")
         Task {
             do {
                 let service = ChannelFetchService()
-                let url: String
-                if channelId.hasPrefix("UC") {
-                    url = "https://www.youtube.com/channel/\(channelId)"
-                } else if channelId.hasPrefix("@") {
-                    url = "https://www.youtube.com/\(channelId)/videos"
-                } else {
-                    url = "https://www.youtube.com/@\(channelName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channelName)/videos"
-                }
+                let url = try await channelInfoURL()
                 let fetched = try await service.fetchChannelInfo(from: url)
 
                 var allChannels = SubscribedChannel.loadAll()
@@ -229,10 +312,12 @@ struct ChannelHeaderView: View {
                                let img = NSImage(data: data) {
                                 LibraryCacheService.shared.cacheAvatar(for: channelId, data: data)
                                 await MainActor.run { avatar = img }
+                                DebugLogManager.shared?.append("[Channel] 🖼️ 아바타 캐시 갱신 완료 (\(img.size.width)x\(img.size.height))")
                             }
                         }
                     }
                     isRefreshing = false
+                    DebugLogManager.shared?.append("[Channel] ✅ 채널 정보 갱신 완료: \(fetched.name) (구독자 \(fetched.subscriberCount ?? 0), 영상 \(fetched.videoCount)개)")
                 }
 
                 await MainActor.run {
@@ -242,6 +327,7 @@ struct ChannelHeaderView: View {
                 await MainActor.run {
                     errorMessage = "갱신 실패"
                     isRefreshing = false
+                    DebugLogManager.shared?.append("[Channel] ❌ 채널 정보 갱신 실패: \(error.localizedDescription) (channelId=\(channelId))")
                 }
             }
         }

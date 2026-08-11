@@ -1,5 +1,16 @@
 # TODO — 작업 추적 목록
 
+## v3.10 — 채널 아바타 동기화 (macOS) ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1099 | **CachedAvatarView url변경+갱신통지 구독 재로드** | high | done | onChange(of: url) + channelInfoDidUpdateNotification 구독 |
+| T-1100 | **ChannelDownloaderView 갱신 시 아바타 캐시+통지 발행** | high | done | refreshChannelInfo 성공 시 cacheAvatar + 통지 |
+| T-1101 | **빈 아바타 캐시 우선 조회** | high | done | loadAvatar가 url 검사 전 cachedAvatar 먼저 조회 |
+| T-1102 | **빌드 검증 + CHANGELOG/session** | high | done | build_and_run debug macos ✅ / avatar_*.jpg 38개 실측 |
+
+---
+
 ## v3.9 — 다운로드 유령 완료 방지 + 보관함·히스토리 보정 (macOS) 🚧
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
