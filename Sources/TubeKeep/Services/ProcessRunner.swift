@@ -18,6 +18,11 @@ enum ProcessError: LocalizedError {
     }
 }
 
+/// withTaskCancellationHandler의 onCancel에서 실행 중인 Process를 종료하기 위한 참조 박스
+final class ProcessBox: @unchecked Sendable {
+    var process: Process?
+}
+
 actor ProcessRunner {
     struct ProgressUpdate {
         let percentage: Double

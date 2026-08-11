@@ -18,6 +18,7 @@ final class TTSService: NSObject, AVSpeechSynthesizerDelegate {
 
     func speak(_ text: String, rate: Float = AVSpeechUtteranceDefaultSpeechRate, completion: (() -> Void)? = nil) {
         self.completion = completion
+        currentUtterance = nil
         synthesizer.stopSpeaking(at: .immediate)
 
         let utterance = AVSpeechUtterance(string: text)
@@ -29,6 +30,24 @@ final class TTSService: NSObject, AVSpeechSynthesizerDelegate {
         currentUtterance = utterance
 
         synthesizer.speak(utterance)
+    }
+
+    // MARK: - AVSpeechSynthesizerDelegate
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        guard utterance === currentUtterance else { return }
+        let completion = self.completion
+        self.completion = nil
+        currentUtterance = nil
+        completion?()
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        guard utterance === currentUtterance else { return }
+        let completion = self.completion
+        self.completion = nil
+        currentUtterance = nil
+        completion?()
     }
 
     func pause() {
@@ -178,22 +197,30 @@ final class TTSService: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     private nonisolated func convertMP3ToAIFF(mp3URL: URL, aiffURL: URL) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: Constants.ffmpegPath)
-        process.arguments = [
-            "-i", mp3URL.path,
-            "-f", "aiff",
-            "-y", aiffURL.path
-        ]
+        let box = ProcessBox()
+        return try await withTaskCancellationHandler {
+            let process = Process()
+            box.process = process
+            process.executableURL = URL(fileURLWithPath: Constants.ffmpegPath)
+            process.arguments = [
+                "-i", mp3URL.path,
+                "-f", "aiff",
+                "-y", aiffURL.path
+            ]
 
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
 
-        try process.run()
-        process.waitUntilExit()
+            try process.run()
+            process.waitUntilExit()
 
-        guard process.terminationStatus == 0 else {
-            throw TTSError.engineError("MP3→AIFF 변환 실패")
+            guard process.terminationStatus == 0 else {
+                throw TTSError.engineError("MP3→AIFF 변환 실패")
+            }
+        } onCancel: {
+            box.process?.terminate()
+            let pid = box.process?.processIdentifier ?? 0
+            if pid > 0 { kill(pid, SIGKILL) }
         }
     }
 }

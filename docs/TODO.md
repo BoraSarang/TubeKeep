@@ -5,9 +5,9 @@
 | ID | 작업 | 우선순위 | 상태 | 비고 |
 |----|------|---------|------|------|
 | T-1103 | **PLAN_v3.11 + TODO 등록 + 기준선(76/76)** | high | 진행중 | docs/plans/PLAN_v3.11_refactor-macos.md |
-| T-1104 | **1단계-A 프로세스 고아화** (DownloadManager/SummarizationService/convertMP3ToAIFF) | high | pending | 취소 시 terminate |
-| T-1105 | **1단계-B 콜백/Continuation 누락** (TTSService completion, EdgeTTSClient hang) | high | pending | didFinish/didCancel + cancellationHandler |
-| T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | pending | DatabaseManager |
+| T-1104 | **1단계-A 프로세스 고아화** (DownloadManager/SummarizationService/convertMP3ToAIFF) | high | done | 취소 시 terminate+SIGKILL, withTaskCancellationHandler |
+| T-1105 | **1단계-B 콜백/Continuation 누락** (TTSService completion, EdgeTTSClient hang) | high | done | didFinish/didCancel + cancellationHandler |
+| T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | done | DatabaseManager |
 | T-1107 | **2단계-D 채널 ID 교정 단일화** (normalizeUserID) | high | pending | UC_ 핸들 마이그레이션 |
 | T-1108 | **2단계-E 아바타 캐시 중앙화** | medium | pending | v3.10 연계 |
 | T-1109 | **3단계-F LLMChainExecutor 신설** | medium | pending | 폴백 4벌 단일화 |

@@ -198,18 +198,26 @@ actor SummarizationService {
     // MARK: - Subtitle Fetching
 
     private static func runProcess(arguments: [String]) async throws -> Int32 {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = arguments
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
+        let box = ProcessBox()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
+                let process = Process()
+                box.process = process
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = arguments
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                process.terminationHandler = { p in
+                    continuation.resume(returning: p.terminationStatus)
+                }
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
+        } onCancel: {
+            box.process?.terminate()
         }
     }
 

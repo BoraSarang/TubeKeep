@@ -158,8 +158,13 @@ final class DownloadManager: @unchecked Sendable {
                     }
 
                 while process.isRunning {
+                    if Task.isCancelled {
+                        process.terminate()
+                        let pid = process.processIdentifier
+                        if pid > 0 { kill(pid, SIGKILL) }
+                        break
+                    }
                     try await Task.sleep(nanoseconds: 300_000_000)
-                    try Task.checkCancellation()
                 }
                 stdoutHandle.readabilityHandler = nil
                 stderrHandle.readabilityHandler = nil
@@ -258,7 +263,11 @@ final class DownloadManager: @unchecked Sendable {
             $0.canceledItems.insert(itemId)
             $0.pausedItems.remove(itemId)
         }
-        if let p = process, p.isRunning { p.terminate() }
+        if let p = process, p.isRunning {
+            p.terminate()
+            let pid = p.processIdentifier
+            if pid > 0 { kill(pid, SIGKILL) }
+        }
     }
 
     @discardableResult

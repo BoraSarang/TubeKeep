@@ -145,7 +145,7 @@ final class DatabaseManager {
         guard let db = _db else { return false }
         var errMsg: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
-            let errmsg = String(cString: errMsg!)
+            let errmsg = errMsg.map { String(cString: $0) } ?? "unknown error"
             sqlite3_free(errMsg)
             log("[DB] 실행 실패: \(errmsg)")
             return false
@@ -756,7 +756,7 @@ let sql = """
             var stmt: OpaquePointer?
             let sql = "DELETE FROM download_history WHERE channel_name = ?;"
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-            sqlite3_bind_text(stmt, 1, (channel as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, (channel as NSString).utf8String, -1, Self.transient)
             sqlite3_step(stmt)
             sqlite3_finalize(stmt)
             log("[DB] deleteDownloadHistory — channel: \(channel)")
@@ -769,7 +769,7 @@ let sql = """
             var stmt: OpaquePointer?
             let sql = "DELETE FROM download_history WHERE video_id = ?;"
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-            sqlite3_bind_text(stmt, 1, (videoId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, (videoId as NSString).utf8String, -1, Self.transient)
             sqlite3_step(stmt)
             sqlite3_finalize(stmt)
             log("[DB] deleteDownloadHistory — videoId: \(videoId)")
