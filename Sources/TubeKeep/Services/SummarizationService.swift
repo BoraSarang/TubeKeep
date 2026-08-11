@@ -69,11 +69,31 @@ actor SummarizationService {
             return SummaryResult(overview: summary, keyPoints: [], chapters: chapters, provider: "cached")
         }
 
-        log("[AI Fallback] 사용 가능한 서비스 — OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음")")
-        
-        // 1순위: OpenRouter (무료)
+        log("[AI Fallback] 사용 가능한 서비스 — Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음"), OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), yTeaser: 항상 사용")
+
+        // 1순위: Gemini (성능 최상위)
+        if !geminiAPIKey.isEmpty {
+            log("[AI Fallback] 1순위: Gemini 시도 — videoId: \(videoId)")
+            do {
+                let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
+                log("[AI Fallback] ✅ Gemini 성공 — videoId: \(videoId)")
+                return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
+            } catch let error as SummaryError {
+                if case .summaryFailed(let msg) = error, msg.contains("요청 한도 초과") {
+                    log("[AI Fallback] ⚠️ Gemini 할당량 초과(\(msg)) → OpenRouter 시도 — videoId: \(videoId)")
+                } else {
+                    log("[AI Fallback] ❌ Gemini 실패(\(error.localizedDescription)) → OpenRouter 시도 — videoId: \(videoId)")
+                }
+            } catch {
+                log("[AI Fallback] ❌ Gemini 실패(\(error.localizedDescription)) → OpenRouter 시도 — videoId: \(videoId)")
+            }
+        } else {
+            log("[AI Fallback] Gemini 키 없음 → OpenRouter 시도 — videoId: \(videoId)")
+        }
+
+        // 2순위: OpenRouter (무료)
         if !openRouterAPIKey.isEmpty {
-            log("[AI Fallback] 1순위: OpenRouter 시도 — videoId: \(videoId)")
+            log("[AI Fallback] 2순위: OpenRouter 시도 — videoId: \(videoId)")
             do {
                 let text = try await fetchTranscript(videoId: videoId, progress: progress)
                 log("[AI Fallback] 자막 추출 완료 — 길이: \(text.count)자")
@@ -89,27 +109,19 @@ actor SummarizationService {
             log("[AI Fallback] OpenRouter 키 없음 → yTeaser 시도 — videoId: \(videoId)")
         }
 
-        // 2순위: yTeaser (무료)
-        log("[AI Fallback] 2순위: yTeaser 시도 — videoId: \(videoId)")
+        // 3순위: yTeaser (무료)
+        log("[AI Fallback] 3순위: yTeaser 시도 — videoId: \(videoId)")
         do {
             let result = try await summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
             log("[AI Fallback] ✅ yTeaser 성공 — videoId: \(videoId)")
             return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "yTeaser")
         } catch SummaryError.quotaExceeded {
-            log("[AI Fallback] ⚠️ yTeaser 할당량 초과 → Gemini 시도 — videoId: \(videoId)")
+            log("[AI Fallback] ⚠️ yTeaser 할당량 초과 → 요약 실패 — videoId: \(videoId)")
+            throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
         } catch {
-            log("[AI Fallback] ❌ yTeaser 실패(\(error.localizedDescription)) → Gemini 시도 — videoId: \(videoId)")
-        }
-
-        // 3순위: Gemini (유료)
-        guard !geminiAPIKey.isEmpty else {
-            log("[AI Fallback] ❌ Gemini 키 없음 → 요약 실패 — videoId: \(videoId)")
+            log("[AI Fallback] ❌ yTeaser 실패(\(error.localizedDescription)) → 요약 실패 — videoId: \(videoId)")
             throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
         }
-        log("[AI Fallback] 3순위: Gemini 시도 — videoId: \(videoId)")
-        let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
-        log("[AI Fallback] ✅ Gemini 성공 — videoId: \(videoId)")
-        return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
     }
 
     private func log(_ message: String) {

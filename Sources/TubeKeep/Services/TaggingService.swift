@@ -10,24 +10,7 @@ actor TaggingService {
     func classify(title: String, channel: String, openRouterAPIKey: String, geminiAPIKey: String) async -> String {
         AITaskTracker.shared.begin()
         defer { AITaskTracker.shared.end() }
-        // 1순위: OpenRouter (무료)
-        if !openRouterAPIKey.isEmpty {
-            do {
-                let service = OpenRouterService()
-                let tag = try await service.classifyTag(title: title, channel: channel, apiKey: openRouterAPIKey)
-                if predefinedTags.contains(tag) {
-                    log("[AI Fallback] OpenRouter 태깅 성공: \(tag) — \(title)")
-                    return tag
-                }
-                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → Gemini 시도 — \(title)")
-            } catch {
-                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → Gemini 시도 — \(title)")
-            }
-        } else {
-            log("[AI Fallback] OpenRouter 키 없음 → Gemini 시도 — \(title)")
-        }
-
-        // 2순위: Gemini (유료)
+        // 1순위: Gemini (성능 최상위)
         if !geminiAPIKey.isEmpty {
             let prompt = """
             Classify the following YouTube video into exactly ONE category.
@@ -38,14 +21,35 @@ actor TaggingService {
 
             Return ONLY the category name, nothing else.
             """
-            if let tag = try? await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey),
-               predefinedTags.contains(tag) {
-                log("[AI Fallback] Gemini 태깅 성공: \(tag) — \(title)")
-                return tag
+            do {
+                let tag = try await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey)
+                if predefinedTags.contains(tag) {
+                    log("[AI Fallback] Gemini 태깅 성공: \(tag) — \(title)")
+                    return tag
+                }
+                log("[AI Fallback] Gemini 태깅 결과 미매칭(\(tag)) → OpenRouter 시도 — \(title)")
+            } catch {
+                log("[AI Fallback] Gemini 태깅 실패(\(error.localizedDescription)) → OpenRouter 시도 — \(title)")
             }
-            log("[AI Fallback] Gemini 태깅 실패 → 규칙 기반 분류 — \(title)")
         } else {
-            log("[AI Fallback] Gemini 키 없음 → 규칙 기반 분류 — \(title)")
+            log("[AI Fallback] Gemini 키 없음 → OpenRouter 시도 — \(title)")
+        }
+
+        // 2순위: OpenRouter (무료)
+        if !openRouterAPIKey.isEmpty {
+            do {
+                let service = OpenRouterService()
+                let tag = try await service.classifyTag(title: title, channel: channel, apiKey: openRouterAPIKey)
+                if predefinedTags.contains(tag) {
+                    log("[AI Fallback] OpenRouter 태깅 성공: \(tag) — \(title)")
+                    return tag
+                }
+                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → 규칙 기반 분류 — \(title)")
+            } catch {
+                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → 규칙 기반 분류 — \(title)")
+            }
+        } else {
+            log("[AI Fallback] OpenRouter 키 없음 → 규칙 기반 분류 — \(title)")
         }
 
         // 3순위: 규칙 기반

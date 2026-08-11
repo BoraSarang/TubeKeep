@@ -15,6 +15,7 @@
 | T-1111 | **3단계-H 파서 단일화 + 태그 세트 통일** (SummaryParser) | medium | pending | |
 | T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | pending | 백오프 공통 |
 | T-1118 | **3단계-N A.X 4.0 전면 제거** (사용자 요청) | high | done | AX4Service 삭제 + 폴백 체인 단순화(요약 OR→yTeaser→Gemini, 태깅 OR→Gemini→규칙) |
+| T-1119 | **3단계-O AI 폴백 체인 성능순 재배치** (Gemini 1순위) | high | done | 요약 Gemini→OpenRouter→yTeaser, 태깅 Gemini→OpenRouter→규칙 + 설정 UI 순서/라벨 + AI_MODELS.json |
 | T-1113 | **4단계-J AppDelegate 분해** (WindowFactory/CommandHandler) | low | pending | 925줄 |
 | T-1114 | **4단계-K LibrarySidebarView 분해** | low | pending | 871줄 |
 | T-1115 | **4단계-L 자막 상태 enum 전환** | low | pending | |

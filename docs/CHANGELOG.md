@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v3.11 — AI 폴백 체인 성능순 재배치 (macOS, T-1118~T-1119) 🚧
+
+### 변경
+- **AI 폴백 체인 성능순 재배치 (T-1119)**: 할당량이 거의 없는 Gemini를 1순위, 무료 한도가 넉넉한 OpenRouter를 2순위로 재배치
+  - 요약: Gemini → OpenRouter → yTeaser (`SummarizationService`)
+  - 태깅: Gemini → OpenRouter → 규칙 기반(`autoClassify`) (`TaggingService`)
+  - 설정 UI(`SettingsAITab`)의 LLM 섹션도 동일 순서(Gemini→OpenRouter→yTeaser)로 재배치 + 순위 라벨 추가(Gemini "1순위·할당량 초과 시 자동 폴백", OpenRouter "2순위 폴백", yTeaser "3순위 폴백"), 폴백 순서 설명 문구 갱신
+  - `docs/AI_MODELS.json`의 `default_chain`/`summary.chain`/`tagging.chain` 갱신, qna·podcast 체인은 실제 코드(OpenRouter 전용)와 일치하도록 교정
+- **A.X 4.0 전면 제거 (T-1118)**: AX4Service 삭제 + 폴백 체인 단순화 (T-1118 done 커밋 반영)
+
+### 검증
+- `swift build` ✅ (Build complete 9.55s, 기존 경고만 — libmpv 26.0)
+
+---
+
 ## v3.10 — 채널 아바타 동기화 (macOS, T-1099~T-1102) ✅
 
 ### 버그 수정

@@ -190,7 +190,60 @@ struct SettingsAITab: View {
                 subtitle: "요약/태깅에 사용할 AI 엔진 설정"
             )
 
-            // OpenRouter
+            // Google Gemini (1순위)
+            VStack(spacing: 0) {
+                SettingsComponents.divider()
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Google Gemini")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("유료 · API 키 필요 (1순위. 할당량 초과 시 자동 폴백)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+
+                VStack(spacing: 0) {
+                    SettingsComponents.divider()
+
+                    SettingsRow(title: "API 키") {
+                        HStack(spacing: 8) {
+                            SecureField("API 키 입력", text: Binding(
+                                get: { store.geminiAPIKey },
+                                set: { store.send(.setGeminiAPIKey($0)) }
+                            ))
+                            .textFieldStyle(.plain)
+                            .font(.system(.callout, design: .monospaced))
+                            .frame(width: 160)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(nsColor: .controlBackgroundColor))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            )
+
+                            Button("발급 받기") {
+                                NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.blue)
+                        }
+                        .fixedSize()
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            .padding(.leading, 20)
+
+            // OpenRouter (2순위)
+            SettingsComponents.sectionSubHeader()
+
             VStack(spacing: 0) {
                 SettingsComponents.divider()
 
@@ -198,7 +251,7 @@ struct SettingsAITab: View {
                     Text("OpenRouter")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("무료 · API 키 필요 (openrouter.ai 가입)")
+                    Text("무료 · API 키 필요 · openrouter.ai 가입 (2순위 폴백)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -263,7 +316,7 @@ struct SettingsAITab: View {
             }
             .padding(.leading, 20)
 
-            // yTeaser
+            // yTeaser (3순위)
             SettingsComponents.sectionSubHeader()
 
             VStack(spacing: 0) {
@@ -273,7 +326,7 @@ struct SettingsAITab: View {
                     Text("yTeaser")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("무료 · API 키 불필요 · 50회/일 (IP 기반)")
+                    Text("무료 · API 키 불필요 · 50회/일 (3순위 폴백)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -293,59 +346,6 @@ struct SettingsAITab: View {
             }
             .padding(.leading, 20)
 
-            // Google Gemini
-            SettingsComponents.sectionSubHeader()
-
-            VStack(spacing: 0) {
-                SettingsComponents.divider()
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Google Gemini")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text("유료 · API 키 필요")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10)
-
-                VStack(spacing: 0) {
-                    SettingsComponents.divider()
-
-                    SettingsRow(title: "API 키") {
-                        HStack(spacing: 8) {
-                            SecureField("API 키 입력", text: Binding(
-                                get: { store.geminiAPIKey },
-                                set: { store.send(.setGeminiAPIKey($0)) }
-                            ))
-                            .textFieldStyle(.plain)
-                            .font(.system(.callout, design: .monospaced))
-                            .frame(width: 160)
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                            )
-
-                            Button("발급 받기") {
-                                NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
-                            }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.blue)
-                        }
-                        .fixedSize()
-                    }
-                }
-                .padding(.leading, 20)
-            }
-            .padding(.leading, 20)
-
             // 폴백 순서
             SettingsComponents.sectionSubHeader()
 
@@ -356,10 +356,10 @@ struct SettingsAITab: View {
                     Text("폴백 순서")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("요약: OpenRouter → yTeaser → Gemini")
+                    Text("요약: Gemini → OpenRouter → yTeaser")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Text("태깅: OpenRouter → Gemini → 규칙 기반")
+                    Text("태깅: Gemini → OpenRouter → 규칙 기반")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }

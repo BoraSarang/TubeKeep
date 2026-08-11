@@ -11,10 +11,10 @@
     "required_files": ["docs/plans/PLAN_v{version}_{platform}.md", "docs/TODO.md"],
     "session_auto_save_minutes": 15
   },
-  "default_chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+  "default_chain": ["gemini", "openrouter/free", "yTeaser"],
   "models": {
     "summary": {
-      "chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+      "chain": ["gemini", "openrouter/free", "yTeaser"],
       "temperature": 0.2,
       "max_tokens": 4096,
       "prompt_version": "summary_v2.5",
@@ -22,20 +22,20 @@
       "cache": "SQLite video_ai_data (summary + chapters)"
     },
     "tagging": {
-      "chain": ["openrouter/free", "yTeaser/ax4", "gemini", "autoClassify"],
+      "chain": ["gemini", "openrouter/free", "autoClassify"],
       "temperature": 0.1,
       "prompt_version": "tagging_v2.4",
       "vision_support": false,
       "cache": "SQLite video_ai_data (tags)"
     },
     "qna": {
-      "model": "yTeaser/ax4",
+      "model": "openrouter/free",
       "temperature": 0.2,
       "prompt_version": "qna_v2.5",
       "vision_support": false
     },
     "podcast": {
-      "chain": ["openrouter/free", "yTeaser/ax4", "gemini"],
+      "chain": ["openrouter/free"],
       "prompt_version": "podcast_v2.5",
       "vision_support": false
     },

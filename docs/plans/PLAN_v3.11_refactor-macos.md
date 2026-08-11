@@ -55,6 +55,12 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - 폴백 체인 변경: 요약 `OpenRouter → yTeaser → Gemini`, 태깅 `OpenRouter → Gemini → 규칙`
 - 호출부 파라미터 제거: `SummarizationService.summarizeVideo`, `TaggingService.classify`, `LibraryReducer` 4곳, `IdleSubtitleService` 2곳
 
+### T-O. AI 폴백 체인 성능순 재배치 (사용자 요청)
+- 기존 체인은 "비용순(무료→유료)" 배치 → **성능순**으로 재배치 (Gemini Flash 1순위)
+- 요약: `Gemini → OpenRouter → yTeaser` (Gemini 할당량 초과/실패 시 자동 폴백)
+- 태깅: `Gemini → OpenRouter → 규칙(autoClassify)` (yTeaser는 요약 전용이라 태깅 미사용)
+- `SettingsAITab` LLM 섹션 화면 배치도 Gemini → OpenRouter → yTeaser 순으로 재배치 + 우선순위 라벨 추가
+
 ## 4단계: 구조 개선
 
 ### T-J. AppDelegate 분해 (925줄)
