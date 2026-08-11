@@ -36,8 +36,10 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 
 ## 3단계: AI 폴백 체인 통합
 
-### T-F. LLMChainExecutor 신설
+### T-F. LLMChainExecutor 신설 ✅
 - Summarization/Tagging/ChannelInsight/SimilarVideo에 복붙 4벌 → 체인 정의 1개, 서비스별 단계 조합만 주입
+- `LLMChainStep<Output>`(provider/isAvailable/execute/validate) + `LLMChainExecutor.run`(순차 시도, 실패 시 다음 단계, 모두 실패 시 nil) — `Services/LLMChainExecutor.swift`
+- 적용: Summarization(요약 Gemini→OpenRouter→yTeaser), Tagging(태깅 Gemini→OpenRouter→규칙), ChannelInsight(OpenRouter→Gemini), SimilarVideo(검색어 OpenRouter→Gemini→규칙)
 
 ### T-G. 요약 프롬프트 단일화
 - `SummarizationService:385-410` / `OpenRouterService:28-53` / `AX4Service:31-56` (동일) → `LLMPrompts.swift` 1벌

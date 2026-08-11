@@ -73,6 +73,14 @@ final class ChannelInsightService {
         UserDefaults.standard.removeObject(forKey: cacheKey(for: channelId))
     }
 
+    private func log(_ message: String) {
+        #if DEBUG
+        Task { @MainActor in
+            DebugLogManager.shared?.append(message)
+        }
+        #endif
+    }
+
     private func cacheKey(for channelId: String) -> String {
         "\(cacheKeyPrefix):\(channelId)"
     }
@@ -121,46 +129,25 @@ final class ChannelInsightService {
 
         let systemMessage = "당신은 YouTube 채널을 분석해 한국어로 소개하는 전문가입니다. 반드시 한국어로만 답하세요."
 
-        // 1순위: OpenRouter
-        if keys.openRouter.isEmpty == false {
-            do {
+        let steps: [LLMChainStep<String>] = [
+            LLMChainStep(provider: "OpenRouter", isAvailable: !keys.openRouter.isEmpty, validate: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 let text = try await OpenRouterService().chatCompletion(
                     prompt: prompt,
                     apiKey: keys.openRouter,
                     systemMessage: systemMessage
                 )
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !cleaned.isEmpty {
-                    #if DEBUG
-                    DebugLogManager.shared?.append("[ChannelInsight] ✅ OpenRouter 생성 — 채널: \(channelId)")
-                    #endif
-                    return cleaned
-                }
-            } catch {
-                #if DEBUG
-                DebugLogManager.shared?.append("[ChannelInsight] OpenRouter 실패 — 채널: \(channelId): \(error.localizedDescription)")
-                #endif
-            }
-        }
-
-        // 2순위: Gemini
-        if keys.gemini.isEmpty == false {
-            do {
+                return text.trimmingCharacters(in: .whitespacesAndNewlines)
+            },
+            LLMChainStep(provider: "Gemini", isAvailable: !keys.gemini.isEmpty, validate: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 let text = try await GeminiService().query(prompt: prompt, apiKey: keys.gemini)
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !cleaned.isEmpty {
-                    #if DEBUG
-                    DebugLogManager.shared?.append("[ChannelInsight] ✅ Gemini 생성 — 채널: \(channelId)")
-                    #endif
-                    return cleaned
-                }
-            } catch {
-                #if DEBUG
-                DebugLogManager.shared?.append("[ChannelInsight] Gemini 실패 — 채널: \(channelId): \(error.localizedDescription)")
-                #endif
-            }
-        }
+                return text.trimmingCharacters(in: .whitespacesAndNewlines)
+            },
+        ]
 
+        if let result = await LLMChainExecutor.run(steps) {
+            log("[ChannelInsight] ✅ \(result.provider) 생성 — 채널: \(channelId)")
+            return result.output
+        }
         return nil
     }
 }

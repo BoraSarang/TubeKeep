@@ -10,7 +10,7 @@
 | T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | done | DatabaseManager |
 | T-1107 | **2단계-D 채널 ID 교정 단일화** (normalizeUserID) | high | done | isRealChannelID/normalizeChannelID + migrateChannelIDs(UC_→실제ID) |
 | T-1108 | **2단계-E 아바타 캐시 중앙화** | medium | done | updateAvatarURLs 중복 제거, channelNames 단일 소스 |
-| T-1109 | **3단계-F LLMChainExecutor 신설** | medium | pending | 폴백 4벌 단일화 |
+| T-1109 | **3단계-F LLMChainExecutor 신설** | medium | done | 폴백 4벌 단일화 — LLMChainStep/run + Summarization/Tagging/ChannelInsight/SimilarVideo 적용 |
 | T-1110 | **3단계-G 요약 프롬프트 단일화** (LLMPrompts) | medium | pending | |
 | T-1111 | **3단계-H 파서 단일화 + 태그 세트 통일** (SummaryParser) | medium | pending | |
 | T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | pending | 백오프 공통 |

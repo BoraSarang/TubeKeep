@@ -71,57 +71,42 @@ actor SummarizationService {
 
         log("[AI Fallback] 사용 가능한 서비스 — Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음"), OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), yTeaser: 항상 사용")
 
-        // 1순위: Gemini (성능 최상위)
-        if !geminiAPIKey.isEmpty {
-            log("[AI Fallback] 1순위: Gemini 시도 — videoId: \(videoId)")
-            do {
-                let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
-                log("[AI Fallback] ✅ Gemini 성공 — videoId: \(videoId)")
-                return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
-            } catch let error as SummaryError {
-                if case .summaryFailed(let msg) = error, msg.contains("요청 한도 초과") {
-                    log("[AI Fallback] ⚠️ Gemini 할당량 초과(\(msg)) → OpenRouter 시도 — videoId: \(videoId)")
-                } else {
-                    log("[AI Fallback] ❌ Gemini 실패(\(error.localizedDescription)) → OpenRouter 시도 — videoId: \(videoId)")
-                }
-            } catch {
-                log("[AI Fallback] ❌ Gemini 실패(\(error.localizedDescription)) → OpenRouter 시도 — videoId: \(videoId)")
-            }
-        } else {
-            log("[AI Fallback] Gemini 키 없음 → OpenRouter 시도 — videoId: \(videoId)")
-        }
-
-        // 2순위: OpenRouter (무료)
-        if !openRouterAPIKey.isEmpty {
-            log("[AI Fallback] 2순위: OpenRouter 시도 — videoId: \(videoId)")
-            do {
-                let text = try await fetchTranscript(videoId: videoId, progress: progress)
-                log("[AI Fallback] 자막 추출 완료 — 길이: \(text.count)자")
+        let steps: [LLMChainStep<SummaryResult>] = [
+            LLMChainStep(provider: "Gemini", isAvailable: !geminiAPIKey.isEmpty) {
+                let result = try await self.summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
+                return result
+            },
+            LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterAPIKey.isEmpty) {
+                self.log("[AI Fallback] 2순위: OpenRouter 시도 — videoId: \(videoId)")
+                let text = try await self.fetchTranscript(videoId: videoId, progress: progress)
+                self.log("[AI Fallback] 자막 추출 완료 — 길이: \(text.count)자")
                 progress?("요약 생성 중...")
                 let service = OpenRouterService()
                 let result = try await service.generateSummary(transcript: text, title: title, channel: channel, apiKey: openRouterAPIKey)
-                log("[AI Fallback] ✅ OpenRouter 성공 — videoId: \(videoId)")
                 return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "OpenRouter")
-            } catch {
-                log("[AI Fallback] ❌ OpenRouter 실패(\(error.localizedDescription)) → yTeaser 시도 — videoId: \(videoId)")
+            },
+            LLMChainStep(provider: "yTeaser", isAvailable: true) {
+                self.log("[AI Fallback] 3순위: yTeaser 시도 — videoId: \(videoId)")
+                return try await self.summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
+            },
+        ]
+
+        log("[AI Fallback] 체인 실행 — videoId: \(videoId)")
+        guard let result = await LLMChainExecutor.run(
+            steps,
+            logSkipped: { provider in
+                self.log("[AI Fallback] \(provider) 키 없음/결과 미검증 → 다음 단계 — videoId: \(videoId)")
+            },
+            logFailed: { provider, error in
+                self.log("[AI Fallback] ❌ \(provider) 실패(\(error.localizedDescription)) → 다음 단계 — videoId: \(videoId)")
             }
-        } else {
-            log("[AI Fallback] OpenRouter 키 없음 → yTeaser 시도 — videoId: \(videoId)")
+        ) else {
+            log("[AI Fallback] ❌ 모든 AI 요약 서비스 실패 — videoId: \(videoId)")
+            throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
         }
 
-        // 3순위: yTeaser (무료)
-        log("[AI Fallback] 3순위: yTeaser 시도 — videoId: \(videoId)")
-        do {
-            let result = try await summarizeWithYTeaser(videoId: videoId, title: title, channel: channel)
-            log("[AI Fallback] ✅ yTeaser 성공 — videoId: \(videoId)")
-            return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "yTeaser")
-        } catch SummaryError.quotaExceeded {
-            log("[AI Fallback] ⚠️ yTeaser 할당량 초과 → 요약 실패 — videoId: \(videoId)")
-            throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
-        } catch {
-            log("[AI Fallback] ❌ yTeaser 실패(\(error.localizedDescription)) → 요약 실패 — videoId: \(videoId)")
-            throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
-        }
+        log("[AI Fallback] ✅ \(result.provider) 성공 — videoId: \(videoId)")
+        return SummaryResult(overview: result.output.overview, keyPoints: result.output.keyPoints, chapters: result.output.chapters, provider: result.provider)
     }
 
     private func log(_ message: String) {

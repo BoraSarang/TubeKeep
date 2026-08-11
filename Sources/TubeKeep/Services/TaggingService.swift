@@ -10,46 +10,30 @@ actor TaggingService {
     func classify(title: String, channel: String, openRouterAPIKey: String, geminiAPIKey: String) async -> String {
         AITaskTracker.shared.begin()
         defer { AITaskTracker.shared.end() }
-        // 1순위: Gemini (성능 최상위)
-        if !geminiAPIKey.isEmpty {
-            let prompt = """
-            Classify the following YouTube video into exactly ONE category.
-            Choose only from: \(predefinedTags.joined(separator: ", "))
 
-            Title: \(title)
-            Channel: \(channel)
+        let steps: [LLMChainStep<String>] = [
+            LLMChainStep(provider: "Gemini", isAvailable: !geminiAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
+                let prompt = """
+                Classify the following YouTube video into exactly ONE category.
+                Choose only from: \(self.predefinedTags.joined(separator: ", "))
 
-            Return ONLY the category name, nothing else.
-            """
-            do {
-                let tag = try await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey)
-                if predefinedTags.contains(tag) {
-                    log("[AI Fallback] Gemini 태깅 성공: \(tag) — \(title)")
-                    return tag
-                }
-                log("[AI Fallback] Gemini 태깅 결과 미매칭(\(tag)) → OpenRouter 시도 — \(title)")
-            } catch {
-                log("[AI Fallback] Gemini 태깅 실패(\(error.localizedDescription)) → OpenRouter 시도 — \(title)")
-            }
-        } else {
-            log("[AI Fallback] Gemini 키 없음 → OpenRouter 시도 — \(title)")
-        }
+                Title: \(title)
+                Channel: \(channel)
 
-        // 2순위: OpenRouter (무료)
-        if !openRouterAPIKey.isEmpty {
-            do {
+                Return ONLY the category name, nothing else.
+                """
+                return try await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey)
+            },
+            LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
                 let service = OpenRouterService()
-                let tag = try await service.classifyTag(title: title, channel: channel, apiKey: openRouterAPIKey)
-                if predefinedTags.contains(tag) {
-                    log("[AI Fallback] OpenRouter 태깅 성공: \(tag) — \(title)")
-                    return tag
-                }
-                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → 규칙 기반 분류 — \(title)")
-            } catch {
-                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → 규칙 기반 분류 — \(title)")
-            }
-        } else {
-            log("[AI Fallback] OpenRouter 키 없음 → 규칙 기반 분류 — \(title)")
+                return try await service.classifyTag(title: title, channel: channel, apiKey: openRouterAPIKey)
+            },
+        ]
+
+        log("[AI Fallback] 태깅 체인 실행 — \(title)")
+        if let result = await LLMChainExecutor.run(steps) {
+            log("[AI Fallback] \(result.provider) 태깅 성공: \(result.output) — \(title)")
+            return result.output
         }
 
         // 3순위: 규칙 기반

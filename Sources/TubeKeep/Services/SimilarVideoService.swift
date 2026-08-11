@@ -100,32 +100,36 @@ actor SimilarVideoService {
         - 반드시 JSON 문자열 배열 형태로만 출력하세요. 예: ["검색어1", "검색어2", "검색어3"] 다른 텍스트 금지.
         """
 
-        if !openRouterKey.isEmpty {
-            do {
-                let service = OpenRouterService()
-                let response = try await service.chatCompletion(
-                    prompt: prompt,
-                    apiKey: openRouterKey,
-                    systemMessage: "당신은 한국어로 답변하는 YouTube 추천 전문가입니다. 반드시 한국어로만 답변하고 JSON 배열만 출력하세요."
-                )
-                if let queries = parseQueries(from: response), !queries.isEmpty {
-                    log("[Similar] OpenRouter 검색어 생성 성공: \(queries)")
-                    return queries
-                }
-                log("[Similar] OpenRouter 검색어 파싱 실패 → Gemini 시도")
-            } catch {
-                log("[Similar] OpenRouter 실패(\(error.localizedDescription)) → Gemini 시도")
-            }
-        }
-
-        if !geminiKey.isEmpty {
+        if !openRouterKey.isEmpty || !geminiKey.isEmpty {
+            let openRouterSystem = "당신은 한국어로 답변하는 YouTube 추천 전문가입니다. 반드시 한국어로만 답변하고 JSON 배열만 출력하세요."
             let geminiPrompt = prompt + "\n\n반드시 JSON 배열만 출력하세요."
-            if let response = try? await GeminiService().query(prompt: geminiPrompt, apiKey: geminiKey),
-               let queries = parseQueries(from: response), !queries.isEmpty {
-                log("[Similar] Gemini 검색어 생성 성공: \(queries)")
-                return queries
+
+            let steps: [LLMChainStep<[String]>] = [
+                LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterKey.isEmpty, validate: { !$0.isEmpty }) {
+                    let service = OpenRouterService()
+                    let response = try await service.chatCompletion(
+                        prompt: prompt,
+                        apiKey: openRouterKey,
+                        systemMessage: openRouterSystem
+                    )
+                    guard let queries = self.parseQueries(from: response), !queries.isEmpty else {
+                        throw LLMChainStepError.invalidOutput
+                    }
+                    return queries
+                },
+                LLMChainStep(provider: "Gemini", isAvailable: !geminiKey.isEmpty, validate: { !$0.isEmpty }) {
+                    let response = try await GeminiService().query(prompt: geminiPrompt, apiKey: geminiKey)
+                    guard let queries = self.parseQueries(from: response), !queries.isEmpty else {
+                        throw LLMChainStepError.invalidOutput
+                    }
+                    return queries
+                },
+            ]
+
+            if let result = await LLMChainExecutor.run(steps) {
+                log("[Similar] \(result.provider) 검색어 생성 성공: \(result.output)")
+                return result.output
             }
-            log("[Similar] Gemini 실패 → 규칙 폴백")
         }
 
         return nil

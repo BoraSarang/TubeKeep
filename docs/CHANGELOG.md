@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109) 🚧
+
+### 리팩토링
+- **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화
+  - `LLMChainStep<Output>`(provider/isAvailable/execute/validate) + `LLMChainExecutor.run` — 순차 시도 후 첫 성공 반환, 모두 실패 시 nil
+  - `SummarizationService.summarizeVideo`: Gemini→OpenRouter→yTeaser 체인을 Step 배열로 재구성
+  - `TaggingService.classify`: Gemini→OpenRouter→규칙 (validate로 프리셋 매칭 검증)
+  - `ChannelInsightService.summarize`: OpenRouter→Gemini
+  - `SimilarVideoService.buildQueriesFromAI`: OpenRouter→Gemini (JSON 배열 파싱 검증)
+  - `LLMChainStepError.invalidOutput` — 출력 파싱 실패 시 다음 단계로 넘기는 오류 추가
+
+### 검증
+- `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)
+- `swift test` ✅ 76/76 통과
+
+---
+
 ## v3.10.0 — 채널 아바타 동기화 + AI 폴백 성능순 재배치 (macOS, T-1099~T-1102, T-1118~T-1119) ✅
 
 ### 기능/변경
