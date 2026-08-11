@@ -160,80 +160,20 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             object: nil
         )
 
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // 영상 플레이어 창이 활성일 때 스페이스바(49) → 재생/일시정지
-            if event.keyCode == 49 {
-                #if DEBUG
-                let cmd = event.modifierFlags.contains(.command)
-                Task { @MainActor in
-                    DebugLogManager.shared?.append("[Key] Space — cmd=\(cmd) playerWindow=\(String(describing: self.playerWindow != nil)) isKey=\(self.playerWindow?.isKeyWindow ?? false) keyWin=\(String(describing: NSApp.keyWindow?.identifier?.rawValue))")
-                }
-                #endif
-                if !event.modifierFlags.contains(.command),
-                   let player = self.playerWindow, player.isKeyWindow {
-                    NotificationCenter.default.post(name: Constants.playerTogglePlayPauseNotification, object: nil)
-                    return nil
-                }
-            }
-            if event.modifierFlags.contains(.command) {
-                switch event.keyCode {
-                case 43: // , (settings)
-                    self.openSettingsWindow()
-                    return nil
-                case 12: // q (quit)
-                    NSApp.terminate(nil)
-                    return nil
-                case 7: // x (cut)
-                    NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil)
-                    return nil
-                case 8: // c (copy)
-                    #if DEBUG
-                    if event.modifierFlags.contains(.shift) {
-                        DebugLogManager.shared?.copySelection()
-                        return nil
-                    }
-                    #endif
-                    NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
-                    return nil
-                case 9: // v (paste)
-                    NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
-                    return nil
-                case 0: // a (selectAll)
-                    #if DEBUG
-                    if event.modifierFlags.contains(.shift) {
-                        DebugLogManager.shared?.copyAll()
-                        return nil
-                    }
-                    #endif
-                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
-                    return nil
-                case 2: // d (debug panel toggle)
-                    #if DEBUG
-                    self.toggleDebugLogWindow()
-                    return nil
-                    #else
-                    return event
-                    #endif
-                case 40: // k (clear logs)
-                    #if DEBUG
-                    DebugLogManager.shared?.clear()
-                    return nil
-                    #else
-                    return event
-                    #endif
-                case 1: // s (auto scroll toggle)
-                    #if DEBUG
-                    if event.modifierFlags.contains(.shift) {
-                        self.debugToggleAutoScroll()
-                        return nil
-                    }
-                    #endif
-                    return event
-                default:
-                    return event
-                }
-            }
-            return event
+        let keyHandler = KeyCommandHandler(
+            isPlayerKeyWindow: { [weak self] in
+                guard let player = self?.playerWindow else { return false }
+                return player.isKeyWindow
+            },
+            onTogglePlayerPlayPause: {
+                NotificationCenter.default.post(name: Constants.playerTogglePlayPauseNotification, object: nil)
+            },
+            onOpenSettings: { [weak self] in self?.openSettingsWindow() },
+            onToggleDebugPanel: { [weak self] in self?.toggleDebugLogWindow() },
+            onToggleDebugAutoScroll: { [weak self] in self?.debugToggleAutoScroll() }
+        )
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak keyHandler] event in
+            keyHandler?.handle(event) ?? event
         }
 
         setupMainMenu()

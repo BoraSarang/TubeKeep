@@ -25,6 +25,8 @@
   - `WindowFactory.makeWindow` — SwiftUI 뷰 → 공통 설정 NSWindow 구성 (size/styleMask/zoom/level/background)
   - `WindowFactory.present` — center + makeKeyAndOrderFront + activate 공통화
   - 적용 창: lib/downloader/batch/channel/about/settings/qna/debugLog 8개 (player는 PlayerWindow 서브클래스라 유지)
+- **KeyCommandHandler 분리 (T-1113)**: AppDelegate에 있던 전역 키 이벤트 처리(스페이스 토글/설정/디버그 단축키)를 `App/KeyCommandHandler.swift`로 분리
+  - 콜백 주입(isPlayerKeyWindow/onTogglePlayerPlayPause/onOpenSettings 등)으로 AppDelegate 상태 접근 유지
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)
