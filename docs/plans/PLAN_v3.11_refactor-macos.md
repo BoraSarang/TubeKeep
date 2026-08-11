@@ -100,4 +100,4 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - debounce 도입으로 saveSettings 동기 인코딩(30곳) 감소, Cold Start 영향 없음
 
 ## 에러코드
-- `E-MAC-AI-1003` "AI 응답 파싱 실패" 추가 (error_message_ko.json)
+- `E-MAC-AI-1003` "AI 응답 파싱 실패" 추가 (error_message_ko.json) ✅

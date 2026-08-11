@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1116) 🚧
+## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1116) ✅
 
 ### 리팩토링
 - **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화

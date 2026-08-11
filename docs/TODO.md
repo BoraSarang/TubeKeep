@@ -1,10 +1,10 @@
 # TODO — 작업 추적 목록
 
-## v3.11 — 안정성 버그 + 채널 ID 정규화 + AI 폴백 통합 + 구조 개선 (macOS) 🚧
+## v3.11 — 안정성 버그 + 채널 ID 정규화 + AI 폴백 통합 + 구조 개선 (macOS) ✅
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
 |----|------|---------|------|------|
-| T-1103 | **PLAN_v3.11 + TODO 등록 + 기준선(76/76)** | high | 진행중 | docs/plans/PLAN_v3.11_refactor-macos.md |
+| T-1103 | **PLAN_v3.11 + TODO 등록 + 기준선(76/76)** | high | done | docs/plans/PLAN_v3.11_refactor-macos.md |
 | T-1104 | **1단계-A 프로세스 고아화** (DownloadManager/SummarizationService/convertMP3ToAIFF) | high | done | 취소 시 terminate+SIGKILL, withTaskCancellationHandler |
 | T-1105 | **1단계-B 콜백/Continuation 누락** (TTSService completion, EdgeTTSClient hang) | high | done | didFinish/didCancel + cancellationHandler |
 | T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | done | DatabaseManager |
@@ -20,7 +20,7 @@
 | T-1114 | **4단계-K LibrarySidebarView 분해** | low | done | 797줄 — SidebarSelectableRow 행 통일(5행 적용) |
 | T-1115 | **4단계-L 자막 상태 enum 전환** | low | done | SubtitleState enum — loading/error/available 3필드 통합 |
 | T-1116 | **4단계-M debounce/dead code 정리** | low | done | insertFTSIndex/ProgressUpdate 제거, 검색 debounce 300ms + saveSettings debounce 0.5s |
-| T-1117 | **마무리** (CHANGELOG v3.11 + 에러코드 + 세션) | high | pending | E-MAC-API-3003 |
+| T-1117 | **마무리** (CHANGELOG v3.11 + 에러코드 + 세션) | high | done | E-MAC-AI-1003 추가 + CHANGELOG 병합 + 세션 로그 갱신 |
 
 ---
 
