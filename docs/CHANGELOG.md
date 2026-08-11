@@ -27,6 +27,8 @@
   - 적용 창: lib/downloader/batch/channel/about/settings/qna/debugLog 8개 (player는 PlayerWindow 서브클래스라 유지)
 - **KeyCommandHandler 분리 (T-1113)**: AppDelegate에 있던 전역 키 이벤트 처리(스페이스 토글/설정/디버그 단축키)를 `App/KeyCommandHandler.swift`로 분리
   - 콜백 주입(isPlayerKeyWindow/onTogglePlayerPlayPause/onOpenSettings 등)으로 AppDelegate 상태 접근 유지
+- **SidebarSelectableRow 신설 (T-1114)**: LibrarySidebarView에서 5개 행(nav/filter/category/history/profile)이 반복하던 HStack+선택 배경+버튼 스타일을 `Features/Library/SidebarSelectableRow.swift`로 통일
+  - 아이콘/카운트/trailing(ProgressView) 옵션 지원, LibrarySidebarView 865→797줄
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

@@ -74,8 +74,9 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - `WindowFactory`: 9개 창 생성 중복 ~180줄 통일 (identifier/styleMask/center) — 8개 창 적용, AppDelegate 926→890줄
 - `KeyCommandHandler`: 전역 특수키 핸들러(스페이스/설정/디버그) 분리 — 콜백 주입으로 AppDelegate 상태 접근 유지
 
-### T-K. LibrarySidebarView 분해 (871줄)
+### T-K. LibrarySidebarView 분해 (871줄) ✅
 - 7개 섹션 서브뷰 분리 + `SidebarSelectableRow` 행 통일
+- `SidebarSelectableRow` 신설: nav/filter/category/history/profile 5개 행 중복 통일 → LibrarySidebarView 865→797줄
 
 ### T-L. 자막 상태 enum 전환
 - `PlayerReducer` 자막 상태 5개 boolean → `enum SubtitleState` + Whisper 블록 분해

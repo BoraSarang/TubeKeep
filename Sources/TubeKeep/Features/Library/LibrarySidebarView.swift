@@ -227,27 +227,14 @@ struct LibrarySidebarView: View {
     }
 
     private func navRow(title: String, icon: String, mode: LibrarySidebarMode) -> some View {
-        let isSelected = store.library.sidebarMode == mode
-        return Button {
+        SidebarSelectableRow(
+            title: title,
+            isSelected: store.library.sidebarMode == mode,
+            icon: icon,
+            iconFrame: 16
+        ) {
             store.send(.library(.setSidebarMode(mode)))
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white : .primary)
-                    .frame(width: 16)
-                Text(title)
-                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
-                    .foregroundStyle(isSelected ? .white : .primary)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor : Color.clear)
-            .contentShape(Rectangle())
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 8)
     }
 
@@ -362,24 +349,12 @@ struct LibrarySidebarView: View {
     }
 
     private func historyChannelRow(name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "person")
-                .font(.system(size: 12))
-                .foregroundStyle(isSelected ? .white : .secondary)
-                .frame(width: 20, height: 20)
-
-            Text(name)
-                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? .white : .primary)
-
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(isSelected ? Color.accentColor : Color.clear)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: action)
+        SidebarSelectableRow(
+            title: name,
+            isSelected: isSelected,
+            icon: "person",
+            action: action
+        )
     }
 
     private var historyChannels: [String] {
@@ -420,31 +395,14 @@ struct LibrarySidebarView: View {
     }
 
     private var profileCategoryRow: some View {
-        let isSelected = store.library.isShowingProfileRecommendations
-        return HStack(spacing: 6) {
-            Image(systemName: "heart")
-                .font(.system(size: 12))
-                .foregroundStyle(isSelected ? .white : .secondary)
-                .frame(width: 20, height: 20)
-
-            Text("내 취향")
-                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? .white : .primary)
-
-            Spacer()
-
-            if store.library.profileRecommendationsLoading {
-                ProgressView()
-                    .scaleEffect(0.5)
-                    .frame(width: 12, height: 12)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(isSelected ? Color.accentColor : Color.clear)
-        .contentShape(Rectangle())
-        .onTapGesture {
+        SidebarSelectableRow(
+            title: "내 취향",
+            isSelected: store.library.isShowingProfileRecommendations,
+            icon: "heart",
+            trailing: store.library.profileRecommendationsLoading ? {
+                AnyView(ProgressView().scaleEffect(0.5).frame(width: 12, height: 12))
+            } : nil
+        ) {
             store.send(.library(.selectProfileRecommendations))
         }
     }
@@ -544,22 +502,12 @@ struct LibrarySidebarView: View {
     }
 
     private func filterRow(title: String, count: Int, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
-                    .foregroundStyle(isSelected ? .white : .primary)
-                Spacer()
-                Text("\(count)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor : Color.clear)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        SidebarSelectableRow(
+            title: title,
+            isSelected: isSelected,
+            count: count,
+            action: action
+        )
     }
 
     // MARK: - Category Filter
@@ -591,31 +539,15 @@ struct LibrarySidebarView: View {
     }
 
     private func categoryFilterRow(_ row: (name: String, count: Int)) -> some View {
-        let isSelected = store.library.selectedCategory == row.name
-        return Button {
+        SidebarSelectableRow(
+            title: row.name,
+            isSelected: store.library.selectedCategory == row.name,
+            icon: categorySystemIcon(row.name),
+            count: row.count
+        ) {
             store.send(.library(.setSelectedCategory(store.library.selectedCategory == row.name ? nil : row.name)))
-        } label: {
-            HStack {
-                Image(systemName: categorySystemIcon(row.name))
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white : .secondary)
-                    .frame(width: 20, height: 20)
-                Text(row.name)
-                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
-                    .lineLimit(1)
-                    .foregroundStyle(isSelected ? .white : .primary)
-                Spacer()
-                Text("\(row.count)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor : Color.clear)
-            .contentShape(Rectangle())
-            .frame(height: categoryRowHeight)
         }
-        .buttonStyle(.plain)
+        .frame(height: categoryRowHeight)
     }
 
     private func categorySystemIcon(_ name: String) -> String {

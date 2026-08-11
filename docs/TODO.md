@@ -17,7 +17,7 @@
 | T-1118 | **3단계-N A.X 4.0 전면 제거** (사용자 요청) | high | done | AX4Service 삭제 + 폴백 체인 단순화(요약 OR→yTeaser→Gemini, 태깅 OR→Gemini→규칙) |
 | T-1119 | **3단계-O AI 폴백 체인 성능순 재배치** (Gemini 1순위) | high | done | 요약 Gemini→OpenRouter→yTeaser, 태깅 Gemini→OpenRouter→규칙 + 설정 UI 순서/라벨 + AI_MODELS.json |
 | T-1113 | **4단계-J AppDelegate 분해** (WindowFactory/CommandHandler) | low | done | 890줄 — WindowFactory 8창 + KeyCommandHandler 분리 |
-| T-1114 | **4단계-K LibrarySidebarView 분해** | low | pending | 871줄 |
+| T-1114 | **4단계-K LibrarySidebarView 분해** | low | done | 797줄 — SidebarSelectableRow 행 통일(5행 적용) |
 | T-1115 | **4단계-L 자막 상태 enum 전환** | low | pending | |
 | T-1116 | **4단계-M debounce/dead code 정리** | low | pending | |
 | T-1117 | **마무리** (CHANGELOG v3.11 + 에러코드 + 세션) | high | pending | E-MAC-API-3003 |
