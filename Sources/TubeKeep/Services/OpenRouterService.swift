@@ -25,32 +25,7 @@ struct OpenRouterService {
         channel: String,
         apiKey: String
     ) async throws -> (overview: String, keyPoints: [String], chapters: [ChapterInfo]) {
-        let prompt = """
-        다음 YouTube 영상의 자막을 분석하여 요약해 주세요.
-
-        **반드시 모든 내용을 한국어로 답변하세요. 영어 사용 금지.**
-
-        제목: \(title)
-        채널: \(channel)
-
-        자막 내용:
-        \(transcript.prefix(15000))
-
-        아래 정확한 형식으로 답변하세요:
-
-        개요: (2~3문장 요약)
-
-        핵심 포인트:
-        • (핵심 포인트 1)
-        • (핵심 포인트 2)
-        • (핵심 포인트 3)
-
-        챕터:
-        • [0:00 - 2:30] 챕터 제목
-        • [2:30 - 5:00] 챕터 제목
-
-        챕터는 영상의 주요 내용 구간을 2~5개로 나누어 시간대와 함께 작성하세요.
-        """
+        let prompt = LLMPrompts.summary(transcript: transcript, title: title, channel: channel)
 
         let response = try await chatCompletion(
             messages: [
@@ -74,16 +49,7 @@ struct OpenRouterService {
             "요리/음식", "여행/일상", "과학",
         ]
 
-        let prompt = """
-        다음 YouTube 영상의 제목과 채널명을 보고 가장 적합한 태그를 선택해 주세요.
-
-        제목: \(title)
-        채널: \(channel)
-
-        다음 태그 중 하나만 선택해 주세요: \(predefinedTags.joined(separator: ", "))
-
-        답변은 선택된 태그 이름만 작성해 주세요. 다른 텍스트는 포함하지 마세요.
-        """
+        let prompt = LLMPrompts.tag(title: title, channel: channel, tags: predefinedTags)
 
         let response = try await chatCompletion(
             messages: [

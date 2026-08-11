@@ -41,8 +41,9 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - `LLMChainStep<Output>`(provider/isAvailable/execute/validate) + `LLMChainExecutor.run`(순차 시도, 실패 시 다음 단계, 모두 실패 시 nil) — `Services/LLMChainExecutor.swift`
 - 적용: Summarization(요약 Gemini→OpenRouter→yTeaser), Tagging(태깅 Gemini→OpenRouter→규칙), ChannelInsight(OpenRouter→Gemini), SimilarVideo(검색어 OpenRouter→Gemini→규칙)
 
-### T-G. 요약 프롬프트 단일화
-- `SummarizationService:385-410` / `OpenRouterService:28-53` / `AX4Service:31-56` (동일) → `LLMPrompts.swift` 1벌
+### T-G. 요약 프롬프트 단일화 ✅
+- `SummarizationService:385-410` / `OpenRouterService:28-53` (Gemini 영문 라벨 vs OpenRouter 한글 라벨 분화) → `LLMPrompts.swift` 1벌 (한글 라벨 통일)
+- 프롬프트: `LLMPrompts.summary`(요약) + `LLMPrompts.tag`(태깅) — Gemini/OpenRouter 공통 + TaggingService에도 적용
 
 ### T-H. 응답 파서 단일화
 - OR/AX4/Gemini 파서 3벌(`hasPrefix` vs `lowercased().contains` 분화) → `SummaryParser` 1벌

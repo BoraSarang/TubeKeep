@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109) 🚧
+## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1110) 🚧
 
 ### 리팩토링
 - **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화
@@ -10,6 +10,9 @@
   - `ChannelInsightService.summarize`: OpenRouter→Gemini
   - `SimilarVideoService.buildQueriesFromAI`: OpenRouter→Gemini (JSON 배열 파싱 검증)
   - `LLMChainStepError.invalidOutput` — 출력 파싱 실패 시 다음 단계로 넘기는 오류 추가
+- **LLMPrompts 단일화 (T-1110)**: 요약/태깅 프롬프트가 Gemini(영문 라벨)·OpenRouter(한글 라벨)로 분화된 것을 `LLMPrompts.swift` 1벌로 통일
+  - `LLMPrompts.summary(transcript:title:channel:)` — Gemini/OpenRouter 요약 공통
+  - `LLMPrompts.tag(title:channel:tags:)` — Gemini/OpenRouter/Tagging 태깅 공통
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

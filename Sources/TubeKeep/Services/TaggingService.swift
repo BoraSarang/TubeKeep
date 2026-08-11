@@ -13,15 +13,7 @@ actor TaggingService {
 
         let steps: [LLMChainStep<String>] = [
             LLMChainStep(provider: "Gemini", isAvailable: !geminiAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
-                let prompt = """
-                Classify the following YouTube video into exactly ONE category.
-                Choose only from: \(self.predefinedTags.joined(separator: ", "))
-
-                Title: \(title)
-                Channel: \(channel)
-
-                Return ONLY the category name, nothing else.
-                """
+                let prompt = LLMPrompts.tag(title: title, channel: channel, tags: self.predefinedTags)
                 return try await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey)
             },
             LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {

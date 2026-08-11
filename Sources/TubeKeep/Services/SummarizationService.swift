@@ -361,32 +361,7 @@ actor SummarizationService {
     // MARK: - LLM Summary
 
     private func generateSummary(text: String, title: String, channel: String, apiKey: String) async throws -> SummaryResult {
-        let prompt = """
-        You are a helpful assistant that summarizes YouTube videos.
-
-        **반드시 모든 내용을 한국어로 답변하세요. 영어 사용 금지.**
-
-        Video Title: \(title)
-        Channel: \(channel)
-
-        Transcript:
-        \(text.prefix(15000))
-
-        Provide a summary in this exact format:
-
-        개요: (2~3문장 요약)
-
-        핵심 포인트:
-        • (핵심 포인트 1)
-        • (핵심 포인트 2)
-        • (핵심 포인트 3)
-
-        챕터:
-        • [0:00 - 2:30] 챕터 제목
-        • [2:30 - 5:00] 챕터 제목
-
-        챕터는 영상의 주요 내용 구간을 2~5개로 나누어 시간대와 함께 작성하세요.
-        """
+        let prompt = LLMPrompts.summary(transcript: text, title: title, channel: channel)
 
         let response: String
         do {
