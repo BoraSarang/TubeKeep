@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1112) 🚧
+## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1116) 🚧
 
 ### 리팩토링
 - **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화
@@ -31,6 +31,10 @@
   - 아이콘/카운트/trailing(ProgressView) 옵션 지원, LibrarySidebarView 865→797줄
 - **SubtitleState enum 전환 (T-1115)**: PlayerReducer의 자막 상태 3개 필드(subtitleLoading/subtitleError/subtitleAvailable)를 `Features/Player/SubtitleState.swift`의 `enum SubtitleState`(idle/loading/available/failed)로 통합
   - `SubtitlePanel`은 isLoading/subtitleAvailable/errorMessage 3개 파라미터 대신 subtitleState 하나를 받도록 단순화
+- **debounce/dead code 정리 (T-1116)**:
+  - 검색(`setSearchText`) 300ms + `saveSettings` 0.5s debounce — TCA 1.26의 `clock.sleep` + `.cancellable(cancelInFlight:)` 패턴으로 적용
+  - dead code 제거: `DatabaseManager.insertFTSIndex`(미사용), `ProcessRunner.ProgressUpdate`(미참조)
+  - `Format.isAudioOnly`/`showSubtitleToastToast`는 실제 사용 중이라 유지
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

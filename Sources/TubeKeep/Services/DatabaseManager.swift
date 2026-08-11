@@ -862,22 +862,6 @@ let sql = """
         }
     }
 
-    func insertFTSIndex(videoId: String, title: String, channelName: String, transcript: String?, summary: String?) {
-        sync {
-            guard let db = _db else { return }
-            let sql = "INSERT OR REPLACE INTO video_fts(video_id, title, channel_name, transcript, summary) VALUES (?, ?, ?, ?, ?);"
-            var stmt: OpaquePointer?
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-            defer { sqlite3_finalize(stmt) }
-            sqlite3_bind_text(stmt, 1, videoId, -1, Self.transient)
-            sqlite3_bind_text(stmt, 2, title, -1, Self.transient)
-            sqlite3_bind_text(stmt, 3, channelName, -1, Self.transient)
-            bindOptionalText(stmt, 4, transcript)
-            bindOptionalText(stmt, 5, summary)
-            sqlite3_step(stmt)
-        }
-    }
-
     func deleteFTSIndex(videoId: String) {
         sync {
             guard let db = _db else { return }

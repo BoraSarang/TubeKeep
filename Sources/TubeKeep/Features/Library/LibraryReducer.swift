@@ -15,6 +15,8 @@ enum LibrarySidebarMode: String, Equatable {
 
 @Reducer
 struct LibraryReducer {
+    @Dependency(\.continuousClock) private var clock
+
     @ObservableState
     struct State: Equatable {
         var items: [LibraryItem] = []
@@ -411,10 +413,14 @@ case .trashItem(let id):
                 state.searchText = text
                 state.selectedIds = []
                 if text.count >= 2 {
-                    return .run { [items = state.items] send in
-                        let results = SearchService.search(query: text, in: items)
+                    let query = text
+                    let items = state.items
+                    return .run { send in
+                        try await clock.sleep(for: .milliseconds(300))
+                        let results = SearchService.search(query: query, in: items)
                         await send(.searchResultsUpdated(results))
                     }
+                    .cancellable(id: "librarySearch", cancelInFlight: true)
                 } else {
                     state.searchResults = []
                     return .none

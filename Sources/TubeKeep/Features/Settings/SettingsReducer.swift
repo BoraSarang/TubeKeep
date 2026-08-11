@@ -40,6 +40,8 @@ struct DerivedDataReport: Equatable {
 
 @Reducer
 struct SettingsReducer {
+    @Dependency(\.continuousClock) private var clock
+
     @ObservableState
     struct State: Equatable {
         var selectedTab: SettingsTab = .downloads
@@ -488,12 +490,15 @@ struct SettingsReducer {
                 return .none
 
             case .saveSettings:
-                return .run { [settings = state.settings] _ in
+                let settings = state.settings
+                return .run { _ in
+                    try await clock.sleep(for: .milliseconds(500))
                     if let data = try? JSONEncoder().encode(settings),
                        let json = String(data: data, encoding: .utf8) {
                         UserDefaults.standard.set(json, forKey: Constants.settingsSaveKey)
                     }
                 }
+                .cancellable(id: "saveSettings", cancelInFlight: true)
             }
         }
     }

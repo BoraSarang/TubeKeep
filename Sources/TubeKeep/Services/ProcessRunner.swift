@@ -24,12 +24,6 @@ final class ProcessBox: @unchecked Sendable {
 }
 
 actor ProcessRunner {
-    struct ProgressUpdate {
-        let percentage: Double
-        let speed: String
-        let eta: String
-    }
-
     private final class MutableData: @unchecked Sendable {
         var data = Data()
     }

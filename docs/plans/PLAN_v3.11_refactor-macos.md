@@ -82,9 +82,10 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - `PlayerReducer` 자막 상태 3개 필드(subtitleLoading/subtitleError/subtitleAvailable) → `enum SubtitleState`(idle/loading/available/failed) + Whisper 블록 분해
 - `SubtitlePanel` 인터페이스도 subtitleState 하나로 교체
 
-### T-M. debounce + 정리
-- `saveSettings` debounce 0.5s, 검색 `.debounce 300ms`
-- dead code: `insertFTSIndex`, `Format.isAudioOnly`, `ProcessRunner.ProgressUpdate`, `showSubtitleToastToast`
+### T-M. debounce + 정리 ✅
+- `saveSettings` debounce 0.5s, 검색 `.debounce 300ms` → TCA 1.26 `clock.sleep` + `.cancellable(cancelInFlight:)` 패턴 적용
+- dead code: `insertFTSIndex`, `ProcessRunner.ProgressUpdate` 제거 완료
+- `Format.isAudioOnly`, `showSubtitleToastToast` → 실제 사용 중이라 유지 (PLAN 목록과 다름)
 
 ## 테스트 계획
 - 1~4단계 각각 `swift build` + `swift test` (기준선 76/76) 통과
