@@ -78,8 +78,9 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - 7개 섹션 서브뷰 분리 + `SidebarSelectableRow` 행 통일
 - `SidebarSelectableRow` 신설: nav/filter/category/history/profile 5개 행 중복 통일 → LibrarySidebarView 865→797줄
 
-### T-L. 자막 상태 enum 전환
-- `PlayerReducer` 자막 상태 5개 boolean → `enum SubtitleState` + Whisper 블록 분해
+### T-L. 자막 상태 enum 전환 ✅
+- `PlayerReducer` 자막 상태 3개 필드(subtitleLoading/subtitleError/subtitleAvailable) → `enum SubtitleState`(idle/loading/available/failed) + Whisper 블록 분해
+- `SubtitlePanel` 인터페이스도 subtitleState 하나로 교체
 
 ### T-M. debounce + 정리
 - `saveSettings` debounce 0.5s, 검색 `.debounce 300ms`

@@ -3,9 +3,7 @@ import SwiftUI
 struct SubtitlePanel: View {
     let cues: [SubtitleCue]
     let currentTime: Double
-    let isLoading: Bool
-    let subtitleAvailable: Bool?
-    let errorMessage: String?
+    let subtitleState: SubtitleState
     let isTranscribing: Bool
     let transcribeError: String?
     let whisperProgressMessage: String?
@@ -21,14 +19,14 @@ struct SubtitlePanel: View {
                 VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text(whisperProgressMessage ?? errorMessage ?? "자막 생성 중...")
+                    Text(whisperProgressMessage ?? "자막 생성 중...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if isLoading {
+            } else if subtitleState == .loading {
                 VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -57,7 +55,7 @@ struct SubtitlePanel: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if cues.isEmpty, let available = subtitleAvailable {
+            } else if cues.isEmpty, case let .available(available) = subtitleState {
                 if available {
                     VStack(spacing: 8) {
                         Image(systemName: "captions.bubble")

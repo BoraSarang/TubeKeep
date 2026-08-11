@@ -220,9 +220,7 @@ struct PlayerView: View {
         SubtitlePanel(
             cues: store.subtitles,
             currentTime: mpv.currentTime,
-            isLoading: store.subtitleLoading,
-            subtitleAvailable: store.subtitleAvailable,
-            errorMessage: store.subtitleError,
+            subtitleState: store.subtitleState,
             isTranscribing: store.isTranscribing,
             transcribeError: store.transcribeError,
             whisperProgressMessage: store.whisperProgressMessage,

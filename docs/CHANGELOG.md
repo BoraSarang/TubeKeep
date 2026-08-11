@@ -29,6 +29,8 @@
   - 콜백 주입(isPlayerKeyWindow/onTogglePlayerPlayPause/onOpenSettings 등)으로 AppDelegate 상태 접근 유지
 - **SidebarSelectableRow 신설 (T-1114)**: LibrarySidebarView에서 5개 행(nav/filter/category/history/profile)이 반복하던 HStack+선택 배경+버튼 스타일을 `Features/Library/SidebarSelectableRow.swift`로 통일
   - 아이콘/카운트/trailing(ProgressView) 옵션 지원, LibrarySidebarView 865→797줄
+- **SubtitleState enum 전환 (T-1115)**: PlayerReducer의 자막 상태 3개 필드(subtitleLoading/subtitleError/subtitleAvailable)를 `Features/Player/SubtitleState.swift`의 `enum SubtitleState`(idle/loading/available/failed)로 통합
+  - `SubtitlePanel`은 isLoading/subtitleAvailable/errorMessage 3개 파라미터 대신 subtitleState 하나를 받도록 단순화
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

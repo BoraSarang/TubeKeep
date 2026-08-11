@@ -12,9 +12,7 @@ struct PlayerReducer {
         var currentTime: Double = 0
         var duration: Double = 0
         var subtitles: [SubtitleCue] = []
-        var subtitleLoading = false
-        var subtitleError: String?
-        var subtitleAvailable: Bool?
+        var subtitleState: SubtitleState = .idle
         var isPlaying = false
         var showSubtitleOverlay = false
         var showSubtitlePanel = false
@@ -123,9 +121,7 @@ struct PlayerReducer {
                 state.currentTime = 0
                 state.duration = 0
                 state.subtitles = []
-                state.subtitleLoading = false
-                state.subtitleError = nil
-                state.subtitleAvailable = nil
+                state.subtitleState = .idle
                 state.showUpNext = false
                 state.autoPlayCountdown = 0
                 state.recommendations = []
@@ -285,8 +281,7 @@ struct PlayerReducer {
                 state.duration = duration
                 if hadZeroDuration && state.playerItem.videoId != nil {
                     state.subtitles = []
-                    state.subtitleError = nil
-                    state.subtitleAvailable = nil
+                    state.subtitleState = .idle
                     return .send(.checkSubtitlesAvailability)
                 }
                 return .none
@@ -302,7 +297,7 @@ struct PlayerReducer {
 
             case .checkSubtitlesAvailability:
                 guard let videoId = state.playerItem.videoId else { return .none }
-                state.subtitleError = nil
+                state.subtitleState = .idle
                 state.transcribeError = nil
 
                 let data = DatabaseManager.shared.loadVideoAIData(videoId: videoId)
@@ -310,7 +305,6 @@ struct PlayerReducer {
                    let cues = try? JSONDecoder().decode([SubtitleCue].self, from: subtitlesData),
                    !cues.isEmpty {
                     state.subtitles = cues
-                    state.subtitleAvailable = nil
                     return .none
                 }
                 if let transcript = data?.transcript, !transcript.isEmpty {
@@ -319,19 +313,17 @@ struct PlayerReducer {
                         let estimated = PlayerReducer().estimateSubtitles(from: transcript, duration: duration)
                         if !estimated.isEmpty {
                             state.subtitles = estimated
-                            state.subtitleAvailable = nil
                             return .none
                         }
                     }
                     let fallback = PlayerReducer().fallbackCues(from: transcript)
                     if !fallback.isEmpty {
                         state.subtitles = fallback
-                        state.subtitleAvailable = nil
                         return .none
                     }
                 }
 
-                state.subtitleLoading = true
+                state.subtitleState = .loading
                 return .run { send in
                     let available = await YouTubeDLService().checkSubtitlesAvailability(videoId: videoId)
                     await send(.subtitlesAvailable(available))
@@ -339,17 +331,12 @@ struct PlayerReducer {
                 .cancellable(id: "checkSubtitlesAvailability", cancelInFlight: true)
 
             case let .subtitlesAvailable(available):
-                state.subtitleLoading = false
-                state.subtitleAvailable = available
-                if !available {
-                    state.subtitleError = "자막이 없습니다"
-                }
+                state.subtitleState = available ? .available(true) : .failed("자막이 없습니다")
                 return .none
 
             case .downloadSubtitles:
                 guard let videoId = state.playerItem.videoId else { return .none }
-                state.subtitleLoading = true
-                state.subtitleError = nil
+                state.subtitleState = .loading
                 return .run { send in
                     do {
                         let cues = try await YouTubeDLService().fetchSubtitles(videoId: videoId)
@@ -413,8 +400,7 @@ struct PlayerReducer {
                 .cancellable(id: "transcribeWithWhisper", cancelInFlight: true)
 
             case let .subtitlesLoaded(cues):
-                state.subtitleLoading = false
-                state.subtitleAvailable = nil
+                state.subtitleState = .available(true)
                 state.subtitles = cues
                 #if DEBUG
                 DebugLogManager.shared?.append("[Player] 자막 로딩 완료: \(cues.count)개")
@@ -422,24 +408,20 @@ struct PlayerReducer {
                 return .none
 
             case let .subtitlesFailed(error):
-                state.subtitleLoading = false
-                state.subtitleError = error
+                state.subtitleState = .failed(error)
                 #if DEBUG
                 DebugLogManager.shared?.append("[Player] 자막 로딩 실패: \(error)")
                 #endif
                 return .none
 
             case let .whisperProgress(msg):
-                state.subtitleLoading = true
-                state.subtitleError = nil
+                state.subtitleState = .loading
                 state.whisperProgressMessage = msg
                 return .none
 
             case let .whisperLoaded(cues):
                 state.isTranscribing = false
-                state.subtitleLoading = false
-                state.subtitleError = nil
-                state.subtitleAvailable = nil
+                state.subtitleState = .available(true)
                 state.whisperProgressMessage = nil
                 state.subtitles = cues
                 if let videoId = state.playerItem.videoId {
@@ -454,7 +436,7 @@ struct PlayerReducer {
 
             case let .whisperFailed(error):
                 state.isTranscribing = false
-                state.subtitleLoading = false
+                state.subtitleState = .idle
                 state.transcribeError = error
                 state.whisperProgressMessage = nil
                 return .none
@@ -464,7 +446,7 @@ struct PlayerReducer {
                     DatabaseManager.shared.deleteVideoAIData(videoId: videoId)
                 }
                 state.subtitles = []
-                state.subtitleError = "자막이 삭제되었습니다"
+                state.subtitleState = .failed("자막이 삭제되었습니다")
                 return .none
 
             case .toggleAlwaysOnTop:
