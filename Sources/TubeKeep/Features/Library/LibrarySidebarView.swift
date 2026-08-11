@@ -139,7 +139,8 @@ struct LibrarySidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: Constants.channelInfoDidUpdateNotification)) { note in
             if let channelId = note.userInfo?["channelId"] as? String {
                 LibraryCacheService.shared.clearAvatarCache(for: channelId)
-                updateAvatarURLs()
+                // channelNames(from:)이 구독 아바타 URL을 병합하므로 목록 · 아바타 함께 갱신
+                updateChannelNames(store.library.items)
             }
         }
         .onAppear {
@@ -853,13 +854,6 @@ private struct CategoryDropDelegate: DropDelegate {
                     return ai < bi
                 }
             }
-        }
-    }
-
-    private func updateAvatarURLs() {
-        let avatarURLs = Dictionary(uniqueKeysWithValues: SubscribedChannel.loadAll().map { ($0.id, $0.avatarURL) })
-        channelNames = channelNames.map {
-            (id: $0.id, name: $0.name, count: $0.count, avatarURL: avatarURLs[$0.id] ?? $0.avatarURL)
         }
     }
 
