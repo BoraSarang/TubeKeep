@@ -151,7 +151,6 @@ struct State: Equatable {
     // AI (v2.2.0: SummaryServiceMode 제거, 항상 자동 폴백)
     var geminiAPIKey: String = ""
     var openRouterAPIKey: String = ""
-    var ax4APIKey: String = ""
 
     var sponsorBlock: Bool = true           // v2.3.0
     var embedMetadata: Bool = true          // v2.3.0
@@ -536,13 +535,12 @@ final class LibraryCacheService {
   - FileManager.enumerator로 `storageDirectory` + `~/Library/Caches/com.tubekeep/` 순회, 파일 크기 합산
   - LibraryReducer.diskUsageBytes에 저장
 
-### 5.6 SummarizationService (actor) — v2.0.0/v2.4.0/v2.4.1/v2.5.0
-- `summarizeVideo(videoId:title:channel:openRouterAPIKey:ax4APIKey:geminiAPIKey:localFilePath:)` → `SummaryResult`
-  - **v2.4.1 폴백 체인**: OpenRouter → yTeaser → A.X 4.0 → Gemini (무료→유료 순서)
+### 5.6 SummarizationService (actor) — v2.0.0/v2.4.0/v2.4.1/v2.5.0/v3.11
+- `summarizeVideo(videoId:title:channel:openRouterAPIKey:geminiAPIKey:)` → `SummaryResult`
+  - **v3.11 폴백 체인**: OpenRouter → yTeaser → Gemini (A.X 4.0 서비스 종료로 제거)
   - 1순위: OpenRouter (`summarizeWithOpenRouter`) — 무료 티어, 모델: `openrouter/free`
   - 2순위: yTeaser (`summarizeWithYTeaser`) — 무료 50회/일 (IP 기반)
-  - 3순위: A.X 4.0 (`summarizeWithAX4`) — SKT 한국어 특화 LLM, 무료 API
-  - 4순위: Gemini (`summarize`) — Google Gemini API, 유료 (API 키 필요)
+  - 3순위: Gemini (`summarize`) — Google Gemini API, 유료 (API 키 필요)
   - `fetchTranscript(videoId:)` — yt-dlp `--write-subs --write-auto-subs`로 자막 다운로드 → VTT/SRT 파싱
   - `generateSummary(text:title:channel:)` — LLM API 호출 → 개요+핵심포인트+챕터 파싱
   - **v2.5.0**: DB 캐시 확인 후 API 호출, 결과를 DB에 저장
@@ -550,16 +548,10 @@ final class LibraryCacheService {
 - `summarizeFromLocalFile(videoPath:title:channel:openRouterAPIKey:geminiAPIKey:)` → `SummaryResult`
   - `extractTranscriptFromLocalFile(videoPath:)` — 같은 디렉토리의 `{videoId}.en.ko.vtt/srt` 검색
   - 외부 자막 파일 없으면 `fetchTranscript(videoId:)`로 YouTube 자막 다운로드 fallback
-- 의존성: OpenRouter (`openrouter.ai`), yTeaser (`yteaser.com`), A.X 4.0 (`guest-api.sktax.chat`), Gemini (`generativelanguage.googleapis.com`)
+- 의존성: OpenRouter (`openrouter.ai`), yTeaser (`yteaser.com`), Gemini (`generativelanguage.googleapis.com`)
 - 에러 처리: `noSubtitle` / `transcriptionFailed` / `summaryFailed` / `quotaExceeded` / `apiUnavailable`
 
-### 5.6.1 AX4Service (v2.4.0)
-- A.X 4.0 API 클라이언트 (OpenAI 호환 형식)
-- Base URL: `https://guest-api.sktax.chat/v1`
-- 모델: `ax4`
-- 한국어 특화 LLM (KMMLU 78.3점, CLIcK 83.5점)
-
-### 5.6.2 OpenRouterService (v2.4.1)
+### 5.6.1 OpenRouterService (v2.4.1)
 - OpenRouter Free Tier API 클라이언트 (OpenAI 호환 형식)
 - Base URL: `https://openrouter.ai/api/v1`
 - 모델: `openrouter/free`
@@ -571,15 +563,15 @@ final class LibraryCacheService {
 - 테이블: `qna_history` (id, video_id, question, answer, timestamps, created_at)
 - CRUD 메서드: saveVideoAIData / loadVideoAIData / updateTranscript / updateSummary / updateChapters / updateMindmap / updatePodcastPath / saveQnAEntry / loadQnAHistory 등
 
-### 5.6.4 QAService (v2.5.3)
+### 5.6.3 QAService (v2.5.3)
 - 트랜스크립트 기반 Q&A 생성 서비스 (actor)
-- 폴백 체인: OpenRouter → yTeaser → A.X 4.0 → Gemini
+- OpenRouter 전용 (`chatCompletion`)
 - 질문/답변 + 타임스탬프 응답 파싱
 - Q&A 히스토리 DB 저장/로드/삭제
 
-### 5.6.5 MindmapService (v2.5.4)
+### 5.6.4 MindmapService (v2.5.4)
 - 마인드맵 생성 서비스 (actor)
-- 폴백 체인: OpenRouter → yTeaser → A.X 4.0 → Gemini
+- OpenRouter 전용 (`chatCompletion`)
 - JSON 응답 → MindmapNode 트리 파싱 (재귀적, UUID 자동 생성)
 - 생성 결과 DB 저장 + LibraryReducer.mindmapNode에 전달
 
@@ -596,7 +588,7 @@ final class LibraryCacheService {
 
 ### 5.8 PodcastService (actor) — v2.5.2
 - `generatePodcastScript(transcript:title:channel:)` → PodcastScript
-  - LLM API 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+  - OpenRouter 전용 (`chatCompletionForPodcast`)
   - 2인 대화 스크립트 생성 (진행자A/B)
   - 15~25개 세그먼트
 - `synthesizeAudio(script:outputDir:)` → String (오디오 파일 경로)
@@ -693,7 +685,7 @@ VStack(spacing: 0)
 - 메뉴바 "설정..." (⌘,) + `NSEvent.addLocalMonitorForEvents` 글로벌 모니터로 모든 창에서 접근 가능
 - **v2.2.0**: 4탭 레이아웃 (일반/저장/시스템/AI 요약) → **v2.7.2**: 5탭 (다운로드/저장/알림 신규/시스템/AI 설정) — 좌측 140pt 사이드바 + 우측 ScrollView
 - `SettingsRow<Control>` 제네릭 컴포넌트: Title + Description 수직 스택 + Control
-- `SummaryServiceMode` 제거 (v2.2.0) — 항상 OpenRouter → yTeaser → A.X 4.0 → Gemini 자동 폴백
+- `SummaryServiceMode` 제거 (v2.2.0) — 항상 OpenRouter → yTeaser → Gemini 자동 폴백 (v3.11 A.X 4.0 제거)
 - 창 크기: 가로 560px 고정, 세로 420px 고정 (리사이즈 불가)
 
 ### 6.4 DownloadQueueView
@@ -899,9 +891,8 @@ enum Constants {
 | `UploadOrderService.swift` | 업로드 순번 조회 actor |
 | `TrendingService.swift` | yt-dlp `ytsearch` 기반 트렌딩 검색 + 30분 TTL 캐시 |
 | `SimilarVideoService.swift` | 재생 영상 기반 유사 영상 검색 (AI 검색어 생성 + 병렬 검색 + UserDefaults 캐시) (v3.3) |
-| `SummarizationService.swift` | OpenRouter → yTeaser → A.X 4.0 → Gemini 4단계 요약 |
-| `TaggingService.swift` | OpenRouter → A.X 4.0 → Gemini → 규칙 기반 자동 태깅 |
-| `AX4Service.swift` | SKT A.X 4.0 API 클라이언트 (OpenAI 호환) |
+| `SummarizationService.swift` | OpenRouter → yTeaser → Gemini 3단계 요약 |
+| `TaggingService.swift` | OpenRouter → Gemini → 규칙 기반 자동 태깅 |
 | `OpenRouterService.swift` | OpenRouter Free Tier API 클라이언트 (v2.4.1) |
 | `PodcastService.swift` | AI 팟캐스트 생성 (LLM + TTS) |
 | `TTSService.swift` | AVSpeechSynthesizer 래퍼 (한국어 TTS) |

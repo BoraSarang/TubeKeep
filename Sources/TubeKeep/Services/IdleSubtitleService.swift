@@ -424,7 +424,6 @@ final class IdleSubtitleService {
                     title: item.title,
                     channel: item.channelName,
                     openRouterAPIKey: keys.openRouter,
-                    ax4APIKey: keys.ax4,
                     geminiAPIKey: keys.gemini
                 )
                 guard !Task.isCancelled else { return }
@@ -446,7 +445,6 @@ final class IdleSubtitleService {
                         title: item.title,
                         channel: item.channelName,
                         openRouterAPIKey: keys.openRouter,
-                        ax4APIKey: keys.ax4,
                         geminiAPIKey: keys.gemini
                     )
                     var tagged = item

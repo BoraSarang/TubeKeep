@@ -30,7 +30,6 @@
 |------|-----|------|
 | [api/SETUP_GEMINI.md](api/SETUP_GEMINI.md) | Google Gemini | 현재 사용 |
 | [api/SETUP_OLLAMA.md](api/SETUP_OLLAMA.md) | Ollama | 레거시 (v2.1.0 이후 미사용) |
-| [api/AX4_ANALYSIS.md](api/AX4_ANALYSIS.md) | SKT A.X 4.0 | 현재 사용 |
 
 → 자세한 내용은 [api/README.md](api/README.md) 참조
 

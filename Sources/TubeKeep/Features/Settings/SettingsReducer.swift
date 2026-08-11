@@ -91,10 +91,6 @@ struct SettingsReducer {
             get { UserDefaults.standard.string(forKey: "geminiAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "geminiAPIKey") }
         }
-        var ax4APIKey: String {
-            get { UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey }
-            set { UserDefaults.standard.set(newValue, forKey: "ax4APIKey") }
-        }
 
         var settings: Settings {
             Settings(
@@ -184,7 +180,6 @@ struct SettingsReducer {
         case setOpenRouterAPIKey(String)
         case setOpenRouterModel(String)
         case setGeminiAPIKey(String)
-        case setAX4APIKey(String)
         case clearDerivedAIData
         case clearDerivedAIDataReported(DerivedDataReport?)
         case dismissClearReport
@@ -455,10 +450,6 @@ struct SettingsReducer {
 
             case let .setGeminiAPIKey(key):
                 state.geminiAPIKey = key
-                return .none
-
-            case let .setAX4APIKey(key):
-                state.ax4APIKey = key
                 return .none
 
             case .clearDerivedAIData:

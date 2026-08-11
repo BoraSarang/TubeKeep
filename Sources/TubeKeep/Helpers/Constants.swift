@@ -12,7 +12,6 @@ enum Constants {
     static let defaultStorageDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Documents/TubeKeep").path
     static let defaultFilenameTemplate = "{index} - {title}.{id}"
-    static let defaultAX4APIKey = ""
     static let defaultOpenRouterModel = "openrouter/free"
 
     static var youtubeExtractorArgs: String {

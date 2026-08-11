@@ -178,7 +178,7 @@ yt-dlp를 백엔드 엔진으로 사용, SwiftUI + TCA 아키텍처.
 
 ### 17. AI 팟캐스트 생성 (v2.5.2)
 - 자막을 분석하여 2인 대화형 팟캐스트 자동 생성
-- 대화 스크립트: LLM API 활용 (OpenRouter → yTeaser → A.X 4.0 → Gemini)
+- 대화 스크립트: LLM API 활용 (OpenRouter)
 - TTS: macOS 내장 AVSpeechSynthesizer (완전 무료, 오프라인)
 - 한국어 음성 지원 (Yuna, Siwoo 등)
 - 팟캐스트 생성/재생/삭제 기능

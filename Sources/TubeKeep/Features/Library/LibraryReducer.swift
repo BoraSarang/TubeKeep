@@ -872,7 +872,7 @@ case .trashItem(let id):
                     let service = SummarizationService()
                     let keys = Settings.loadAPIKeys()
                     do {
-                        let result = try await service.summarizeVideo(videoId: videoId, title: title, channel: channel, openRouterAPIKey: keys.openRouter, ax4APIKey: keys.ax4, geminiAPIKey: keys.gemini)
+                        let result = try await service.summarizeVideo(videoId: videoId, title: title, channel: channel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini)
                         await send(.discoverSummaryLoaded(videoId: videoId, text: "\(result.overview)\n\n" + result.keyPoints.map { "• \($0)" }.joined(separator: "\n"), provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
                         if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
@@ -940,7 +940,7 @@ case .trashItem(let id):
                     let service = SummarizationService()
                     let keys = Settings.loadAPIKeys()
                     do {
-                        let result = try await service.summarizeVideo(videoId: videoId, title: summaryTitle, channel: summaryChannel, openRouterAPIKey: keys.openRouter, ax4APIKey: keys.ax4, geminiAPIKey: keys.gemini, progress: progress)
+                        let result = try await service.summarizeVideo(videoId: videoId, title: summaryTitle, channel: summaryChannel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini, progress: progress)
                         await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
                         if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
@@ -972,7 +972,7 @@ case .trashItem(let id):
                     let service = SummarizationService()
                     let keys = Settings.loadAPIKeys()
                     do {
-                        let result = try await service.summarizeVideo(videoId: videoId, title: resummaryTitle, channel: resummaryChannel, openRouterAPIKey: keys.openRouter, ax4APIKey: keys.ax4, geminiAPIKey: keys.gemini, progress: progress)
+                        let result = try await service.summarizeVideo(videoId: videoId, title: resummaryTitle, channel: resummaryChannel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini, progress: progress)
                         await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
                     } catch let error as SummarizationService.SummaryError {
                         if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
@@ -1044,7 +1044,7 @@ case .trashItem(let id):
                 return .run { send in
                     let service = TaggingService()
                     let keys = Settings.loadAPIKeys()
-                    let tag = await service.classify(title: title, channel: channel, openRouterAPIKey: keys.openRouter, ax4APIKey: keys.ax4, geminiAPIKey: keys.gemini)
+                    let tag = await service.classify(title: title, channel: channel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini)
                     await send(.itemTagged(videoId: videoId, tag: tag))
                 }
 

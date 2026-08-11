@@ -51,7 +51,7 @@ actor SummarizationService {
         return try await generateSummary(text: text, title: title, channel: channel, apiKey: apiKey)
     }
 
-    func summarizeVideo(videoId: String, title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
+    func summarizeVideo(videoId: String, title: String, channel: String, openRouterAPIKey: String, geminiAPIKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
         AITaskTracker.shared.begin()
         defer { AITaskTracker.shared.end() }
         log("[AI Fallback] 요약 시작 — videoId: \(videoId), title: \(title)")
@@ -69,7 +69,7 @@ actor SummarizationService {
             return SummaryResult(overview: summary, keyPoints: [], chapters: chapters, provider: "cached")
         }
 
-        log("[AI Fallback] 사용 가능한 서비스 — OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), A.X: \(ax4APIKey.isEmpty ? "없음" : "있음"), Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음")")
+        log("[AI Fallback] 사용 가능한 서비스 — OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음")")
         
         // 1순위: OpenRouter (무료)
         if !openRouterAPIKey.isEmpty {
@@ -96,33 +96,17 @@ actor SummarizationService {
             log("[AI Fallback] ✅ yTeaser 성공 — videoId: \(videoId)")
             return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "yTeaser")
         } catch SummaryError.quotaExceeded {
-            log("[AI Fallback] ⚠️ yTeaser 할당량 초과 → A.X 4.0 시도 — videoId: \(videoId)")
+            log("[AI Fallback] ⚠️ yTeaser 할당량 초과 → Gemini 시도 — videoId: \(videoId)")
         } catch {
-            log("[AI Fallback] ❌ yTeaser 실패(\(error.localizedDescription)) → A.X 4.0 시도 — videoId: \(videoId)")
+            log("[AI Fallback] ❌ yTeaser 실패(\(error.localizedDescription)) → Gemini 시도 — videoId: \(videoId)")
         }
 
-        // 3순위: A.X 4.0
-        if !ax4APIKey.isEmpty {
-            log("[AI Fallback] 3순위: A.X 4.0 시도 — videoId: \(videoId)")
-            do {
-                let result = try await summarizeWithAX4(videoId: videoId, title: title, channel: channel, apiKey: ax4APIKey, progress: progress)
-                log("[AI Fallback] ✅ A.X 4.0 성공 — videoId: \(videoId)")
-                return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "A.X 4.0")
-            } catch AX4Error.serviceUnavailable {
-                log("[AI Fallback] ⚠️ A.X 4.0 게스트 API 종료 → Gemini 시도 — videoId: \(videoId)")
-            } catch {
-                log("[AI Fallback] ❌ A.X 4.0 실패(\(error.localizedDescription)) → Gemini 시도 — videoId: \(videoId)")
-            }
-        } else {
-            log("[AI Fallback] A.X 4.0 키 없음 → Gemini 시도 — videoId: \(videoId)")
-        }
-
-        // 4순위: Gemini (유료)
+        // 3순위: Gemini (유료)
         guard !geminiAPIKey.isEmpty else {
             log("[AI Fallback] ❌ Gemini 키 없음 → 요약 실패 — videoId: \(videoId)")
             throw SummaryError.apiUnavailable("모든 AI 요약 서비스를 사용할 수 없습니다. 설정에서 API 키를 확인해 주세요.")
         }
-        log("[AI Fallback] 4순위: Gemini 시도 — videoId: \(videoId)")
+        log("[AI Fallback] 3순위: Gemini 시도 — videoId: \(videoId)")
         let result = try await summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
         log("[AI Fallback] ✅ Gemini 성공 — videoId: \(videoId)")
         return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "Gemini")
@@ -144,16 +128,6 @@ actor SummarizationService {
         data.subtitleSource = source
         DatabaseManager.shared.saveVideoAIData(data)
         log("[Subtitle] ✅ 자막 DB 저장 완료 — videoId: \(videoId)")
-    }
-
-    // MARK: - A.X 4.0 API
-
-    func summarizeWithAX4(videoId: String, title: String, channel: String, apiKey: String, progress: (@Sendable (String) -> Void)? = nil) async throws -> SummaryResult {
-        let text = try await fetchTranscript(videoId: videoId, progress: progress)
-        progress?("요약 생성 중...")
-        let ax4 = AX4Service()
-        let result = try await ax4.generateSummary(transcript: text, title: title, channel: channel, apiKey: apiKey)
-        return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "A.X 4.0")
     }
 
     // MARK: - yTeaser API

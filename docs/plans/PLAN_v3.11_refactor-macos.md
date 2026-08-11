@@ -49,6 +49,12 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 ### T-I. HTTP 요청/재시도 공통화
 - HTTP 요청 4벌 + 재시도 정책 제각각 → `LLMHTTPClient` 1벌 + 공통 지수 백오프
 
+### T-N. A.X 4.0(AX4) 서비스 전면 제거 (사용자 요청)
+- SKT A.X 4.0 게스트 API(`guest-api.sktax.chat`) 서비스 종료 → 기능 전체 삭제
+- 삭제 대상: `AX4Service.swift`(파일 삭제), `AX4Error`, `summarizeWithAX4`, `classifyWithAX4`, `Settings.ax4APIKey`, `SettingsReducer.setAX4APIKey`, `SettingsAITab` A.X 4.0 섹션, `Constants.defaultAX4APIKey`
+- 폴백 체인 변경: 요약 `OpenRouter → yTeaser → Gemini`, 태깅 `OpenRouter → Gemini → 규칙`
+- 호출부 파라미터 제거: `SummarizationService.summarizeVideo`, `TaggingService.classify`, `LibraryReducer` 4곳, `IdleSubtitleService` 2곳
+
 ## 4단계: 구조 개선
 
 ### T-J. AppDelegate 분해 (925줄)

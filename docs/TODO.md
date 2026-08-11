@@ -8,12 +8,13 @@
 | T-1104 | **1단계-A 프로세스 고아화** (DownloadManager/SummarizationService/convertMP3ToAIFF) | high | done | 취소 시 terminate+SIGKILL, withTaskCancellationHandler |
 | T-1105 | **1단계-B 콜백/Continuation 누락** (TTSService completion, EdgeTTSClient hang) | high | done | didFinish/didCancel + cancellationHandler |
 | T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | done | DatabaseManager |
-| T-1107 | **2단계-D 채널 ID 교정 단일화** (normalizeUserID) | high | pending | UC_ 핸들 마이그레이션 |
-| T-1108 | **2단계-E 아바타 캐시 중앙화** | medium | pending | v3.10 연계 |
+| T-1107 | **2단계-D 채널 ID 교정 단일화** (normalizeUserID) | high | done | isRealChannelID/normalizeChannelID + migrateChannelIDs(UC_→실제ID) |
+| T-1108 | **2단계-E 아바타 캐시 중앙화** | medium | done | updateAvatarURLs 중복 제거, channelNames 단일 소스 |
 | T-1109 | **3단계-F LLMChainExecutor 신설** | medium | pending | 폴백 4벌 단일화 |
 | T-1110 | **3단계-G 요약 프롬프트 단일화** (LLMPrompts) | medium | pending | |
 | T-1111 | **3단계-H 파서 단일화 + 태그 세트 통일** (SummaryParser) | medium | pending | |
 | T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | pending | 백오프 공통 |
+| T-1118 | **3단계-N A.X 4.0 전면 제거** (사용자 요청) | high | done | AX4Service 삭제 + 폴백 체인 단순화(요약 OR→yTeaser→Gemini, 태깅 OR→Gemini→규칙) |
 | T-1113 | **4단계-J AppDelegate 분해** (WindowFactory/CommandHandler) | low | pending | 925줄 |
 | T-1114 | **4단계-K LibrarySidebarView 분해** | low | pending | 871줄 |
 | T-1115 | **4단계-L 자막 상태 enum 전환** | low | pending | |

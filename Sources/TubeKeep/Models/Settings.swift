@@ -79,7 +79,6 @@ struct Settings: Equatable, Codable {
     var openRouterAPIKey: String = ""
     var openRouterModel: String = "openrouter/free"
     var geminiAPIKey: String = ""
-    var ax4APIKey: String = Constants.defaultAX4APIKey
     var showMainWindowOnLaunch: Bool = true
     var sponsorBlock: Bool = true
     var embedMetadata: Bool = true
@@ -117,7 +116,7 @@ struct Settings: Equatable, Codable {
         case concurrentDownloads, filenameTemplate, limitRate
         case playSoundOnComplete, clipboardMonitoring, showOnlyVideo
         case defaultResolution, maxRetries, launchAtLogin, maxUploadCheck, skipIndexOnFailure
-        case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, ax4APIKey, showMainWindowOnLaunch
+        case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, showMainWindowOnLaunch
         case sponsorBlock, embedMetadata, showThumbnailPreview, ttsEngine, playerMode, showChannelBadge
         case subtitleLanguageOverride, enableWhisperTranscription, whisperModelSize
         case showMenuBarNotifications, menuBarNotificationDuration, presets, activePresetId, smartMode
@@ -140,7 +139,6 @@ struct Settings: Equatable, Codable {
         openRouterAPIKey: String = "",
         openRouterModel: String = "openrouter/free",
         geminiAPIKey: String = "",
-        ax4APIKey: String = Constants.defaultAX4APIKey,
         showMainWindowOnLaunch: Bool = true,
         sponsorBlock: Bool = true,
         embedMetadata: Bool = true,
@@ -177,7 +175,6 @@ struct Settings: Equatable, Codable {
         self.openRouterAPIKey = openRouterAPIKey
         self.openRouterModel = openRouterModel
         self.geminiAPIKey = geminiAPIKey
-        self.ax4APIKey = ax4APIKey
         self.showMainWindowOnLaunch = showMainWindowOnLaunch
         self.sponsorBlock = sponsorBlock
         self.embedMetadata = embedMetadata
@@ -217,7 +214,6 @@ struct Settings: Equatable, Codable {
         openRouterAPIKey = try c.decodeIfPresent(String.self, forKey: .openRouterAPIKey) ?? ""
         openRouterModel = try c.decodeIfPresent(String.self, forKey: .openRouterModel) ?? "openrouter/free"
         geminiAPIKey = try c.decodeIfPresent(String.self, forKey: .geminiAPIKey) ?? ""
-        ax4APIKey = try c.decodeIfPresent(String.self, forKey: .ax4APIKey) ?? Constants.defaultAX4APIKey
         showMainWindowOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showMainWindowOnLaunch) ?? true
         sponsorBlock = try c.decodeIfPresent(Bool.self, forKey: .sponsorBlock) ?? true
         embedMetadata = try c.decodeIfPresent(Bool.self, forKey: .embedMetadata) ?? true
@@ -257,7 +253,6 @@ struct Settings: Equatable, Codable {
         try c.encode(openRouterAPIKey, forKey: .openRouterAPIKey)
         try c.encode(openRouterModel, forKey: .openRouterModel)
         try c.encode(geminiAPIKey, forKey: .geminiAPIKey)
-        try c.encode(ax4APIKey, forKey: .ax4APIKey)
         try c.encode(showMainWindowOnLaunch, forKey: .showMainWindowOnLaunch)
         try c.encode(sponsorBlock, forKey: .sponsorBlock)
         try c.encode(embedMetadata, forKey: .embedMetadata)
@@ -287,14 +282,12 @@ struct Settings: Equatable, Codable {
 
     struct APIKeys {
         let openRouter: String
-        let ax4: String
         let gemini: String
     }
 
     static func loadAPIKeys() -> APIKeys {
         APIKeys(
             openRouter: UserDefaults.standard.string(forKey: "openRouterAPIKey") ?? "",
-            ax4: UserDefaults.standard.string(forKey: "ax4APIKey") ?? Constants.defaultAX4APIKey,
             gemini: UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
         )
     }

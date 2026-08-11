@@ -7,7 +7,7 @@ actor TaggingService {
         "요리/음식", "여행/일상", "과학",
     ]
 
-    func classify(title: String, channel: String, openRouterAPIKey: String, ax4APIKey: String, geminiAPIKey: String) async -> String {
+    func classify(title: String, channel: String, openRouterAPIKey: String, geminiAPIKey: String) async -> String {
         AITaskTracker.shared.begin()
         defer { AITaskTracker.shared.end() }
         // 1순위: OpenRouter (무료)
@@ -19,33 +19,15 @@ actor TaggingService {
                     log("[AI Fallback] OpenRouter 태깅 성공: \(tag) — \(title)")
                     return tag
                 }
-                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → A.X 4.0 시도 — \(title)")
+                log("[AI Fallback] OpenRouter 태깅 결과 미매칭(\(tag)) → Gemini 시도 — \(title)")
             } catch {
-                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → A.X 4.0 시도 — \(title)")
+                log("[AI Fallback] OpenRouter 태깅 실패(\(error.localizedDescription)) → Gemini 시도 — \(title)")
             }
         } else {
-            log("[AI Fallback] OpenRouter 키 없음 → A.X 4.0 시도 — \(title)")
+            log("[AI Fallback] OpenRouter 키 없음 → Gemini 시도 — \(title)")
         }
 
-        // 2순위: A.X 4.0
-        if !ax4APIKey.isEmpty {
-            do {
-                let tag = try await classifyWithAX4(title: title, channel: channel, apiKey: ax4APIKey)
-                if predefinedTags.contains(tag) {
-                    log("[AI Fallback] A.X 4.0 태깅 성공: \(tag) — \(title)")
-                    return tag
-                }
-                log("[AI Fallback] A.X 4.0 태깅 결과 미매칭(\(tag)) → Gemini 시도 — \(title)")
-            } catch AX4Error.serviceUnavailable {
-                log("[AI Fallback] A.X 4.0 게스트 API 종료 → Gemini 시도 — \(title)")
-            } catch {
-                log("[AI Fallback] A.X 4.0 태깅 실패 → Gemini 시도 — \(title)")
-            }
-        } else {
-            log("[AI Fallback] A.X 4.0 키 없음 → Gemini 시도 — \(title)")
-        }
-
-        // 3순위: Gemini (유료)
+        // 2순위: Gemini (유료)
         if !geminiAPIKey.isEmpty {
             let prompt = """
             Classify the following YouTube video into exactly ONE category.
@@ -66,7 +48,7 @@ actor TaggingService {
             log("[AI Fallback] Gemini 키 없음 → 규칙 기반 분류 — \(title)")
         }
 
-        // 4순위: 규칙 기반
+        // 3순위: 규칙 기반
         let fallback = autoClassify(title: title, channel: channel)
         log("[AI Fallback] 규칙 기반 태깅: \(fallback) — \(title)")
         return fallback
@@ -78,11 +60,6 @@ actor TaggingService {
             DebugLogManager.shared?.append(message)
         }
         #endif
-    }
-
-    private func classifyWithAX4(title: String, channel: String, apiKey: String) async throws -> String {
-        let ax4 = AX4Service()
-        return try await ax4.classifyTag(title: title, channel: channel, apiKey: apiKey)
     }
 
     private func autoClassify(title: String, channel: String) -> String {
