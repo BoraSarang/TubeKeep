@@ -401,13 +401,12 @@ final class LibraryCacheService {
     /// - 보관함(LibraryItem.channelId)과 구독(SubscribedChannel.id) 모두 대상.
     @discardableResult
     func migrateChannelIDs() -> (items: Int, channels: Int) {
-        let realByToken: [String: String] = Dictionary(
-            uniqueKeysWithValues: (try? context.fetch(FetchDescriptor<LibraryItem>(sortBy: [])))?
-                .compactMap { item -> (String, String)? in
-                    guard Self.isRealChannelID(item.channelId) else { return nil }
-                    return (item.channelName, item.channelId)
-                } ?? []
-        )
+        let pairs = (try? context.fetch(FetchDescriptor<LibraryItem>(sortBy: [])))?
+            .compactMap { item -> (String, String)? in
+                guard Self.isRealChannelID(item.channelId) else { return nil }
+                return (item.channelName, item.channelId)
+            } ?? []
+        let realByToken = Dictionary(pairs, uniquingKeysWith: { first, _ in first })
 
         var itemFix = 0
         let items = (try? context.fetch(FetchDescriptor<LibraryItem>(sortBy: []))) ?? []
