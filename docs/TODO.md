@@ -1,5 +1,27 @@
 # TODO — 작업 추적 목록
 
+## v3.11 — 안정성 버그 + 채널 ID 정규화 + AI 폴백 통합 + 구조 개선 (macOS) 🚧
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1103 | **PLAN_v3.11 + TODO 등록 + 기준선(76/76)** | high | 진행중 | docs/plans/PLAN_v3.11_refactor-macos.md |
+| T-1104 | **1단계-A 프로세스 고아화** (DownloadManager/SummarizationService/convertMP3ToAIFF) | high | pending | 취소 시 terminate |
+| T-1105 | **1단계-B 콜백/Continuation 누락** (TTSService completion, EdgeTTSClient hang) | high | pending | didFinish/didCancel + cancellationHandler |
+| T-1106 | **1단계-C DB 크래시** (errMsg! 언랩, SQLITE_STATIC) | high | pending | DatabaseManager |
+| T-1107 | **2단계-D 채널 ID 교정 단일화** (normalizeUserID) | high | pending | UC_ 핸들 마이그레이션 |
+| T-1108 | **2단계-E 아바타 캐시 중앙화** | medium | pending | v3.10 연계 |
+| T-1109 | **3단계-F LLMChainExecutor 신설** | medium | pending | 폴백 4벌 단일화 |
+| T-1110 | **3단계-G 요약 프롬프트 단일화** (LLMPrompts) | medium | pending | |
+| T-1111 | **3단계-H 파서 단일화 + 태그 세트 통일** (SummaryParser) | medium | pending | |
+| T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | pending | 백오프 공통 |
+| T-1113 | **4단계-J AppDelegate 분해** (WindowFactory/CommandHandler) | low | pending | 925줄 |
+| T-1114 | **4단계-K LibrarySidebarView 분해** | low | pending | 871줄 |
+| T-1115 | **4단계-L 자막 상태 enum 전환** | low | pending | |
+| T-1116 | **4단계-M debounce/dead code 정리** | low | pending | |
+| T-1117 | **마무리** (CHANGELOG v3.11 + 에러코드 + 세션) | high | pending | E-MAC-API-3003 |
+
+---
+
 ## v3.10 — 채널 아바타 동기화 (macOS) ✅
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
