@@ -21,6 +21,10 @@
 - **LLMHTTPClient 공통화 (T-1112)**: HTTP 요청/재시도 로직이 Gemini(429 4회·지수백오프)·OpenRouter(모델 폴백)·yTeaser로 제각각이던 것을 `LLMHTTPClient.swift` 1벌로 통일
   - `LLMHTTPClient.postJSON` — POST JSON + Bearer 인증 + 추가 헤더 + 429 지수 백오프 재시도 + 상태 로깅 훅
   - `GeminiService.query` / `OpenRouterService.sendRequest` / `SummarizationService.summarizeWithYTeaser` 공통 적용
+- **WindowFactory 분해 (T-1113 일부)**: AppDelegate에 중복되던 9개 창 생성 코드(identifier/styleMask/center/activate ~180줄)를 `App/WindowFactory.swift`로 통일
+  - `WindowFactory.makeWindow` — SwiftUI 뷰 → 공통 설정 NSWindow 구성 (size/styleMask/zoom/level/background)
+  - `WindowFactory.present` — center + makeKeyAndOrderFront + activate 공통화
+  - 적용 창: lib/downloader/batch/channel/about/settings/qna/debugLog 8개 (player는 PlayerWindow 서브클래스라 유지)
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

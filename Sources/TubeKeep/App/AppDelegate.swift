@@ -412,24 +412,20 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         let rootView = MainView(store: store)
             .modelContainer(PersistenceController.shared.container)
 
-        let hostingCtrl = NSHostingController(rootView: rootView)
         let localizedTitle = Locale.preferredLanguages.first?.hasPrefix("ko") == true
             ? "튜브킵"
             : "TubeKeep"
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = localizedTitle
-        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        window.showsResizeIndicator = true
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("lib")
-        window.contentMinSize = NSSize(width: 840, height: 500)
-        window.setContentSize(NSSize(width: 840, height: 640))
+        let window = WindowFactory.makeWindow(
+            identifier: "lib",
+            title: localizedTitle,
+            rootView: rootView,
+            contentSize: NSSize(width: 840, height: 640),
+            minSize: NSSize(width: 840, height: 500),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable]
+        )
         let controller = FixedWidthWindowController(window: window)
         libraryWindowController = controller
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        WindowFactory.present(window)
     }
 
     // MARK: - Video Downloader Window
@@ -448,20 +444,16 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         #endif
         let rootView = VideoDownloadView(store: store)
 
-        let hostingCtrl = NSHostingController(rootView: rootView)
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "영상 다운로더"
-        window.styleMask = [.titled, .closable, .resizable]
-        window.showsResizeIndicator = false
-        window.isReleasedWhenClosed = false
-        window.standardWindowButton(.zoomButton)?.isEnabled = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("downloader")
-        window.contentMinSize = NSSize(width: 520, height: 300)
-        window.setContentSize(NSSize(width: 520, height: 480))
-        window.center()
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        let window = WindowFactory.makeWindow(
+            identifier: "downloader",
+            title: "영상 다운로더",
+            rootView: rootView,
+            contentSize: NSSize(width: 520, height: 480),
+            minSize: NSSize(width: 520, height: 300),
+            styleMask: [.titled, .closable, .resizable],
+            zoomEnabled: false
+        )
+        WindowFactory.present(window)
         videoDownloaderWindow = window
     }
 
@@ -491,20 +483,16 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         #endif
         let rootView = BatchDownloadView(store: store)
 
-        let hostingCtrl = NSHostingController(rootView: rootView)
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "일괄 다운로더"
-        window.styleMask = [.titled, .closable, .resizable]
-        window.showsResizeIndicator = false
-        window.isReleasedWhenClosed = false
-        window.standardWindowButton(.zoomButton)?.isEnabled = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("batch")
-        window.contentMinSize = NSSize(width: 480, height: 340)
-        window.setContentSize(NSSize(width: 480, height: 420))
-        window.center()
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        let window = WindowFactory.makeWindow(
+            identifier: "batch",
+            title: "일괄 다운로더",
+            rootView: rootView,
+            contentSize: NSSize(width: 480, height: 420),
+            minSize: NSSize(width: 480, height: 340),
+            styleMask: [.titled, .closable, .resizable],
+            zoomEnabled: false
+        )
+        WindowFactory.present(window)
     }
 
     // MARK: - Channel Downloader Window
@@ -534,21 +522,17 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 
         pendingChannelId = nil
         pendingChannelData = nil
-        let hostingCtrl = NSHostingController(rootView: rootView)
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "채널 다운로더"
-        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        window.showsResizeIndicator = true
-        window.isReleasedWhenClosed = false
-        window.standardWindowButton(.zoomButton)?.isEnabled = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("channel")
-        window.contentMinSize = NSSize(width: 720, height: 400)
-        window.contentMaxSize = NSSize(width: 720, height: 9999)
-        window.setContentSize(NSSize(width: 720, height: 520))
-        window.center()
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        let window = WindowFactory.makeWindow(
+            identifier: "channel",
+            title: "채널 다운로더",
+            rootView: rootView,
+            contentSize: NSSize(width: 720, height: 520),
+            minSize: NSSize(width: 720, height: 400),
+            maxSize: NSSize(width: 720, height: 9999),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            zoomEnabled: false
+        )
+        WindowFactory.present(window)
         channelDownloaderWindow = window
     }
 
@@ -562,18 +546,14 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     // MARK: - About Window
 
     @objc func openAboutWindow() {
-        let hostingCtrl = NSHostingController(rootView: AboutView())
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "정보"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("about")
-        window.contentMinSize = NSSize(width: 440, height: 200)
-        window.setContentSize(NSSize(width: 440, height: 200))
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        let window = WindowFactory.makeWindow(
+            identifier: "about",
+            title: "정보",
+            rootView: AboutView(),
+            contentSize: NSSize(width: 440, height: 200),
+            minSize: NSSize(width: 440, height: 200)
+        )
+        WindowFactory.present(window)
     }
 
     // MARK: - Settings Window
@@ -585,21 +565,15 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             return
         }
 
-        let hostingCtrl = NSHostingController(
-            rootView: SettingsView(store: store.scope(state: \.settings, action: \.settings))
+        let window = WindowFactory.makeWindow(
+            identifier: "settings",
+            title: "설정",
+            rootView: SettingsView(store: store.scope(state: \.settings, action: \.settings)),
+            contentSize: NSSize(width: 640, height: 420)
         )
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "설정"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("settings")
-        window.setContentSize(NSSize(width: 640, height: 420))
         window.contentMinSize = window.frame.size
         window.contentMaxSize = window.frame.size
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        WindowFactory.present(window)
         settingsWindow = window
     }
 
@@ -621,17 +595,12 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
         let windowHeight = min(560, screenHeight - 40)
 
-        let hostingCtrl = NSHostingController(
-            rootView: AIWindowView(store: store)
+        let window = WindowFactory.makeWindow(
+            identifier: "qna",
+            title: "AI 기능",
+            rootView: AIWindowView(store: store),
+            contentSize: NSSize(width: 560, height: windowHeight)
         )
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "AI 기능"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("qna")
-        window.setContentSize(NSSize(width: 560, height: windowHeight))
-        window.center()
         window.center()
         window.makeKeyAndOrderFront(nil)
         DispatchQueue.main.async {
@@ -704,23 +673,18 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             return
         }
 
-        let hostingCtrl = NSHostingController(
-            rootView: DebugLogWindowView()
+        let window = WindowFactory.makeWindow(
+            identifier: "debugLog",
+            title: "🐛 Debug Logs",
+            rootView: DebugLogWindowView(),
+            contentSize: NSSize(width: 600, height: 320),
+            minSize: NSSize(width: 400, height: 200),
+            maxSize: NSSize(width: 2000, height: 1200),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            level: .floating + 100,
+            movableByBackground: true
         )
-        let window = NSWindow(contentViewController: hostingCtrl)
-        window.title = "🐛 Debug Logs"
-        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        window.isReleasedWhenClosed = false
-        window.isMovableByWindowBackground = true
-        window.collectionBehavior = [.managed, .ignoresCycle]
-        window.identifier = NSUserInterfaceItemIdentifier("debugLog")
-        window.contentMinSize = NSSize(width: 400, height: 200)
-        window.maxSize = NSSize(width: 2000, height: 1200)
-        window.setContentSize(NSSize(width: 600, height: 320))
-        window.level = .floating + 100
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        WindowFactory.present(window)
         debugLogWindow = window
     }
 

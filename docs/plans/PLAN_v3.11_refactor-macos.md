@@ -70,9 +70,9 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 
 ## 4단계: 구조 개선
 
-### T-J. AppDelegate 분해 (925줄)
-- `WindowFactory`: 9개 창 생성 중복 ~180줄 통일 (identifier/styleMask/center)
-- `CommandHandler`: 특수키 핸들러 74줄 분리
+### T-J. AppDelegate 분해 (926줄) 🚧
+- `WindowFactory`: 9개 창 생성 중복 ~180줄 통일 (identifier/styleMask/center) — 8개 창 적용 완료, AppDelegate 926→890줄
+- `CommandHandler`: 특수키 핸들러 74줄 분리 (진행 예정)
 
 ### T-K. LibrarySidebarView 분해 (871줄)
 - 7개 섹션 서브뷰 분리 + `SidebarSelectableRow` 행 통일
