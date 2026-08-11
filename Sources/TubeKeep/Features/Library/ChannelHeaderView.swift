@@ -220,14 +220,12 @@ struct ChannelHeaderView: View {
         // 2) 같은 이름/토큰의 보관함 아이템에서 실제 UC 채널 ID(24자) 탐색 — 잘못 저장된 핸들 형식 교정
         if let realId = items.first(where: {
             $0.channelName != channelName
-                && $0.channelId.hasPrefix("UC")
-                && $0.channelId.count == 24
+                && LibraryCacheService.isRealChannelID($0.channelId)
                 && $0.channelId != channelId
                 && nameTokensMatch($0.channelName, channelName)
         })?.channelId ?? items.first(where: {
             $0.channelName == channelName
-                && $0.channelId.hasPrefix("UC")
-                && $0.channelId.count == 24
+                && LibraryCacheService.isRealChannelID($0.channelId)
                 && $0.channelId != channelId
         })?.channelId {
             return "https://www.youtube.com/channel/\(realId)"
@@ -240,13 +238,13 @@ struct ChannelHeaderView: View {
             if let handle = match.handle, !handle.isEmpty {
                 return "https://www.youtube.com/\(handle)"
             }
-            if match.id.hasPrefix("UC"), match.id.count == 24 {
+            if LibraryCacheService.isRealChannelID(match.id) {
                 return "https://www.youtube.com/channel/\(match.id)"
             }
         }
 
         // 4) 실제 채널 ID(UC로 시작 + 22자)만 channel/ 경로로 구성
-        if channelId.hasPrefix("UC"), channelId.count == 24 {
+        if LibraryCacheService.isRealChannelID(channelId) {
             return "https://www.youtube.com/channel/\(channelId)"
         }
         if channelId.hasPrefix("@") {
@@ -261,28 +259,7 @@ struct ChannelHeaderView: View {
 
     /// 두 채널 이름의 유효 토큰(한글/영문 단어) 공통 여부 확인 — "지무비 G Movie" vs "지무비 : G Movie" 매칭
     private func nameTokensMatch(_ a: String, _ b: String) -> Bool {
-        guard !a.isEmpty, !b.isEmpty else { return false }
-        if a == b { return true }
-        let tokensA = Set(nameTokens(a))
-        let tokensB = Set(nameTokens(b))
-        guard tokensA.count >= 2, tokensB.count >= 2 else {
-            return false
-        }
-        return tokensA.intersection(tokensB).count >= 2
-    }
-
-    private func nameTokens(_ name: String) -> [String] {
-        var tokens: Set<String> = []
-        // 한글/알파벳/숫자 덩어리로 분리
-        let regex = try? NSRegularExpression(pattern: "[\\p{L}\\p{N}]{2,}")
-        if let regex {
-            let ns = name as NSString
-            for match in regex.matches(in: name, range: NSRange(location: 0, length: ns.length)) {
-                let token = ns.substring(with: match.range)
-                tokens.insert(token.lowercased())
-            }
-        }
-        return Array(tokens)
+        LibraryCacheService.nameTokensMatch(a, b)
     }
 
     private func refreshChannelInfo() {

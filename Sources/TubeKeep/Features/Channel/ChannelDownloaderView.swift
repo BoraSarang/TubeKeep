@@ -390,7 +390,7 @@ struct ChannelDownloaderView: View {
                 let url: String
                 if let handle = channel.handle, !handle.isEmpty {
                     url = "https://www.youtube.com/\(handle)"
-                } else if channel.id.hasPrefix("UC"), channel.id.count == 24 {
+                } else if LibraryCacheService.isRealChannelID(channel.id) {
                     url = "https://www.youtube.com/channel/\(channel.id)"
                 } else {
                     url = "https://www.youtube.com/channel/\(channel.id)"

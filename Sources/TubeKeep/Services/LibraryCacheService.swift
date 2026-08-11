@@ -333,7 +333,7 @@ final class LibraryCacheService {
         for entry in entries {
             if let idx = merged.firstIndex(where: { nameTokensMatch($0.name, entry.name) }) {
                 // 실제 UC ID(24자)가 있으면 그것을 우선 키로 사용
-                merged[idx].id = (entry.id.hasPrefix("UC") && entry.id.count == 24) ? entry.id : merged[idx].id
+                merged[idx].id = Self.isRealChannelID(entry.id) ? entry.id : merged[idx].id
                 merged[idx].name = entry.name
                 merged[idx].count += entry.count
             } else {
@@ -379,6 +379,60 @@ final class LibraryCacheService {
             }
         }
         return Array(tokens)
+    }
+
+    // MARK: - Channel ID Normalization
+
+    /// 실제 YouTube 채널 ID(UC + 22자 = 24자, 핸들 형식 UC_.. 제외) 여부
+    nonisolated static func isRealChannelID(_ id: String) -> Bool {
+        id.hasPrefix("UC") && id.count == 24
+    }
+
+    /// 채널 ID 교정: 실제 UC ID(24자)면 그대로, 아니면 기존 값 유지.
+    /// 아이템/구독에서 실제 ID를 우선 키로 쓸 수 있도록 한다.
+    nonisolated static func normalizeChannelID(_ id: String, prefer candidates: [String] = []) -> String {
+        if isRealChannelID(id) { return id }
+        // 서로 다른 저장소에 실제 UC ID가 있으면 그것을 우선
+        if let real = candidates.first(where: { isRealChannelID($0) }) { return real }
+        return id
+    }
+
+    /// 잘못 저장된 핸들 형식(UC_..) 채널 ID를 채널명 토큰 매칭으로 실제 UC ID로 복구한다.
+    /// - 보관함(LibraryItem.channelId)과 구독(SubscribedChannel.id) 모두 대상.
+    @discardableResult
+    func migrateChannelIDs() -> (items: Int, channels: Int) {
+        let realByToken: [String: String] = Dictionary(
+            uniqueKeysWithValues: (try? context.fetch(FetchDescriptor<LibraryItem>(sortBy: [])))?
+                .compactMap { item -> (String, String)? in
+                    guard Self.isRealChannelID(item.channelId) else { return nil }
+                    return (item.channelName, item.channelId)
+                } ?? []
+        )
+
+        var itemFix = 0
+        let items = (try? context.fetch(FetchDescriptor<LibraryItem>(sortBy: []))) ?? []
+        for item in items where !Self.isRealChannelID(item.channelId) {
+            if let real = realByToken.first(where: { nameTokensMatch($0.key, item.channelName) })?.value {
+                item.channelId = real
+                itemFix += 1
+            }
+        }
+
+        var channelFix = 0
+        let channels = SubscribedChannel.loadAll()
+        for channel in channels where !Self.isRealChannelID(channel.id) {
+            if let real = realByToken.first(where: { nameTokensMatch($0.key, channel.name) })?.value {
+                channel.id = real
+                channelFix += 1
+            }
+        }
+
+        if itemFix > 0 { try? context.save() }
+        if channelFix > 0 { SubscribedChannel.saveAll(channels) }
+        if itemFix + channelFix > 0 {
+            DebugLogManager.shared?.append("[Channel] 🪄 채널 ID 마이그레이션: items \(itemFix)개, channels \(channelFix)개")
+        }
+        return (itemFix, channelFix)
     }
 
     // MARK: - Thumbnail Cache

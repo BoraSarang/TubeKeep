@@ -92,6 +92,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         setupManagers()
 
         LibraryCacheService.shared.autoPurgeTrash(olderThan: 30)
+        LibraryCacheService.shared.migrateChannelIDs()
 
         Task { await BundledLibraryManager.shared.warmUp() }
 
