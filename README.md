@@ -4,6 +4,10 @@
 > 채널을 구독하듯 담고, 영상을 내 것으로. 그리고 AI가 비서처럼 정리해 줍니다.
 
 <p align="center">
+  <img src="docs/app-icon.png" alt="TubeKeep 아이콘" width="96"/>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/app/main.png" alt="TubeKeep 메인 화면" width="760"/>
 </p>
 
