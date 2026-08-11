@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var pendingChannelId: String?
     private var pendingChannelData: [String: Any]?
     private var keyMonitor: Any?
+    private var keyCommandHandler: KeyCommandHandler?
 
     #if DEBUG
     private var debugLogWindow: NSWindow?
@@ -172,6 +173,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             onToggleDebugPanel: { [weak self] in self?.toggleDebugLogWindow() },
             onToggleDebugAutoScroll: { [weak self] in self?.debugToggleAutoScroll() }
         )
+        keyCommandHandler = keyHandler
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak keyHandler] event in
             keyHandler?.handle(event) ?? event
         }
