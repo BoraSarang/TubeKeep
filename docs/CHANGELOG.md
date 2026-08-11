@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1111) 🚧
+## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1112) 🚧
 
 ### 리팩토링
 - **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화
@@ -18,6 +18,9 @@
   - `SummaryParser.predefinedTags` 10개 — 태깅 카테고리 단일 진실 (Gemini/OpenRouter 공통)
   - `SummaryParser.parseChapterLine` — 챕터 한 줄 파싱 (AIWindowView에도 적용)
   - 각 서비스의 중복 파서(`parseSummaryResponse`/`parseChapterLine`/`parseTimeToSeconds`) 제거
+- **LLMHTTPClient 공통화 (T-1112)**: HTTP 요청/재시도 로직이 Gemini(429 4회·지수백오프)·OpenRouter(모델 폴백)·yTeaser로 제각각이던 것을 `LLMHTTPClient.swift` 1벌로 통일
+  - `LLMHTTPClient.postJSON` — POST JSON + Bearer 인증 + 추가 헤더 + 429 지수 백오프 재시도 + 상태 로깅 훅
+  - `GeminiService.query` / `OpenRouterService.sendRequest` / `SummarizationService.summarizeWithYTeaser` 공통 적용
 
 ### 검증
 - `swift build` ✅ (기존 경고만 — TTSService conformance, libmpv 26.0)

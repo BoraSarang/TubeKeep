@@ -13,7 +13,7 @@
 | T-1109 | **3단계-F LLMChainExecutor 신설** | medium | done | 폴백 4벌 단일화 — LLMChainStep/run + Summarization/Tagging/ChannelInsight/SimilarVideo 적용 |
 | T-1110 | **3단계-G 요약 프롬프트 단일화** (LLMPrompts) | medium | done | LLMPrompts.swift — summary/tag 프롬프트 1벌, Gemini·OpenRouter 공통 적용 |
 | T-1111 | **3단계-H 파서 단일화 + 태그 세트 통일** (SummaryParser) | medium | done | SummaryParser.swift — parse/predefinedTags/parseChapterLine 1벌, Summarization·OpenRouter·AIWindowView 공통 적용 |
-| T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | pending | 백오프 공통 |
+| T-1112 | **3단계-I LLMHTTPClient 공통화** | medium | done | LLMHTTPClient.swift — POST JSON+지수 백오프(429) 1벌, Gemini·OpenRouter·yTeaser 적용 |
 | T-1118 | **3단계-N A.X 4.0 전면 제거** (사용자 요청) | high | done | AX4Service 삭제 + 폴백 체인 단순화(요약 OR→yTeaser→Gemini, 태깅 OR→Gemini→규칙) |
 | T-1119 | **3단계-O AI 폴백 체인 성능순 재배치** (Gemini 1순위) | high | done | 요약 Gemini→OpenRouter→yTeaser, 태깅 Gemini→OpenRouter→규칙 + 설정 UI 순서/라벨 + AI_MODELS.json |
 | T-1113 | **4단계-J AppDelegate 분해** (WindowFactory/CommandHandler) | low | pending | 925줄 |

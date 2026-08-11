@@ -126,32 +126,27 @@ struct OpenRouterService {
         messages: [[String: String]],
         timeout: TimeInterval = 45
     ) async throws -> String? {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.addValue("TubeKeep", forHTTPHeaderField: "HTTP-Referer")
-        request.timeoutInterval = timeout
-
         let body: [String: Any] = [
             "model": model,
             "messages": messages,
             "temperature": 0.3,
             "max_tokens": 4096
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            return nil
-        }
-
-        let responseStr = String(data: data, encoding: .utf8) ?? ""
-        log("[OpenRouter] 모델 \(model) — HTTP \(httpResponse.statusCode)")
-
-        guard httpResponse.statusCode == 200 else {
-            log("[OpenRouter] 모델 \(model) 실패 — \(responseStr.prefix(200))")
+        let data: Data
+        do {
+            data = try await LLMHTTPClient.postJSON(
+                url: url,
+                body: body,
+                apiKey: apiKey,
+                headers: ["HTTP-Referer": "TubeKeep"],
+                timeout: timeout,
+                statusHandler: { status, _ in
+                    log("[OpenRouter] 모델 \(model) — HTTP \(status)")
+                }
+            )
+        } catch {
+            log("[OpenRouter] 모델 \(model) 실패 — \(error.localizedDescription)")
             return nil
         }
 

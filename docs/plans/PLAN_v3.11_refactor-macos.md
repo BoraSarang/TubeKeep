@@ -51,8 +51,10 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - `SummaryParser.swift` 신설: `parse`(overview/keyPoints/chapters) + `predefinedTags` 10개(단일 진실) + `parseChapterLine`
 - 적용: `SummarizationService.parseSummaryResponse`/`parseChapterLine` 제거 → `SummaryParser.parse`, `OpenRouterService.parseSummaryResponse` 제거 → `SummaryParser.parse`, `AIWindowView.extractChaptersFromSummary` → `SummaryParser.parseChapterLine`
 
-### T-I. HTTP 요청/재시도 공통화
+### T-I. HTTP 요청/재시도 공통화 ✅
 - HTTP 요청 4벌 + 재시도 정책 제각각 → `LLMHTTPClient` 1벌 + 공통 지수 백오프
+- `Services/LLMHTTPClient.swift` 신설: `postJSON` — POST JSON + Bearer + 추가 헤더 + 429 시 지수 백오프 재시도 + statusHandler 로깅 훅
+- 적용: `GeminiService.query`(429 4회·지수백오프) → LLMHTTPClient, `OpenRouterService.sendRequest`(모델 폴백+HTTP-Referer) → LLMHTTPClient, `SummarizationService.summarizeWithYTeaser` → LLMHTTPClient
 
 ### T-N. A.X 4.0(AX4) 서비스 전면 제거 (사용자 요청)
 - SKT A.X 4.0 게스트 API(`guest-api.sktax.chat`) 서비스 종료 → 기능 전체 삭제

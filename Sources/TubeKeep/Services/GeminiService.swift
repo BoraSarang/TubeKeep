@@ -26,42 +26,38 @@ struct GeminiService {
             throw GeminiError.invalidResponse
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = timeoutInterval
-
         let body: [String: Any] = [
             "contents": [["parts": [["text": prompt]]]]
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        var lastDetail: String?
-        for attempt in 0..<4 {
-            if attempt > 0 {
-                let delay = Double(min(attempt, 4)) * 2.0
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            }
-            do {
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw GeminiError.connectionFailed
+        let data: Data
+        do {
+            data = try await LLMHTTPClient.postJSON(
+                url: url,
+                body: body,
+                timeout: timeoutInterval,
+                maxAttempts: 4,
+                baseDelaySeconds: 2.0
+            )
+        } catch let error as LLMHTTPError {
+            switch error {
+            case .networkError, .decodingFailed:
+                throw GeminiError.connectionFailed
+            case let .httpStatus(code, data):
+                let detail = Self.parseAPIError(data: data)
+                if code == 429 {
+                    throw GeminiError.quotaExceeded(detail)
                 }
-                guard httpResponse.statusCode == 200 else {
-                    let detail = Self.parseAPIError(data: data)
-                    if httpResponse.statusCode == 429 {
-                        lastDetail = detail
-                        continue
-                    }
-                    throw GeminiError.apiError(httpResponse.statusCode, detail)
-                }
-                return try Self.parseResponse(data: data)
+                throw GeminiError.apiError(code, detail)
+            case .invalidURL:
+                throw GeminiError.invalidResponse
             }
         }
-        throw GeminiError.quotaExceeded(lastDetail)
+        return try Self.parseResponse(data: data)
     }
 
-    private static func parseAPIError(data: Data) -> String? {
+    private static func parseAPIError(data: Data?) -> String? {
+        guard let data else { return nil }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = json["error"] as? [String: Any],
               let message = error["message"] as? String

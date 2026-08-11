@@ -132,24 +132,23 @@ actor SummarizationService {
     func summarizeWithYTeaser(videoId: String, title: String, channel: String) async throws -> SummaryResult {
         let urlString = "https://www.youtube.com/watch?v=\(videoId)"
         let apiURL = URL(string: "https://yteaser.com/api/summarize")!
-        var request = URLRequest(url: apiURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30
 
         let body: [String: Any] = ["url": urlString]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SummaryError.apiUnavailable("yTeaser에 연결할 수 없습니다.")
-        }
-        guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 429 {
-                throw SummaryError.quotaExceeded
+        let data: Data
+        do {
+            data = try await LLMHTTPClient.postJSON(url: apiURL, body: body, timeout: 30)
+        } catch let error as LLMHTTPError {
+            switch error {
+            case .networkError, .decodingFailed, .invalidURL:
+                throw SummaryError.apiUnavailable("yTeaser에 연결할 수 없습니다.")
+            case let .httpStatus(code, data):
+                if code == 429 {
+                    throw SummaryError.quotaExceeded
+                }
+                let detail = Self.parseAPIError(data: data)
+                throw SummaryError.summaryFailed(detail ?? "yTeaser 오류 (HTTP \(code))")
             }
-            let detail = Self.parseAPIError(data: data)
-            throw SummaryError.summaryFailed(detail ?? "yTeaser 오류 (HTTP \(httpResponse.statusCode))")
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -391,7 +390,8 @@ actor SummarizationService {
         }
     }
 
-    private static func parseAPIError(data: Data) -> String? {
+    private static func parseAPIError(data: Data?) -> String? {
+        guard let data else { return nil }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = json["error"] as? [String: Any],
               let message = error["message"] as? String
