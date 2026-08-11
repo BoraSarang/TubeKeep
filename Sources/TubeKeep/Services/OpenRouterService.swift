@@ -35,7 +35,7 @@ struct OpenRouterService {
             apiKey: apiKey
         )
 
-        return parseSummaryResponse(response)
+        return SummaryParser.parse(response)
     }
 
     func classifyTag(
@@ -43,11 +43,7 @@ struct OpenRouterService {
         channel: String,
         apiKey: String
     ) async throws -> String {
-        let predefinedTags = [
-            "기술/IT", "음악", "게임", "뉴스/시사",
-            "스포츠", "엔터테인먼트", "교육/강의",
-            "요리/음식", "여행/일상", "과학",
-        ]
+        let predefinedTags = SummaryParser.predefinedTags
 
         let prompt = LLMPrompts.tag(title: title, channel: channel, tags: predefinedTags)
 
@@ -221,63 +217,6 @@ struct OpenRouterService {
         let totalLetters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
         guard totalLetters > 20 else { return false }
         return Double(koreanChars) / Double(totalLetters) < 0.2
-    }
-
-    private func parseSummaryResponse(_ response: String) -> (overview: String, keyPoints: [String], chapters: [ChapterInfo]) {
-        let lines = response.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-
-        var overview = ""
-        var keyPoints: [String] = []
-        var chapters: [ChapterInfo] = []
-        var inKeyPoints = false
-        var inChapters = false
-
-        for line in lines {
-            let lower = line.lowercased()
-            if lower.contains("개요") || lower.contains("overview") {
-                inKeyPoints = false
-                inChapters = false
-                continue
-            }
-            if lower.contains("핵심") || lower.contains("key point") {
-                inKeyPoints = true
-                inChapters = false
-                continue
-            }
-            if lower.contains("챕터") || lower.contains("chapter") {
-                inKeyPoints = false
-                inChapters = true
-                continue
-            }
-
-            if inKeyPoints {
-                let cleaned = line
-                    .replacingOccurrences(of: #"^\d+[\.\)]\s*"#, with: "", options: .regularExpression)
-                    .replacingOccurrences(of: #"^[-•]\s*"#, with: "", options: .regularExpression)
-                    .trimmingCharacters(in: .whitespaces)
-                if !cleaned.isEmpty {
-                    keyPoints.append(cleaned)
-                }
-            } else if inChapters {
-                if let chapter = SummarizationService.parseChapterLineStatic(line) {
-                    chapters.append(chapter)
-                }
-            } else if !overview.isEmpty {
-                overview += " " + line
-            } else {
-                overview = line
-                    .replacingOccurrences(of: #"^\d+[\.\)]\s*"#, with: "", options: .regularExpression)
-                    .trimmingCharacters(in: .whitespaces)
-            }
-        }
-
-        if overview.isEmpty && !lines.isEmpty {
-            overview = lines[0]
-        }
-
-        return (overview, Array(keyPoints.prefix(5)), chapters)
     }
 }
 

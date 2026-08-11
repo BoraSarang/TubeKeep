@@ -420,7 +420,7 @@ struct AIWindowView: View {
                 continue
             }
             if foundChapters {
-                if let chapter = SummarizationService.parseChapterLineStatic(trimmed) {
+                if let chapter = SummaryParser.parseChapterLine(trimmed) {
                     chapters.append(chapter)
                 } else if !trimmed.isEmpty && !trimmed.hasPrefix("•") && !trimmed.hasPrefix("-") {
                     break

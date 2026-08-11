@@ -371,7 +371,8 @@ actor SummarizationService {
         } catch {
             throw SummaryError.apiUnavailable(error.localizedDescription)
         }
-        return parseSummaryResponse(response)
+        let result = SummaryParser.parse(response)
+        return SummaryResult(overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: "")
     }
 
     private static func mapGeminiError(_ error: GeminiError) -> SummaryError {
@@ -396,84 +397,5 @@ actor SummarizationService {
               let message = error["message"] as? String
         else { return nil }
         return message
-    }
-
-    private func parseSummaryResponse(_ response: String) -> SummaryResult {
-        var overview = ""
-        var keyPoints: [String] = []
-        var chapters: [ChapterInfo] = []
-
-        let lines = response.components(separatedBy: .newlines)
-        var foundPoints = false
-        var foundChapters = false
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("개요:") || trimmed.hasPrefix("개요 :") {
-                let idx = trimmed.hasPrefix("개요:") ? 3 : 4
-                overview = String(trimmed.dropFirst(idx)).trimmingCharacters(in: .whitespaces)
-            } else if trimmed.hasPrefix("핵심 포인트:") || trimmed.hasPrefix("핵심 포인트 :") {
-                foundPoints = true
-                foundChapters = false
-            } else if trimmed.hasPrefix("챕터:") || trimmed.hasPrefix("챕터 :") || trimmed.hasPrefix("Chapters:") || trimmed.hasPrefix("chapters:") {
-                foundChapters = true
-                foundPoints = false
-            } else if foundPoints, trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
-                let point = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
-                if !point.isEmpty { keyPoints.append(point) }
-            } else if foundChapters {
-                if let chapter = Self.parseChapterLine(trimmed) {
-                    chapters.append(chapter)
-                }
-            } else if !foundPoints, !foundChapters, !overview.isEmpty, !trimmed.isEmpty, !trimmed.hasPrefix("핵심"), !trimmed.hasPrefix("챕터") {
-                if trimmed.range(of: "^[\\s\\*\\-]*$", options: .regularExpression) == nil {
-                    overview += " " + trimmed
-                }
-            }
-        }
-
-        if overview.isEmpty {
-            overview = String(response.prefix(200)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        return SummaryResult(overview: overview, keyPoints: keyPoints, chapters: chapters, provider: "")
-    }
-
-    // MARK: - Chapter Parsing (외부 접근 가능)
-
-    static func parseChapterLineStatic(_ line: String) -> ChapterInfo? {
-        return parseChapterLine(line)
-    }
-
-    private static func parseChapterLine(_ line: String) -> ChapterInfo? {
-        let patterns = [
-            #"^\d+[\.\)]\s*\[?(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–~]\s*(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(.+)$"#,
-            #"^[\-\*•]\s*\[?(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–~]\s*(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(.+)$"#,
-            #"^\[?(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–~]\s*(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(.+)$"#,
-        ]
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) {
-                let startStr = String(line[Range(match.range(at: 1), in: line)!])
-                let endStr = String(line[Range(match.range(at: 2), in: line)!])
-                let title = String(line[Range(match.range(at: 3), in: line)!]).trimmingCharacters(in: .whitespaces)
-                let startTime = Self.parseTimeToSeconds(startStr)
-                let endTime = Self.parseTimeToSeconds(endStr)
-                if !title.isEmpty {
-                    return ChapterInfo(title: title, startTime: startTime, endTime: endTime)
-                }
-            }
-        }
-        return nil
-    }
-
-    private static func parseTimeToSeconds(_ time: String) -> Double {
-        let parts = time.split(separator: ":").map { Double($0) ?? 0 }
-        switch parts.count {
-        case 3: return parts[0] * 3600 + parts[1] * 60 + parts[2]
-        case 2: return parts[0] * 60 + parts[1]
-        default: return parts.first ?? 0
-        }
     }
 }

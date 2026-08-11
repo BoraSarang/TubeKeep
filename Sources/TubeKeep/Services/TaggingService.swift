@@ -1,11 +1,7 @@
 import Foundation
 
 actor TaggingService {
-    let predefinedTags = [
-        "기술/IT", "음악", "게임", "뉴스/시사",
-        "스포츠", "엔터테인먼트", "교육/강의",
-        "요리/음식", "여행/일상", "과학",
-    ]
+    let predefinedTags = SummaryParser.predefinedTags
 
     func classify(title: String, channel: String, openRouterAPIKey: String, geminiAPIKey: String) async -> String {
         AITaskTracker.shared.begin()

@@ -45,9 +45,11 @@ v3.10까지 전체 코드베이스 정밀 분석(Services/AI/Reducer/UI 4개 영
 - `SummarizationService:385-410` / `OpenRouterService:28-53` (Gemini 영문 라벨 vs OpenRouter 한글 라벨 분화) → `LLMPrompts.swift` 1벌 (한글 라벨 통일)
 - 프롬프트: `LLMPrompts.summary`(요약) + `LLMPrompts.tag`(태깅) — Gemini/OpenRouter 공통 + TaggingService에도 적용
 
-### T-H. 응답 파서 단일화
+### T-H. 응답 파서 단일화 ✅
 - OR/AX4/Gemini 파서 3벌(`hasPrefix` vs `lowercased().contains` 분화) → `SummaryParser` 1벌
 - `classifyTag`: OR 10개 vs AX4 18개 태그 불일치 → 태그 세트 통일
+- `SummaryParser.swift` 신설: `parse`(overview/keyPoints/chapters) + `predefinedTags` 10개(단일 진실) + `parseChapterLine`
+- 적용: `SummarizationService.parseSummaryResponse`/`parseChapterLine` 제거 → `SummaryParser.parse`, `OpenRouterService.parseSummaryResponse` 제거 → `SummaryParser.parse`, `AIWindowView.extractChaptersFromSummary` → `SummaryParser.parseChapterLine`
 
 ### T-I. HTTP 요청/재시도 공통화
 - HTTP 요청 4벌 + 재시도 정책 제각각 → `LLMHTTPClient` 1벌 + 공통 지수 백오프
