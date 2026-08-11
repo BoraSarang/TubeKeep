@@ -9,15 +9,15 @@ final class KeyCommandHandler {
     /// Cmd+스페이스가 아닌 스페이스바를 플레이어 토글로 소비할지 결정하는 후크.
     let onTogglePlayerPlayPause: () -> Void
     let onOpenSettings: () -> Void
-    let onToggleDebugPanel: () -> Void
-    let onToggleDebugAutoScroll: () -> Void
+    let onToggleDebugPanel: (() -> Void)?
+    let onToggleDebugAutoScroll: (() -> Void)?
 
     init(
         isPlayerKeyWindow: @escaping () -> Bool,
         onTogglePlayerPlayPause: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
-        onToggleDebugPanel: @escaping () -> Void,
-        onToggleDebugAutoScroll: @escaping () -> Void
+        onToggleDebugPanel: (() -> Void)? = nil,
+        onToggleDebugAutoScroll: (() -> Void)? = nil
     ) {
         self.isPlayerKeyWindow = isPlayerKeyWindow
         self.onTogglePlayerPlayPause = onTogglePlayerPlayPause
@@ -74,7 +74,7 @@ final class KeyCommandHandler {
                 return nil
             case 2: // d (debug panel toggle)
                 #if DEBUG
-                onToggleDebugPanel()
+                onToggleDebugPanel?()
                 return nil
                 #else
                 return event
@@ -89,7 +89,7 @@ final class KeyCommandHandler {
             case 1: // s (auto scroll toggle)
                 #if DEBUG
                 if event.modifierFlags.contains(.shift) {
-                    onToggleDebugAutoScroll()
+                    onToggleDebugAutoScroll?()
                     return nil
                 }
                 #endif

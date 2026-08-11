@@ -161,6 +161,13 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             object: nil
         )
 
+        #if DEBUG
+        let debugPanelHandler: (() -> Void)? = { [weak self] in self?.toggleDebugLogWindow() }
+        let debugAutoScrollHandler: (() -> Void)? = { [weak self] in self?.debugToggleAutoScroll() }
+        #else
+        let debugPanelHandler: (() -> Void)? = nil
+        let debugAutoScrollHandler: (() -> Void)? = nil
+        #endif
         let keyHandler = KeyCommandHandler(
             isPlayerKeyWindow: { [weak self] in
                 guard let player = self?.playerWindow else { return false }
@@ -170,8 +177,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
                 NotificationCenter.default.post(name: Constants.playerTogglePlayPauseNotification, object: nil)
             },
             onOpenSettings: { [weak self] in self?.openSettingsWindow() },
-            onToggleDebugPanel: { [weak self] in self?.toggleDebugLogWindow() },
-            onToggleDebugAutoScroll: { [weak self] in self?.debugToggleAutoScroll() }
+            onToggleDebugPanel: debugPanelHandler,
+            onToggleDebugAutoScroll: debugAutoScrollHandler
         )
         keyCommandHandler = keyHandler
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak keyHandler] event in
