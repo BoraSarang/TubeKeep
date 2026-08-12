@@ -130,3 +130,58 @@ L4 패턴(화면 적용)     Features/*           화면에서 L2·L3 조합 + �
 - 디자인 시스템 변경 후: `swift build -c debug` → `swift test`(76개) → `./scripts/test-core.sh`(23 PASS)
 - UI 회귀는 Grid/List/다운로드 큐/사이드바 수동 확인
 - grep으로 잔여 하드코딩 확인: `rg '\.blue\b|\.orange\b|\.green\b|\.red\b' Features/`
+
+---
+
+## 8. Anti-Slop 지침 (v3.12, Hallmark 원칙 적용)
+
+> 출처: turnkey 디자인 스킬 **Hallmark** (nutlope/hallmark, 2026·MIT).
+> 아래는 macOS **SwiftUI 네이티브**에 수용 가능한 원칙만 추려 문서화한 것이다.
+> 웹 카탈로그(그리드·테마·매크로구조)는 적용 대상이 아니며, 랜딩 페이지(`docs/`)에는 그대로 적용한다.
+
+### 8.1 단일 앵커 색 + 그라데이션 과용 금지
+
+- 포인트 색은 **하나**만 둔다: 시스템 블루(`Color.accentColor`) 유지.
+- 같은 화면에서 앵커 외 2색 이상의 채도 높은 색을 뿌리지 않는다. 배지 4종
+  (`badgeSubtitle/badgeChapters/badgeSummary/badgePodcast`)은 **용도별 상태 색**이므로 예외 —
+  단 UI 포인트로 쓰지 말고 상태 표지로만 사용.
+- 그라데이션(Gradient)은 `waveBaseGradient`처럼 **한 화면 한 곳**에만 허용.
+  텍스트·버튼·히어로에 다중 그라데이션 텍스트 금지. (v3.11 랜딩의 3색 히어로 그라데이션 →
+  v3.12에서 단일 레드 앵커로 교체한 사례 참고)
+
+### 8.2 타이포 페어링 (2+1)
+
+- 화면에는 **디스플레이(제목/강조) 1 + 바디 1(+ 모노스페이스 1)** 계통만 사용.
+- `AppFont` 토큰은 바디 계통이며, 화면 제목·수치는 `fontDesign(.rounded)` 등으로
+  "강조" 계통을 구분할 수 있다. 단 앱 전역에 표시 전용 폰트를 여럿 도입하지 않는다.
+- 헤딩 이탤릭 금지: 굵기·색·밑줄로 강조한다.
+
+### 8.3 대칭/중앙 정렬 회피
+
+- 카드 그리드·배너는 단순 중앙 정렬 반복을 피하고, 좌 얼라인 + 의도적 비대칭
+  (구간별 다른 패딩)을 사용한다.
+- 기능 설명 등 정보성 콘텐츠는 중앙보다 좌측 정렬이 눈에 편하다.
+
+### 8.4 상호작용 8-state
+
+- 새 인터랙티브 컴포넌트는 **default · hover · focus-visible · active · disabled · loading · error · success**
+  8개 상태를 모두 신경 쓴다.
+- 목록/그리드 셀 hover·선택·진행·오류는 `LibraryGridView`·`DownloadQueueView`의
+  기존 상태 피드백을 기준으로 한다.
+
+### 8.5 진실한 복사 (honest copy)
+
+- 지표(Metric)는 실제 측정값만 표기하고, 허구 수치(예: "10× faster", "50,000+ teams")를 넣지 않는다.
+- '인증', '추천 수' 등 검증되지 않은 주장을 UI에 표기하지 않는다.
+
+### 8.6 이모지 금지, SF Symbol 사용
+
+- UI 텍스트에서 이모지를 장식으로 쓰지 않는다. 아이콘은 반드시 SF Symbol
+  (`Label`·`Image(systemName:)`)을 사용한다.
+- 랜딩 페이지도 유튜브 스타일 개편에서 이모지 타일을 SVG 아이콘으로 대체함(참고).
+
+### 8.7 반응형/다크-라이트
+
+- 랜딩은 320/375/414/768px 오버플로 없는 것을 기본 게이트로 삼는다
+  (딥다크 `#0f0f0f` + 유튜브 레드 `#ff0000` 팔레트, `prefers-color-scheme: light` 분기).
+- macOS 앱은 시스템 색(NSColor/SwiftUI) 경유 — 다크/라이트 자동 대응 유지.

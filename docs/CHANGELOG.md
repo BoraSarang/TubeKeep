@@ -1,6 +1,25 @@
 # CHANGELOG
 
-## v3.11 — AI 폴백 체인 단일화 (macOS, T-1109~T-1116) ✅
+## v3.12 — Hallmark 디자인 스킬 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1125) ✅
+
+### 문서/도구 (Swift 코드 무변경)
+- **Hallmark 스킬 설치 (T-1121)**: Anti-AI-slop 디자인 스킬(nutlope/hallmark, MIT)을 opencode 전용 `~/.config/opencode/skills/hallmark/`에 설치
+  - `SKILL.md` + `references/`(106) + `site/css/tokens.css` + `site/examples` + `docs/recipes.md`·`study-examples.md` 총 138파일
+  - 원본 저장소 상대경로(`../../site/...`)를 설치 구조에 맞게 정규화 → 참조 무결성 283/283
+- **DESIGN_SYSTEM.md Anti-Slop 지침 섹션 (T-1124)**: SwiftUI 네이티브에 수용 가능한 원칙만 문서화
+  - 단일 앵커 색 + 그라데이션 과용 금지(상태 배지 4종은 예외), 타이포 페어링(2+1), 대칭/중앙정렬 회피, 8-state 상호작용, 진실한 복사, 이모지 금지(SF Symbol 사용), 반응형/다크-라이트
+
+### 랜딩 페이지 리디자인 (T-1122, docs/index.html + style.css)
+- **히어로**: 중앙정렬 + 3색 그라데이션 텍스트 → **비대칭 좌/우 이중 앵커 + 단일 레드 앵커**(`#ff0000`) 교체
+- **폰트 페어링**: 단일 시스템 폰트 → 디스플레이("Apple SD Gothic Neo" 한글 대체 포함) + 바디("Pretendard Variable"·로컬 폴백 "avenir") 2계통
+- **기능 카드**: 이모지 타일 6장 → SVG 아이콘 6종 + 서수/마이크로타이포그래피 강조
+- **마이크로복사**: 로딩·버퍼링·체크로딩 설명, "데이터 보호" → "당신의 영상. 당신의 머신" 토글
+
+### 검증 (T-1123)
+- 로컬 HTTP + chrome-devtools: 320/375/768/1280px 응답 — 히어로 2열/카드 3열(데스크톱) → 각 1열/1·2열(모바일) 정상, 수평 오버플로 0
+- 콘솔 에러 0, 이미지 4장(SVG 10개 아이콘) 전부 로드, 태그 균형 검사 통과
+
+---
 
 ### 리팩토링
 - **LLMChainExecutor 신설 (T-1109)**: 폴백 체인 로직이 4곳(Summarization/Tagging/ChannelInsight/SimilarVideo)에 복붙되어 있던 것을 단일화

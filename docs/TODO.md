@@ -1,5 +1,18 @@
 # TODO — 작업 추적 목록
 
+## v3.12 — Hallmark 디자인 스킬 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS) ✅
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1120 | **PLAN_v3.12 + TODO 등록** | high | done | docs/plans/PLAN_v3.12_landing-macos.md |
+| T-1121 | **Hallmark 스킬 설치** (opencode 전용) | high | done | ~/.config/opencode/skills/hallmark/ — SKILL.md+references(106)+site+docs 138파일, 경로 정규화, 참조 283/283 ✅ |
+| T-1122 | **랜딩 audit → redesign** (레드 브랜드) | high | done | docs/index.html + style.css — 비대칭 히어로·단일 레드 앵커·폰트 페어링·이모지 타일 제거(SVG 6종 교체) |
+| T-1123 | **랜딩 미리보기 검증** | medium | done | chrome-devtools 320/375/768/1280px 통과 — 오버플로 0, 콘솔 에러 0, 이미지·SVG 로드 ✅ |
+| T-1124 | **DESIGN_SYSTEM.md Anti-Slop 섹션** | low | done | §8.1~8.7 SwiftUI 수용 가능 원칙 문서화 |
+| T-1125 | **문서 마감 + 커밋 3분리** | high | done | CHANGELOG v3.12 + 세션 로그 + PLAN 커밋·랜딩 커밋·DESIGN_SYSTEM 커밋 |
+
+---
+
 ## v3.11 — 안정성 버그 + 채널 ID 정규화 + AI 폴백 통합 + 구조 개선 (macOS) ✅
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
