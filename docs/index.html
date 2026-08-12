@@ -16,10 +16,17 @@
       <span class="wordmark">TubeKeep</span>
     </a>
     <div class="search" role="search" aria-label="사이트 검색">
-      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.71a1 1 0 0 0 1.42-1.42M11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7"/>
-      </svg>
-      <span class="search-placeholder">영상 URL을 내 라이브러리에…</span>
+      <span class="search-field">
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.71a1 1 0 0 0 1.42-1.42M11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7"/>
+        </svg>
+        <span class="search-placeholder">TubeKeep에서 검색</span>
+      </span>
+      <button class="search-btn" type="button" aria-label="검색">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.71a1 1 0 0 0 1.42-1.42M11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7"/>
+        </svg>
+      </button>
     </div>
     <div class="topbar-actions">
       <a class="ghost-btn" href="https://github.com/BoraSarang/TubeKeep">
@@ -34,65 +41,96 @@
   </div>
 </header>
 
+<!-- CHIP ROW — YouTube-style category chips -->
+<nav class="chip-row" aria-label="카테고리">
+  <a class="chip active" href="#library" aria-current="true">모두</a>
+  <a class="chip" href="#library">오프라인 보관함</a>
+  <a class="chip" href="#ai">AI 기능</a>
+  <a class="chip" href="#download">다운로드</a>
+  <a class="chip" href="#library">플레이어</a>
+</nav>
+
 <main>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-copy">
-    <p class="eyebrow"><span class="badge">내 라이브러리</span> YouTube · 오프라인 · AI</p>
-    <h1 class="hero-title">
-      받고, 정리하고,<br>
-      <span class="red">AI가 요약합니다.</span>
-    </h1>
-    <p class="hero-sub">
-      좋아하는 영상을 내 기기에 저장해 두고 언제든 다시 봅니다.
-      자막으로 요약하고, 챕터와 마인드맵까지 만들어 줍니다.
-    </p>
-    <div class="hero-cta">
-      <a class="yt-btn yt-btn-lg" href="https://github.com/BoraSarang/TubeKeep/releases/latest">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/></svg>
-        <span>무료로 다운로드</span>
-      </a>
-      <a class="host-btn" href="https://github.com/BoraSarang/TubeKeep">GitHub에서 원본 보기</a>
-    </div>
-    <p class="hero-meta">macOS 14+ · Apple Silicon · 오픈소스</p>
+<!-- LIBRARY — video grid -->
+<section id="library" class="yt-section">
+  <div class="section-row">
+    <h2 class="section-title">인기 있는 오프라인 보관함</h2>
+    <a class="see-all" href="#download">모두 보기 →</a>
   </div>
-  <figure class="hero-figure">
-    <img src="screenshots/app/main.png" alt="TubeKeep 메인 화면" class="showcase-img">
-  </figure>
+  <div class="video-grid">
+
+    <article class="video-card">
+      <div class="thumb">
+        <img src="screenshots/app/main.png" alt="TubeKeep 오프라인 보관함 화면" loading="lazy" decoding="async">
+        <span class="thumb-badge">오프라인</span>
+        <span class="thumb-overlay" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
+        </span>
+      </div>
+      <div class="vc-body">
+        <span class="vc-avatar" aria-hidden="true"><img src="app-icon.png" width="36" height="36" alt=""></span>
+        <div class="vc-info">
+          <h3 class="vc-title">내 보관함 — 오프라인에서도 그대로</h3>
+          <p class="vc-meta">TubeKeep · 그리드/목록 · v3.11</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="video-card">
+      <div class="thumb">
+        <img src="screenshots/app/downloader.png" alt="TubeKeep 영상 다운로더 화면" loading="lazy" decoding="async">
+        <span class="thumb-badge">yt-dlp</span>
+        <span class="thumb-overlay" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
+        </span>
+      </div>
+      <div class="vc-body">
+        <span class="vc-avatar" aria-hidden="true"><img src="app-icon.png" width="36" height="36" alt=""></span>
+        <div class="vc-info">
+          <h3 class="vc-title">URL만 붙여넣으면, 큐로 바로</h3>
+          <p class="vc-meta">TubeKeep · URL/QR · 진행 큐</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="video-card">
+      <div class="thumb">
+        <img src="screenshots/app/player.png" alt="TubeKeep 플레이어 화면" loading="lazy" decoding="async">
+        <span class="thumb-badge">H.264</span>
+        <span class="thumb-overlay" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
+        </span>
+      </div>
+      <div class="vc-body">
+        <span class="vc-avatar" aria-hidden="true"><img src="app-icon.png" width="36" height="36" alt=""></span>
+        <div class="vc-info">
+          <h3 class="vc-title">자체 플레이어로 바로 재생</h3>
+          <p class="vc-meta">TubeKeep · 자막/이어보기 · mpv</p>
+        </div>
+      </div>
+    </article>
+
+  </div>
 </section>
 
-<!-- FEATURES — YouTube card grid -->
-<section class="features">
-  <div class="section-head">
-    <h2 class="section-title">다운로드부터 AI까지, 한 앱에서</h2>
-    <p class="kicker">보관은 쉽게, 재생은 자유롭게, 정리는 AI가.</p>
+<!-- AI FEATURES -->
+<section id="ai" class="yt-section">
+  <div class="section-row">
+    <h2 class="section-title">AI가 정리해 줍니다</h2>
+    <a class="see-all" href="#download">모두 보기 →</a>
   </div>
-  <div class="card-grid">
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7zM5 18v2h14v-2z"/></svg>
-      </div>
-      <h3>안정적 다운로드</h3>
-      <p>yt-dlp 기반 · 큐 관리 · 자동 재개 · 실패도 임시파일 보존으로 이어받기</p>
-    </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2"/></svg>
-      </div>
-      <h3>오프라인 보관함</h3>
-      <p>그리드/목록, 채널별 보관함, 검색·정렬·필터</p>
-    </article>
+  <div class="ai-grid">
     <article class="card">
       <div class="card-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 5.83 13 4.41 14.41 9 19 21 7l-1.41-1.41z"/></svg>
       </div>
       <h3>AI 요약 · Q&amp;A</h3>
-      <p>자막 기반 요약, 챕터, 대화 요약, 마인드맵까지</p>
+      <p>자막 기반 핵심 요약, 챕터, 대화로 묻고 마인드맵까지</p>
     </article>
     <article class="card">
       <div class="card-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3m6-3a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V21h2v-2.07A8 8 0 0 0 20 11z"/></svg>
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.59 2.59 21 2l.59 11.41-2.82-2.82-4.42 4.42-2.82-2.82-4.42 4.42L4.77 14.39l4.42-4.42-2.82-2.82z"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
       </div>
       <h3>AI 팟캐스트</h3>
       <p>자막을 두 사람의 대화형 팟캐스트로 자동 생성</p>
@@ -104,38 +142,25 @@
       <h3>Whisper 자막</h3>
       <p>자막 없는 영상도 로컬 AI 음성 인식으로 자동 자막</p>
     </article>
-    <article class="card">
-      <div class="card-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-      </div>
-      <h3>자체 플레이어</h3>
-      <p>H.264 최적화, 자막 오버레이, 이어보기, 트랜스코딩 캐시</p>
-    </article>
   </div>
 </section>
 
-<!-- GALLERY — screenshot pair -->
-<section class="gallery">
-  <div class="section-head">
-    <h2 class="section-title">직접 보면 더 좋습니다</h2>
+<!-- CTA -->
+<section id="download" class="yt-section">
+  <div class="cta">
+    <div class="cta-copy">
+      <h2 class="cta-title">평생 무료.<br>당신의 기기 안에만 저장합니다.</h2>
+      <p class="cta-sub">모든 콘텐츠는 로컬에서 처리됩니다. AI 요약 · 자막 · 팟캐스트까지.</p>
+    </div>
+    <div class="hero-cta">
+      <a class="yt-btn yt-btn-lg" href="https://github.com/BoraSarang/TubeKeep/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/></svg>
+        <span>무료로 다운로드</span>
+      </a>
+      <a class="host-btn" href="https://github.com/BoraSarang/TubeKeep">GitHub에서 원본 보기</a>
+    </div>
+    <p class="cta-meta">macOS 14+ · Apple Silicon · 오픈소스</p>
   </div>
-  <div class="gallery-grid">
-    <figure class="shot">
-      <img src="screenshots/app/downloader.png" alt="영상 다운로더 화면">
-      <figcaption>영상 다운로더 — URL / QR / 형식 / 진행 큐</figcaption>
-    </figure>
-    <figure class="shot">
-      <img src="screenshots/app/player.png" alt="플레이어 화면">
-      <figcaption>자체 플레이어 — H.264 · 자막 · 이어보기</figcaption>
-    </figure>
-  </div>
-</section>
-
-<!-- PROOF -->
-<section class="proof">
-  <p class="proof-line">
-    모든 콘텐츠는 <strong>기기 안에 저장</strong>됩니다. AI 요약 · 자막 · 팟캐스트는 자동으로 만들어집니다. 오픈소스라 언제까지나 무료입니다.
-  </p>
 </section>
 
 </main>
