@@ -8,66 +8,117 @@
 </head>
 <body>
 
-<div class="bg-glow"></div>
-
-<!-- HERO -->
-<header class="hero">
-  <div class="hero-inner">
-    <div class="logo-badge">
-      <img src="app-icon.png" width="72" height="72" alt="TubeKeep">
+<!-- TOPBAR — YouTube-style bar -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="#">
+      <img src="app-icon.png" width="30" height="30" alt="TubeKeep">
+      <span class="wordmark">TubeKeep</span>
+    </a>
+    <div class="search" role="search" aria-label="사이트 검색">
+      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.71a1 1 0 0 0 1.42-1.42M11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7"/>
+      </svg>
+      <span class="search-placeholder">영상 URL을 내 라이브러리에…</span>
     </div>
-    <h1 class="hero-title">TubeKeep</h1>
-    <p class="hero-sub">
-      YouTube를 내 라이브러리로.<br>
-      받고, 정리하고, AI가 요약해 줍니다.
-    </p>
-    <div class="hero-cta">
-      <a class="btn btn-primary" href="https://github.com/BoraSarang/TubeKeep/releases/latest">최신 버전 다운로드</a>
-      <a class="btn btn-ghost" href="https://github.com/BoraSarang/TubeKeep">GitHub</a>
+    <div class="topbar-actions">
+      <a class="ghost-btn" href="https://github.com/BoraSarang/TubeKeep">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>
+        <span>GitHub</span>
+      </a>
+      <a class="yt-btn" href="https://github.com/BoraSarang/TubeKeep/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/></svg>
+        <span>다운로드</span>
+      </a>
     </div>
-    <p class="hero-meta">macOS 14+ · Apple Silicon · 무료</p>
   </div>
 </header>
 
-<!-- SCREENSHOT HERO -->
-<section class="showcase">
-  <img src="screenshots/app/main.png" alt="TubeKeep 메인 화면" class="showcase-img">
+<main>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow"><span class="badge">내 라이브러리</span> YouTube · 오프라인 · AI</p>
+    <h1 class="hero-title">
+      받고, 정리하고,<br>
+      <span class="red">AI가 요약합니다.</span>
+    </h1>
+    <p class="hero-sub">
+      좋아하는 영상을 내 기기에 저장해 두고 언제든 다시 봅니다.
+      자막으로 요약하고, 챕터와 마인드맵까지 만들어 줍니다.
+    </p>
+    <div class="hero-cta">
+      <a class="yt-btn yt-btn-lg" href="https://github.com/BoraSarang/TubeKeep/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/></svg>
+        <span>무료로 다운로드</span>
+      </a>
+      <a class="host-btn" href="https://github.com/BoraSarang/TubeKeep">GitHub에서 원본 보기</a>
+    </div>
+    <p class="hero-meta">macOS 14+ · Apple Silicon · 오픈소스</p>
+  </div>
+  <figure class="hero-figure">
+    <img src="screenshots/app/main.png" alt="TubeKeep 메인 화면" class="showcase-img">
+  </figure>
 </section>
 
-<!-- FEATURES -->
+<!-- FEATURES — YouTube card grid -->
 <section class="features">
-  <h2 class="section-title">다운로드부터 AI까지, 한 앱에서</h2>
-  <div class="grid">
-    <div class="card">
-      <h3>📥 안정적 다운로드</h3>
+  <div class="section-head">
+    <h2 class="section-title">다운로드부터 AI까지, 한 앱에서</h2>
+    <p class="kicker">보관은 쉽게, 재생은 자유롭게, 정리는 AI가.</p>
+  </div>
+  <div class="card-grid">
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7zM5 18v2h14v-2z"/></svg>
+      </div>
+      <h3>안정적 다운로드</h3>
       <p>yt-dlp 기반 · 큐 관리 · 자동 재개 · 실패도 임시파일 보존으로 이어받기</p>
-    </div>
-    <div class="card">
-      <h3>🗂️ 오프라인 보관함</h3>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2"/></svg>
+      </div>
+      <h3>오프라인 보관함</h3>
       <p>그리드/목록, 채널별 보관함, 검색·정렬·필터</p>
-    </div>
-    <div class="card">
-      <h3>🧠 AI 요약 · Q&A</h3>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 5.83 13 4.41 14.41 9 19 21 7l-1.41-1.41z"/></svg>
+      </div>
+      <h3>AI 요약 · Q&amp;A</h3>
       <p>자막 기반 요약, 챕터, 대화 요약, 마인드맵까지</p>
-    </div>
-    <div class="card">
-      <h3>🎙️ AI 팟캐스트</h3>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3m6-3a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V21h2v-2.07A8 8 0 0 0 20 11z"/></svg>
+      </div>
+      <h3>AI 팟캐스트</h3>
       <p>자막을 두 사람의 대화형 팟캐스트로 자동 생성</p>
-    </div>
-    <div class="card">
-      <h3>🤖 Whisper 자막</h3>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3m6-3a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V21h2v-2.07A8 8 0 0 0 20 11z"/></svg>
+      </div>
+      <h3>Whisper 자막</h3>
       <p>자막 없는 영상도 로컬 AI 음성 인식으로 자동 자막</p>
-    </div>
-    <div class="card">
-      <h3>🎬 자체 플레이어</h3>
+    </article>
+    <article class="card">
+      <div class="card-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+      </div>
+      <h3>자체 플레이어</h3>
       <p>H.264 최적화, 자막 오버레이, 이어보기, 트랜스코딩 캐시</p>
-    </div>
+    </article>
   </div>
 </section>
 
-<!-- GALLERY -->
+<!-- GALLERY — screenshot pair -->
 <section class="gallery">
-  <h2 class="section-title">직접 보면 더 좋습니다</h2>
+  <div class="section-head">
+    <h2 class="section-title">직접 보면 더 좋습니다</h2>
+  </div>
   <div class="gallery-grid">
     <figure class="shot">
       <img src="screenshots/app/downloader.png" alt="영상 다운로더 화면">
@@ -80,21 +131,14 @@
   </div>
 </section>
 
-<!-- STATS -->
-<section class="stats">
-  <div class="stat">
-    <div class="stat-num">100%</div>
-    <div class="stat-label">오프라인 소장</div>
-  </div>
-  <div class="stat">
-    <div class="stat-num">자동</div>
-    <div class="stat-label">AI 요약 · 자막 · 팟캐스트</div>
-  </div>
-  <div class="stat">
-    <div class="stat-num">무료</div>
-    <div class="stat-label">오픈소스</div>
-  </div>
+<!-- PROOF -->
+<section class="proof">
+  <p class="proof-line">
+    모든 콘텐츠는 <strong>기기 안에 저장</strong>됩니다. AI 요약 · 자막 · 팟캐스트는 자동으로 만들어집니다. 오픈소스라 언제까지나 무료입니다.
+  </p>
 </section>
+
+</main>
 
 <footer class="footer">
   <p>TubeKeep은 YouTube와 제휴 관계가 아닙니다. 각 영상의 저작권은 해당 채널에 있습니다.</p>
@@ -104,5 +148,6 @@
   <p class="footer-info">제작: BoRaSaRang · 문의: <a href="mailto:leeborasarang@gmail.com">leeborasarang@gmail.com</a></p>
   <p class="footer-copy">© 2026 BoRaSaRang. All rights reserved.</p>
 </footer>
+
 </body>
 </html>
