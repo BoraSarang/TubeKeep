@@ -8,6 +8,7 @@
 | T-1121 | **Hallmark 스킬 설치** (opencode 전용) | high | done | ~/.config/opencode/skills/hallmark/ — SKILL.md+references(106)+site+docs 138파일, 경로 정규화, 참조 283/283 ✅ |
 | T-1122 | **랜딩 audit → redesign** (레드 브랜드) | high | done | docs/index.html + style.css — 비대칭 히어로·단일 레드 앵커·폰트 페어링·이모지 타일 제거(SVG 6종 교체) |
 | T-1123 | **랜딩 미리보기 검증** | medium | done | chrome-devtools 320/375/768/1280px 통과 — 오버플로 0, 콘솔 에러 0, 이미지·SVG 로드 ✅ |
+| T-1126 | **랜딩 YouTube 홈 미러 재설계** (사용자 재요청) | high | done | 히어로 제거 → 칩 행 + 16:9 비디오 카드 그리드(배지·아바타·hover 오버레이) + CTA 배너 — 1440/1280/768/375/320px 오버플로 0 ✅ |
 | T-1124 | **DESIGN_SYSTEM.md Anti-Slop 섹션** | low | done | §8.1~8.7 SwiftUI 수용 가능 원칙 문서화 |
 | T-1125 | **문서 마감 + 커밋 3분리** | high | done | CHANGELOG v3.12 + 세션 로그 + PLAN 커밋·랜딩 커밋·DESIGN_SYSTEM 커밋 |
 
