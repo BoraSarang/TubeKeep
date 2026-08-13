@@ -41,16 +41,42 @@
   </div>
 </header>
 
+<main>
+
+<!-- HERO — 설명 중심 -->
+<section class="hero" id="hero">
+  <div class="hero-copy">
+    <p class="eyebrow"><span class="badge">내 라이브러리</span> YouTube · 오프라인 · AI</p>
+    <h1 class="hero-title">
+      받고, 정리하고,<br>
+      <span class="red">AI가 요약합니다.</span>
+    </h1>
+    <p class="hero-sub">
+      YouTube 영상을 내 기기에 저장하고, 언제든 다시 봅니다.
+      자막으로 요약하고 챕터와 마인드맵까지 — 모든 처리는 로컬에서 이루어집니다.
+    </p>
+    <div class="hero-cta">
+      <a class="yt-btn yt-btn-lg" href="https://github.com/BoraSarang/TubeKeep/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/></svg>
+        <span>무료로 다운로드</span>
+      </a>
+      <a class="host-btn" href="https://github.com/BoraSarang/TubeKeep">GitHub에서 원본 보기</a>
+    </div>
+    <p class="hero-meta">macOS 14+ · Apple Silicon · 오픈소스</p>
+  </div>
+  <figure class="hero-figure">
+    <img src="screenshots/app/main.png" alt="TubeKeep 메인 화면" class="showcase-img">
+  </figure>
+</section>
+
 <!-- CHIP ROW — YouTube-style category chips -->
 <nav class="chip-row" aria-label="카테고리">
   <a class="chip active" href="#library" aria-current="true">모두</a>
   <a class="chip" href="#library">오프라인 보관함</a>
+  <a class="chip" href="#why">왜 TubeKeep인가</a>
   <a class="chip" href="#ai">AI 기능</a>
   <a class="chip" href="#download">다운로드</a>
-  <a class="chip" href="#library">플레이어</a>
 </nav>
-
-<main>
 
 <!-- LIBRARY — video grid -->
 <section id="library" class="yt-section">
@@ -114,6 +140,37 @@
   </div>
 </section>
 
+<!-- WHY — 스크린샷 + 상세 설명 -->
+<section id="why" class="yt-section">
+  <div class="section-row">
+    <h2 class="section-title">왜 TubeKeep인가</h2>
+    <a class="see-all" href="#download">모두 보기 →</a>
+  </div>
+  <div class="why-grid">
+
+    <article class="why-card">
+      <figure class="why-shot">
+        <img src="screenshots/app/downloader.png" alt="영상 다운로더 화면" loading="lazy" decoding="async">
+      </figure>
+      <div class="why-copy">
+        <h3>다운로드는 큐가 전부 처리합니다</h3>
+        <p>URL을 붙여넣거나 QR로 스캔하면 바로 대기열에 들어갑니다. 형식과 화질을 골라 받고, 실패해도 임시 파일을 보존해 다음에 이어받습니다.</p>
+      </div>
+    </article>
+
+    <article class="why-card">
+      <figure class="why-shot">
+        <img src="screenshots/app/player.png" alt="플레이어 화면" loading="lazy" decoding="async">
+      </figure>
+      <div class="why-copy">
+        <h3>네트워크 없이 그대로 재생합니다</h3>
+        <p>H.264에 최적화된 자체 플레이어로 자막 오버레이와 이어보기를 지원합니다. 저장한 영상은 언제 어디서나 끊김 없이 재생됩니다.</p>
+      </div>
+    </article>
+
+  </div>
+</section>
+
 <!-- AI FEATURES -->
 <section id="ai" class="yt-section">
   <div class="section-row">
@@ -126,21 +183,21 @@
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 5.83 13 4.41 14.41 9 19 21 7l-1.41-1.41z"/></svg>
       </div>
       <h3>AI 요약 · Q&amp;A</h3>
-      <p>자막 기반 핵심 요약, 챕터, 대화로 묻고 마인드맵까지</p>
+      <p>자막 기반 핵심 요약과 챕터 분할. 영상에 대해 대화로 묻고, 마인드맵까지 그려줍니다.</p>
     </article>
     <article class="card">
       <div class="card-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.59 2.59 21 2l.59 11.41-2.82-2.82-4.42 4.42-2.82-2.82-4.42 4.42L4.77 14.39l4.42-4.42-2.82-2.82z"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
       </div>
       <h3>AI 팟캐스트</h3>
-      <p>자막을 두 사람의 대화형 팟캐스트로 자동 생성</p>
+      <p>자막을 두 사람의 자연스러운 대화형 팟캐스트로 변환해, 이동 중에도 귀로 들을 수 있습니다.</p>
     </article>
     <article class="card">
       <div class="card-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3m6-3a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V21h2v-2.07A8 8 0 0 0 20 11z"/></svg>
       </div>
       <h3>Whisper 자막</h3>
-      <p>자막 없는 영상도 로컬 AI 음성 인식으로 자동 자막</p>
+      <p>자막이 없는 영상도 로컬 음성 인식으로 자동 자막을 생성합니다. 네트워크가 없어도 동작합니다.</p>
     </article>
   </div>
 </section>
