@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1128) ✅
+## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1129) ✅
 
 ### 문서/도구 (Swift 코드 무변경)
 - **Hallmark 스킬 설치 (T-1121)**: Anti-AI-slop 디자인 스킬(nutlope/hallmark, MIT)을 opencode 전용 `~/.config/opencode/skills/hallmark/`에 설치
@@ -24,6 +24,14 @@
   - **value prop strip 신설**: 히어로 아래 3열 카드(오프라인 보관 / AI 요약·자막 / 로컬 처리) — Hero-Centric 패턴의 single value prop strip
   - **full-bleed 시네마틱 글로우**: `body::before`에 레드/블루 radial 그라디언트 고정 배경 (OLED + subtle cinematic)
   - **CTA 대비 개선**: 버튼 fill `#ff0000`→`#d50000`(흰 텍스트 5.48:1 PASS), muted `#606060`→`#6d6d6d`(5.2:1 PASS) — 대비 6종 전부 WCAG 통과
+- **다크 미니멀 재설계 (T-1129, 사용자 요청)**: "어색하다(검색·칩·히어로·타일·카피·분위기) + 다크 미니멀" 의견 반영 — YouTube 홈 미러 요소 전면 제거
+  - **검색바·카테고리 칩 행 제거**: topbar는 로고 + GitHub + 다운로드만으로 미니멀화
+  - **히어로 중앙 정렬**: 문구 중심(`유튜브를 내 기기에. AI가 정리해 둡니다.`) + 넓은 여백, CTA + 메타, 우측 이미지 제거
+  - **macOS 창 목업 도입**: 트래픽라이트(빨·노·초) + 타이틀바 + 스크린샷 — 크롭 없이 `contain` 전체 표시, 히어로 아래 메인 화면 1장 크게
+  - **가치 카드 3열**: 오프라인 보관 / AI 요약·자막 / 로컬 처리 (아이콘 + 제목 + 한 줄)
+  - **앱 미리보기 2장**: 다운로더·플레이어 창 목업 + 카피, AI 기능 3카드(요약·Q&A/팟캐스트/Whisper)
+  - **분위기 정리**: 배경 글로우 상단 레드 6%로 은은화, 카드 라운드 16px, `--yt-rule` 얇게, topbar blur 배경
+  - 검증: HTTP 200, 태그 균형 OK, 이모지 없음, 검색/칩 잔여 0, 스크린샷 1280/768/375/320 렌더 확인
 
 ### 검증 (T-1123)
 - 로컬 HTTP + chrome-devtools: 1440/1280/768/375/320px 응답 — 히어로 2열(1280)→1열(768 이하), 비디오·AI 그리드 3열→2열→1열, why 2열→1열, CTA 2열→1열, 수평 오버플로 0
