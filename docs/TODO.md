@@ -10,6 +10,7 @@
 | T-1123 | **랜딩 미리보기 검증** | medium | done | chrome-devtools 320/375/768/1280px 통과 — 오버플로 0, 콘솔 에러 0, 이미지·SVG 로드 ✅ |
 | T-1126 | **랜딩 YouTube 홈 미러 재설계** (사용자 재요청) | high | done | 히어로 제거 → 칩 행 + 16:9 비디오 카드 그리드(배지·아바타·hover 오버레이) + CTA 배너 — 1440/1280/768/375/320px 오버플로 0 ✅ |
 | T-1127 | **랜딩 설명 복원 (히어로 + #why + AI 카피 상세화)** | high | done | 히어로 재도입(헤드라인+상세 2문장+CTA), "왜 TubeKeep인가" 스크린샷+카피 교차 2장, AI 카드 2문장씩 — 5폭 오버플로 0 ✅ |
+| T-1128 | **랜딩 ui-ux-pro-max 스킬 적용** | high | done | Hero-Centric + OLED + Inter 폰트 + value prop strip + 시네마틱 글로우 + CTA 대비(#d50000 5.48:1) — 정적 검증·4폭 스크린샷 ✅ |
 | T-1124 | **DESIGN_SYSTEM.md Anti-Slop 섹션** | low | done | §8.1~8.7 SwiftUI 수용 가능 원칙 문서화 |
 | T-1125 | **문서 마감 + 커밋 3분리** | high | done | CHANGELOG v3.12 + 세션 로그 + PLAN 커밋·랜딩 커밋·DESIGN_SYSTEM 커밋 |
 

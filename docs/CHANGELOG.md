@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.12 — Hallmark 디자인 스킬 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1127) ✅
+## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1128) ✅
 
 ### 문서/도구 (Swift 코드 무변경)
 - **Hallmark 스킬 설치 (T-1121)**: Anti-AI-slop 디자인 스킬(nutlope/hallmark, MIT)을 opencode 전용 `~/.config/opencode/skills/hallmark/`에 설치
@@ -19,6 +19,11 @@
   - **히어로 재도입**: `받고, 정리하고, AI가 요약합니다.` 헤드라인 + 상세 2문장 + CTA + 메타, 우측 `main.png` 라운드 프레임
   - **"왜 TubeKeep인가" (#why) 신설**: 다운로더·플레이어 스크린샷 + 상세 카피 2줄씩 교차 배치
   - **AI 3카드 설명 상세화**: 요약·Q&A / 팟캐스트 / Whisper 각 2문장, 칩 행에 `왜 TubeKeep인가` 앵커 추가
+- **ui-ux-pro-max 스킬 적용 (T-1128, 사용자 재요청)**: 디자인 시스템 재생성(Hero-Centric + OLED Dark + Modern Dark Cinema 타이포)
+  - **Inter 웹폰트 도입**: Google Fonts preconnect + Inter 400~800, 한글은 `Apple SD Gothic Neo` 폴백 — 영문/숫자 정밀 렌더
+  - **value prop strip 신설**: 히어로 아래 3열 카드(오프라인 보관 / AI 요약·자막 / 로컬 처리) — Hero-Centric 패턴의 single value prop strip
+  - **full-bleed 시네마틱 글로우**: `body::before`에 레드/블루 radial 그라디언트 고정 배경 (OLED + subtle cinematic)
+  - **CTA 대비 개선**: 버튼 fill `#ff0000`→`#d50000`(흰 텍스트 5.48:1 PASS), muted `#606060`→`#6d6d6d`(5.2:1 PASS) — 대비 6종 전부 WCAG 통과
 
 ### 검증 (T-1123)
 - 로컬 HTTP + chrome-devtools: 1440/1280/768/375/320px 응답 — 히어로 2열(1280)→1열(768 이하), 비디오·AI 그리드 3열→2열→1열, why 2열→1열, CTA 2열→1열, 수평 오버플로 0
