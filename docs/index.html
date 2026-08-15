@@ -4,11 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TubeKeep — YouTube 오프라인 라이브러리 + AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- TOPBAR — YouTube-style bar -->
+<!-- TOPBAR — sticky nav CTA -->
 <header class="topbar">
   <div class="topbar-inner">
     <a class="logo" href="#">
@@ -43,7 +46,7 @@
 
 <main>
 
-<!-- HERO — 설명 중심 -->
+<!-- HERO — full-bleed, 설명 중심 -->
 <section class="hero" id="hero">
   <div class="hero-copy">
     <p class="eyebrow"><span class="badge">내 라이브러리</span> YouTube · 오프라인 · AI</p>
@@ -67,6 +70,33 @@
   <figure class="hero-figure">
     <img src="screenshots/app/main.png" alt="TubeKeep 메인 화면" class="showcase-img">
   </figure>
+</section>
+
+<!-- VALUE PROP STRIP -->
+<section class="strip" aria-label="핵심 가치">
+  <div class="strip-inner">
+    <div class="strip-item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2"/></svg>
+      <div class="strip-text">
+        <strong>오프라인 보관</strong>
+        <span>저장해 두면 언제나 재생</span>
+      </div>
+    </div>
+    <div class="strip-item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3m6-3a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V21h2v-2.07A8 8 0 0 0 20 11z"/></svg>
+      <div class="strip-text">
+        <strong>AI 요약 · 자막</strong>
+        <span>챕터 · 마인드맵 · 팟캐스트</span>
+      </div>
+    </div>
+    <div class="strip-item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5zm-1 14-4-4 1.41-1.41L11 12.17l5.59-5.59L18 8z"/></svg>
+      <div class="strip-text">
+        <strong>로컬 처리</strong>
+        <span>기기 안에만 저장 · 무료</span>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- CHIP ROW — YouTube-style category chips -->
@@ -140,7 +170,7 @@
   </div>
 </section>
 
-<!-- WHY — 스크린샷 + 상세 설명 -->
+<!-- WHY — key benefit / proof -->
 <section id="why" class="yt-section">
   <div class="section-row">
     <h2 class="section-title">왜 TubeKeep인가</h2>

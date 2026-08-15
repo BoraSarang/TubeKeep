@@ -1,6 +1,6 @@
-/* Hallmark · route: custom (bespoke) · structure: YouTube home mirror
- * paper: #0f0f0f · accent: #ff0000 · display: Apple SD Gothic Neo · body: system
- * gates: all-pass · idea: "make TubeKeep feel like YouTube's own library tab" */
+/* Hallmark + UI/UX Pro Max · Hero-Centric · OLED dark + play red
+ * paper: #0f0f0f · accent: #ff0000/#d50000 CTA · display: Inter → Apple SD Gothic Neo
+ * gates: contrast 4.5 · focus-visible · reduced-motion · 375/768/1024/1440 */
 :root {
   --yt-bg: #0f0f0f;
   --yt-bg-elevated: #212121;
@@ -8,10 +8,12 @@
   --yt-card: #1c1c1c;
   --yt-text: #f1f1f1;
   --yt-text-secondary: #aaaaaa;
-  --yt-text-muted: #606060;
+  --yt-text-muted: #6d6d6d;
   --yt-rule: #3f3f3f;
   --yt-red: #ff0000;
   --yt-red-hover: #cc0000;
+  --yt-btn-fill: #d50000;
+  --yt-btn-fill-hover: #a30000;
   --yt-focus: #5b9cff;
   --yt-blue: #3ea6ff;
   --yt-search-bg: #121212;
@@ -20,8 +22,8 @@
   --yt-chip-active-bg: #f1f1f1;
   --yt-chip-active-text: #0f0f0f;
 
-  --font-display: "Apple SD Gothic Neo", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", Roboto, sans-serif;
+  --font-display: "Inter", "Apple SD Gothic Neo", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", -apple-system, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", Roboto, sans-serif;
 
   --space-2xs: 0.5rem; --space-xs: 0.75rem; --space-sm: 1rem;
   --space-md: 1.5rem; --space-lg: 2rem; --space-xl: 3rem; --space-2xl: 4.5rem;
@@ -44,6 +46,16 @@ body {
   color: var(--yt-text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 40% at 72% 6%, rgba(255, 0, 0, 0.13), transparent 68%),
+    radial-gradient(42% 30% at 18% 28%, rgba(62, 166, 255, 0.05), transparent 70%);
 }
 
 ::selection { background: var(--yt-red); color: #fff; }
@@ -207,7 +219,7 @@ button::-moz-focus-inner { border: 0; }
   font-family: var(--font-display);
   font-size: clamp(2.4rem, 5.2vw, 3.6rem);
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   line-height: 1.15;
   font-style: normal;
   overflow-wrap: anywhere;
@@ -234,6 +246,49 @@ button::-moz-focus-inner { border: 0; }
   border-radius: var(--radius);
   border: 1px solid var(--yt-rule);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+/* ===== VALUE PROP STRIP ===== */
+.strip {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px var(--space-lg);
+}
+.strip-inner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--yt-rule);
+  border: 1px solid var(--yt-rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.strip-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--yt-card);
+}
+.strip-item svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--yt-red);
+}
+.strip-text { min-width: 0; }
+.strip-text strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.strip-text span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.83rem;
+  color: var(--yt-text-secondary);
 }
 
 /* ===== SECTIONS ===== */
@@ -465,15 +520,16 @@ button::-moz-focus-inner { border: 0; }
   gap: 8px;
   padding: 9px 16px;
   border-radius: var(--radius-btn);
-  background: var(--yt-red);
+  background: var(--yt-btn-fill);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
 }
 .yt-btn svg { width: 18px; height: 18px; }
-.yt-btn:hover { background: var(--yt-red-hover); transform: translateY(-1px); }
+.yt-btn:hover { background: var(--yt-btn-fill-hover); transform: translateY(-1px); }
 .yt-btn:active { transform: translateY(0); }
 .yt-btn:focus-visible, .ghost-btn:focus-visible, .host-btn:focus-visible {
   outline: 2px solid var(--yt-focus); outline-offset: 2px;
@@ -528,6 +584,7 @@ button::-moz-focus-inner { border: 0; }
 /* ===== RESPONSIVE — 320 / 375 / 414 / 768 ===== */
 @media (max-width: 1000px) {
   .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+  .strip-inner { grid-template-columns: minmax(0, 1fr); }
   .video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .why-grid { grid-template-columns: minmax(0, 1fr); }
@@ -540,9 +597,11 @@ button::-moz-focus-inner { border: 0; }
   .search { display: none; }
   .ghost-btn span { display: none; }
   .hero, .yt-section { padding: var(--space-lg) 16px var(--space-xl); }
+  .strip { padding: 0 16px var(--space-lg); }
   .chip-row { padding: 12px 16px 0; }
   .hero-sub { font-size: 1rem; }
   .hero-title { font-size: clamp(2rem, 9vw, 2.6rem); }
+  .strip-item { padding: var(--space-sm) var(--space-md); }
   .video-grid { grid-template-columns: minmax(0, 1fr); }
   .ai-grid { grid-template-columns: minmax(0, 1fr); }
 }
@@ -567,7 +626,7 @@ button::-moz-focus-inner { border: 0; }
     --yt-card: #f9f9f9;
     --yt-text: #0f0f0f;
     --yt-text-secondary: #606060;
-    --yt-text-muted: #909090;
+    --yt-text-muted: #6d6d6d;
     --yt-rule: #d9d9d9;
     --yt-red: #cc0000;
     --yt-red-hover: #b00000;
