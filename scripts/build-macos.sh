@@ -121,8 +121,13 @@ if [ -f "$CACHE_DIR/ffmpeg" ] && [ -f "$CACHE_DIR/ffprobe" ]; then
 else
     echo "⬇️  Downloading ffmpeg + ffprobe (static)..."
     mkdir -p "$CACHE_DIR"
+    HOST_ARCH="$(uname -m)"
     for BIN in ffmpeg ffprobe; do
-        URL="https://evermeet.cx/ffmpeg/getrelease/$BIN/zip"
+        if [ "$HOST_ARCH" = "arm64" ]; then
+            URL="https://www.osxexperts.net/${BIN}9arm.zip"
+        else
+            URL="https://evermeet.cx/ffmpeg/getrelease/$BIN/zip"
+        fi
         TMP_ZIP="/tmp/${BIN}_$$.zip"
         if curl -# -f -JL -o "$TMP_ZIP" "$URL"; then
             TMP_DIR="/tmp/${BIN}_extract_$$"
