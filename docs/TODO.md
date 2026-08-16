@@ -11,7 +11,7 @@
 | T-1133 | **B. 용어 통일** — 메인창→보관함 rename 8파일 + Settings decode 폴백 | high | done | AppDelegate/StatusBar/Settings/Reducer/Constants/BatchDownload |
 | T-1134 | **C. 단축키 별도 탭** — SettingsTab .shortcuts + SettingsShortcutsTab 신규 | high | done | Settings.swift + SettingsShortcutsTab.swift |
 | T-1135 | **빌드 + 실행 검증** — Dock/축소판/단축키 탭/보관함 토글·설정값 유지 | high | done | build_and_run.sh debug macos + AXMinimized 최소화/복원 |
-| T-1136 | **문서 마감 + 커밋** — CHANGELOG/TODO/session + 커밋 3분리 | high | 예정 | A/B/C 분리 커밋 |
+| T-1136 | **문서 마감 + 커밋** — CHANGELOG/TODO/session + 커밋 분리 | high | done | 커밋 f8df905(feat)+92ec921(docs), 푸시 완료 |
 | T-1137 | **창별 아이콘 적용** — Dock 앱 아이콘 + titlebar document icon 창별 SF Symbol | high | done | WindowFactory.titlebarIcon + AppDelegate 7창 |
 
 ---
