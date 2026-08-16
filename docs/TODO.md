@@ -12,6 +12,7 @@
 | T-1127 | **랜딩 설명 복원 (히어로 + #why + AI 카피 상세화)** | high | done | 히어로 재도입(헤드라인+상세 2문장+CTA), "왜 TubeKeep인가" 스크린샷+카피 교차 2장, AI 카드 2문장씩 — 5폭 오버플로 0 ✅ |
 | T-1128 | **랜딩 ui-ux-pro-max 스킬 적용** | high | done | Hero-Centric + OLED + Inter 폰트 + value prop strip + 시네마틱 글로우 + CTA 대비(#d50000 5.48:1) — 정적 검증·4폭 스크린샷 ✅ |
 | T-1129 | **랜딩 다크 미니멀 재설계** | high | done | 사용자 "어색+다크 미니멀" 반영 — 검색·칩 제거, 히어로 중앙 정렬, macOS 창 목업(contain), 가치 3열 + 미리보기 2장 + AI 3카드, 글로우 은은화 — 커밋 푸시 완료 ✅ |
+| T-1130 | **Intel 구성 요소 제거 (ffmpeg/ffprobe arm64 전환)** | high | done | "Intel 기반 앱 지원 종료" 알림 — 번들 내 x86_64 ffmpeg/ffprobe가 원인. build-macos.sh 아키텍처 분기 + .build_cache arm64 정적 빌드(ffmpeg 9.0) 교체 — 번들 x86_64 잔여 0, arm64 네이티브 실행 ✅ |
 | T-1124 | **DESIGN_SYSTEM.md Anti-Slop 섹션** | low | done | §8.1~8.7 SwiftUI 수용 가능 원칙 문서화 |
 | T-1125 | **문서 마감 + 커밋 3분리** | high | done | CHANGELOG v3.12 + 세션 로그 + PLAN 커밋·랜딩 커밋·DESIGN_SYSTEM 커밋 |
 

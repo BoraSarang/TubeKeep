@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1129) ✅
+## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1130) ✅
 
 ### 문서/도구 (Swift 코드 무변경)
 - **Hallmark 스킬 설치 (T-1121)**: Anti-AI-slop 디자인 스킬(nutlope/hallmark, MIT)을 opencode 전용 `~/.config/opencode/skills/hallmark/`에 설치
@@ -32,6 +32,14 @@
   - **앱 미리보기 2장**: 다운로더·플레이어 창 목업 + 카피, AI 기능 3카드(요약·Q&A/팟캐스트/Whisper)
   - **분위기 정리**: 배경 글로우 상단 레드 6%로 은은화, 카드 라운드 16px, `--yt-rule` 얇게, topbar blur 배경
   - 검증: HTTP 200, 태그 균형 OK, 이모지 없음, 검색/칩 잔여 0, 스크린샷 1280/768/375/320 렌더 확인
+
+### Intel 구성 요소 제거 (T-1130, 사용자 보고 "Intel 기반 앱 지원 종료" 알림)
+- **원인**: 앱 번들에 포함된 `ffmpeg`·`ffprobe`가 x86_64(Intel) — `.build_cache/`의 evermeet.cx **Intel 전용** 정적 빌드가 `build-macos.sh`를 통해 번들로 복사되며 macOS가 Intel 구성 요소 포함 앱으로 감지
+- **해결**: `scripts/build-macos.sh`의 ffmpeg/ffprobe 다운로드를 **호스트 아키텍처 분기**로 수정
+  - `uname -m` = `arm64` → osxexperts.net arm64 정적 빌드(`ffmpeg9arm.zip`/`ffprobe9arm.zip`)
+  - `x86_64` → 기존 evermeet.cx 유지 (Intel 재유입 방지)
+- **캐시 교체**: `.build_cache/ffmpeg`·`ffprobe`를 arm64 정적 빌드(ffmpeg 9.0 / ffprobe 9.0)로 교체 (gitignore 대상, 커밋 없음)
+- **검증**: 번들 내 ffmpeg/ffprobe arm64 확인, 실행 가능 바이너리 전체에서 x86_64 잔여 **0개**, 앱 arm64 네이티브 실행 확인
 
 ### 검증 (T-1123)
 - 로컬 HTTP + chrome-devtools: 1440/1280/768/375/320px 응답 — 히어로 2열(1280)→1열(768 이하), 비디오·AI 그리드 3열→2열→1열, why 2열→1열, CTA 2열→1열, 수평 오버플로 0
