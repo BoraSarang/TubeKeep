@@ -40,6 +40,7 @@ enum SettingsTab: String, Equatable, CaseIterable {
     case ai = "AI"
     case storage = "저장"
     case notifications = "알림"
+    case shortcuts = "단축키"
     case general = "일반"
 
     var icon: String {
@@ -50,6 +51,7 @@ enum SettingsTab: String, Equatable, CaseIterable {
         case .ai: return "sparkle"
         case .storage: return "folder"
         case .notifications: return "bell"
+        case .shortcuts: return "keyboard"
         case .general: return "gearshape"
         }
     }
@@ -79,7 +81,7 @@ struct Settings: Equatable, Codable {
     var openRouterAPIKey: String = ""
     var openRouterModel: String = "openrouter/free"
     var geminiAPIKey: String = ""
-    var showMainWindowOnLaunch: Bool = true
+    var showLibraryOnLaunch: Bool = true
     var sponsorBlock: Bool = true
     var embedMetadata: Bool = true
     var showThumbnailPreview: Bool = true
@@ -116,7 +118,7 @@ struct Settings: Equatable, Codable {
         case concurrentDownloads, filenameTemplate, limitRate
         case playSoundOnComplete, clipboardMonitoring, showOnlyVideo
         case defaultResolution, maxRetries, launchAtLogin, maxUploadCheck, skipIndexOnFailure
-        case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, showMainWindowOnLaunch
+        case storageDirectory = "outputDirectory", openRouterAPIKey, openRouterModel, geminiAPIKey, showLibraryOnLaunch, legacyShowMainWindowOnLaunch = "showMainWindowOnLaunch"
         case sponsorBlock, embedMetadata, showThumbnailPreview, ttsEngine, playerMode, showChannelBadge
         case subtitleLanguageOverride, enableWhisperTranscription, whisperModelSize
         case showMenuBarNotifications, menuBarNotificationDuration, presets, activePresetId, smartMode
@@ -139,7 +141,7 @@ struct Settings: Equatable, Codable {
         openRouterAPIKey: String = "",
         openRouterModel: String = "openrouter/free",
         geminiAPIKey: String = "",
-        showMainWindowOnLaunch: Bool = true,
+        showLibraryOnLaunch: Bool = true,
         sponsorBlock: Bool = true,
         embedMetadata: Bool = true,
         showThumbnailPreview: Bool = true,
@@ -175,7 +177,7 @@ struct Settings: Equatable, Codable {
         self.openRouterAPIKey = openRouterAPIKey
         self.openRouterModel = openRouterModel
         self.geminiAPIKey = geminiAPIKey
-        self.showMainWindowOnLaunch = showMainWindowOnLaunch
+        self.showLibraryOnLaunch = showLibraryOnLaunch
         self.sponsorBlock = sponsorBlock
         self.embedMetadata = embedMetadata
         self.showThumbnailPreview = showThumbnailPreview
@@ -214,7 +216,7 @@ struct Settings: Equatable, Codable {
         openRouterAPIKey = try c.decodeIfPresent(String.self, forKey: .openRouterAPIKey) ?? ""
         openRouterModel = try c.decodeIfPresent(String.self, forKey: .openRouterModel) ?? "openrouter/free"
         geminiAPIKey = try c.decodeIfPresent(String.self, forKey: .geminiAPIKey) ?? ""
-        showMainWindowOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showMainWindowOnLaunch) ?? true
+        showLibraryOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showLibraryOnLaunch) ?? c.decodeIfPresent(Bool.self, forKey: .legacyShowMainWindowOnLaunch) ?? true
         sponsorBlock = try c.decodeIfPresent(Bool.self, forKey: .sponsorBlock) ?? true
         embedMetadata = try c.decodeIfPresent(Bool.self, forKey: .embedMetadata) ?? true
         showThumbnailPreview = try c.decodeIfPresent(Bool.self, forKey: .showThumbnailPreview) ?? true
@@ -253,7 +255,7 @@ struct Settings: Equatable, Codable {
         try c.encode(openRouterAPIKey, forKey: .openRouterAPIKey)
         try c.encode(openRouterModel, forKey: .openRouterModel)
         try c.encode(geminiAPIKey, forKey: .geminiAPIKey)
-        try c.encode(showMainWindowOnLaunch, forKey: .showMainWindowOnLaunch)
+        try c.encode(showLibraryOnLaunch, forKey: .showLibraryOnLaunch)
         try c.encode(sponsorBlock, forKey: .sponsorBlock)
         try c.encode(embedMetadata, forKey: .embedMetadata)
         try c.encode(showThumbnailPreview, forKey: .showThumbnailPreview)

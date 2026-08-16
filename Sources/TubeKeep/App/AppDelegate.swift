@@ -192,9 +192,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             BookmarkManager.ensureAccess()
             SwiftDataMigration.migrateIfNeeded(context: PersistenceController.shared.context)
 
-            if !Settings.loadSettings().showMainWindowOnLaunch {
-            } else {
-                self.openMainWindow()
+            if Settings.loadSettings().showLibraryOnLaunch {
+                self.openLibraryWindow()
             }
             self.clipboardMonitor?.start(statusItem: self.statusManager?.statusItem)
         }
@@ -202,7 +201,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 
     private func setupManagers() {
         let statusBar = StatusBarManager(store: store)
-        statusBar.onOpenMainWindow = { [weak self] in self?.openMainWindow() }
+        statusBar.onOpenLibraryWindow = { [weak self] in self?.openLibraryWindow() }
         statusBar.onOpenVideoDownloader = { [weak self] in self?.openVideoDownloaderWindow() }
         statusBar.onOpenBatchDownload = { [weak self] in self?.openBatchDownloadWindow() }
         statusBar.onOpenChannelDownloader = { [weak self] in self?.openChannelDownloaderWindow() }
@@ -348,7 +347,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 
     // MARK: - Library Window
 
-    @objc func openMainWindow() {
+    @objc func openLibraryWindow() {
         if let controller = libraryWindowController, let window = controller.window {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -370,7 +369,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             rootView: rootView,
             contentSize: NSSize(width: 840, height: 640),
             minSize: NSSize(width: 840, height: 500),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable]
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            titlebarIcon: WindowFactory.icon("square.grid.2x2")
         )
         let controller = FixedWidthWindowController(window: window)
         libraryWindowController = controller
@@ -399,8 +399,9 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             rootView: rootView,
             contentSize: NSSize(width: 520, height: 480),
             minSize: NSSize(width: 520, height: 300),
-            styleMask: [.titled, .closable, .resizable],
-            zoomEnabled: false
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            zoomEnabled: false,
+            titlebarIcon: WindowFactory.icon("arrow.down.circle")
         )
         WindowFactory.present(window)
         videoDownloaderWindow = window
@@ -438,8 +439,9 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             rootView: rootView,
             contentSize: NSSize(width: 480, height: 420),
             minSize: NSSize(width: 480, height: 340),
-            styleMask: [.titled, .closable, .resizable],
-            zoomEnabled: false
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            zoomEnabled: false,
+            titlebarIcon: WindowFactory.icon("shippingbox")
         )
         WindowFactory.present(window)
     }
@@ -479,7 +481,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             minSize: NSSize(width: 720, height: 400),
             maxSize: NSSize(width: 720, height: 9999),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            zoomEnabled: false
+            zoomEnabled: false,
+            titlebarIcon: WindowFactory.icon("tv")
         )
         WindowFactory.present(window)
         channelDownloaderWindow = window
@@ -500,7 +503,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: "정보",
             rootView: AboutView(),
             contentSize: NSSize(width: 440, height: 200),
-            minSize: NSSize(width: 440, height: 200)
+            minSize: NSSize(width: 440, height: 200),
+            titlebarIcon: WindowFactory.icon("info.circle")
         )
         WindowFactory.present(window)
     }
@@ -518,7 +522,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "settings",
             title: "설정",
             rootView: SettingsView(store: store.scope(state: \.settings, action: \.settings)),
-            contentSize: NSSize(width: 640, height: 420)
+            contentSize: NSSize(width: 640, height: 420),
+            titlebarIcon: WindowFactory.icon("gearshape")
         )
         window.contentMinSize = window.frame.size
         window.contentMaxSize = window.frame.size
@@ -548,7 +553,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "qna",
             title: "AI 기능",
             rootView: AIWindowView(store: store),
-            contentSize: NSSize(width: 560, height: windowHeight)
+            contentSize: NSSize(width: 560, height: windowHeight),
+            titlebarIcon: WindowFactory.icon("sparkle")
         )
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -595,6 +601,10 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         let window = PlayerWindow(contentViewController: hostingCtrl)
         window.title = playerItem.title
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        if let docButton = window.standardWindowButton(.documentIconButton) {
+            docButton.isHidden = false
+            docButton.image = WindowFactory.icon("play.fill")
+        }
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.managed, .ignoresCycle, .fullScreenPrimary]
         window.identifier = NSUserInterfaceItemIdentifier("player")
@@ -631,7 +641,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             maxSize: NSSize(width: 2000, height: 1200),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             level: .floating + 100,
-            movableByBackground: true
+            movableByBackground: true,
+            titlebarIcon: WindowFactory.icon("ladybug.fill")
         )
         WindowFactory.present(window)
         debugLogWindow = window

@@ -125,8 +125,8 @@ struct AppReducer {
                         if settings.skipIndexOnFailure {
                             await send(.settings(.toggleSkipIndexOnFailure))
                         }
-                        if !settings.showMainWindowOnLaunch {
-                            await send(.settings(.toggleShowMainWindowOnLaunch))
+                        if !settings.showLibraryOnLaunch {
+                            await send(.settings(.toggleShowLibraryOnLaunch))
                         }
                         if !settings.showOnlyVideo {
                             await send(.settings(.toggleShowOnlyVideo))

@@ -57,7 +57,7 @@ struct SettingsReducer {
         var launchAtLogin: Bool = false
         var maxUploadCheck: Int = Constants.defaultMaxUploadCheck
         var skipIndexOnFailure: Bool = false
-        var showMainWindowOnLaunch: Bool = true
+        var showLibraryOnLaunch: Bool = true
         var showOnlyVideo: Bool = true
         var showThumbnailPreview: Bool = true
         var sponsorBlock: Bool = true
@@ -109,7 +109,7 @@ struct SettingsReducer {
                 maxUploadCheck: maxUploadCheck,
                 skipIndexOnFailure: skipIndexOnFailure,
                 openRouterAPIKey: openRouterAPIKey,
-                showMainWindowOnLaunch: showMainWindowOnLaunch,
+                showLibraryOnLaunch: showLibraryOnLaunch,
                 sponsorBlock: sponsorBlock,
                 embedMetadata: embedMetadata,
                 showThumbnailPreview: showThumbnailPreview,
@@ -148,7 +148,7 @@ struct SettingsReducer {
         case setLaunchAtLogin(Bool)
         case setMaxUploadCheck(Int)
         case toggleSkipIndexOnFailure
-        case toggleShowMainWindowOnLaunch
+        case toggleShowLibraryOnLaunch
         case toggleShowOnlyVideo
         case toggleShowThumbnailPreview
         case toggleSponsorBlock
@@ -281,8 +281,8 @@ struct SettingsReducer {
                 state.skipIndexOnFailure.toggle()
                 return .send(.saveSettings)
 
-            case .toggleShowMainWindowOnLaunch:
-                state.showMainWindowOnLaunch.toggle()
+            case .toggleShowLibraryOnLaunch:
+                state.showLibraryOnLaunch.toggle()
                 return .send(.saveSettings)
 
             case .toggleShowOnlyVideo:

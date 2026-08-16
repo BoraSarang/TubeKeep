@@ -27,7 +27,7 @@ enum Constants {
         Settings.loadSettings().storageDirectory
     }
 
-    static let openMainWindowNotification = Notification.Name("com.tubekeep.openMainWindow")
+    static let openLibraryWindowNotification = Notification.Name("com.tubekeep.openLibraryWindow")
     static let openDownloaderWindowNotification = Notification.Name("com.tubekeep.openDownloaderWindow")
     static let openBatchWindowNotification = Notification.Name("com.tubekeep.openBatchWindow")
     static let openChannelWindowNotification = Notification.Name("com.tubekeep.openChannelWindow")
@@ -49,7 +49,7 @@ enum Constants {
     static let channelOrderKey = "channelOrder"
     static let sidebarNavExpandedKey = "sidebarNavExpanded"
     static let downloadQueueKey = "downloadQueue"
-    static let showMainWindowOnLaunchKey = "showMainWindowOnLaunch"
+    static let showLibraryOnLaunchKey = "showLibraryOnLaunch"
     static let sponsorBlockKey = "sponsorBlock"
     static let embedMetadataKey = "embedMetadata"
 

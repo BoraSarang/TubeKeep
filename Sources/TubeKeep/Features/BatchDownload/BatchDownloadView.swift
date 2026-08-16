@@ -453,7 +453,7 @@ struct BatchDownloadView: View {
                     batchWindow.close()
                 }
                 NotificationCenter.default.post(
-                    name: Constants.openMainWindowNotification,
+                    name: Constants.openLibraryWindowNotification,
                     object: nil
                 )
             }

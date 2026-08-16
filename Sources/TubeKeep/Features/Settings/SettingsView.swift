@@ -21,6 +21,7 @@ struct SettingsView: View {
                     case .ai: SettingsAITab(store: store)
                     case .storage: SettingsStorageTab(store: store)
                     case .notifications: SettingsNotificationsTab(store: store)
+                    case .shortcuts: SettingsShortcutsTab(store: store)
                     case .general: SettingsSystemTab(store: store)
                     }
                 }

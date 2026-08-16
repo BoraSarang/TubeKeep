@@ -17,7 +17,7 @@ final class StatusBarManager {
     private var hasQueueSection = false
     private var queueTimer: Timer?
 
-    var onOpenMainWindow: (() -> Void)?
+    var onOpenLibraryWindow: (() -> Void)?
     var onOpenVideoDownloader: (() -> Void)?
     var onOpenBatchDownload: (() -> Void)?
     var onOpenChannelDownloader: (() -> Void)?
@@ -178,7 +178,7 @@ final class StatusBarManager {
 
     func rebuildMenu() {
         let menu = NSMenu()
-        let libraryItem = NSMenuItem(title: "🎬 튜브킵", action: #selector(openMainWindow), keyEquivalent: "")
+        let libraryItem = NSMenuItem(title: "🎬 튜브킵", action: #selector(openLibraryWindow), keyEquivalent: "")
         libraryItem.target = self
         menu.addItem(libraryItem)
         menu.addItem(NSMenuItem.separator())
@@ -285,7 +285,7 @@ final class StatusBarManager {
                 onOpenChannelDownloader?()
             }
         } else {
-            onOpenMainWindow?()
+            onOpenLibraryWindow?()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.rebuildMenu()
@@ -294,7 +294,7 @@ final class StatusBarManager {
 
     // MARK: - Menu Actions
 
-    @objc private func openMainWindow() { onOpenMainWindow?() }
+    @objc private func openLibraryWindow() { onOpenLibraryWindow?() }
     @objc private func openVideoDownloaderWindow() { onOpenVideoDownloader?() }
     @objc private func openBatchDownloadWindow() { onOpenBatchDownload?() }
     @objc private func openChannelDownloaderWindow() { onOpenChannelDownloader?() }

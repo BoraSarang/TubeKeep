@@ -18,6 +18,7 @@ enum WindowFactory {
         level: NSWindow.Level? = nil,
         movableByBackground: Bool = false,
         collectionBehavior: NSWindow.CollectionBehavior = [.managed, .ignoresCycle],
+        titlebarIcon: NSImage? = nil,
         delegate: NSWindowDelegate? = nil
     ) -> NSWindow {
         let hostingCtrl = NSHostingController(rootView: rootView)
@@ -34,10 +35,23 @@ enum WindowFactory {
         if !zoomEnabled {
             window.standardWindowButton(.zoomButton)?.isEnabled = false
         }
+        if let titlebarIcon {
+            if let docButton = window.standardWindowButton(.documentIconButton) {
+                docButton.isHidden = false
+                docButton.image = titlebarIcon
+            }
+        }
         if let level { window.level = level }
         if movableByBackground { window.isMovableByWindowBackground = true }
         if let delegate { window.delegate = delegate }
         return window
+    }
+
+    /// SF Symbol을 타이틀바 창 아이콘으로 사용할 NSImage로 생성한다.
+    static func icon(_ symbolName: String) -> NSImage? {
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        image?.isTemplate = true
+        return image
     }
 
     /// 창을 화면 중앙에 띄우고 앱을 전면으로 활성화한다.
