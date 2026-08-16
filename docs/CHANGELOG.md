@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## v3.13 — Dock 표시 + 메인창→보관함 용어 통일 + 단축키 별도 탭 + 창별 아이콘 (macOS, T-1131~T-1137) 🚧
+
+### A. Dock 표시 (T-1132)
+- **`Info.plist` `LSUIElement: true → false`**: 메뉴바 전용(accessory) → Dock 아이콘 + Cmd+Tab 노출. 메뉴바 아이콘(`StatusBarManager`)은 코드로 계속 생성 — **하이브리드** 유지
+- **최소화 가능 추가**: 영상 다운로더(`downloader`), 일괄 다운로더(`batch`) styleMask에 `.miniaturizable` 추가 → 최소화 시 Dock 축소판 생성 (보관함·플레이어·채널은 이미 보유)
+- `applicationShouldTerminateAfterLastWindowClosed = false` 유지 확인 (마지막 창 닫아도 앱 유지)
+- 검증: 번들 `LSUIElement=false`, 실행 앱 `activationPolicy=0(regular)`, 보관함 최소화 `AXMinimized=true` → 복원 성공
+
+### B. 메인창 → 보관함 용어 통일 (T-1133)
+- **UI 라벨**: 설정 "메인창 자동 표시" → **"보관함 자동 표시"** / "실행 시 보관함을 자동으로 엽니다"
+- **내부 식별자 rename (8개 파일)**: `openMainWindow`→`openLibraryWindow`, `showMainWindowOnLaunch`→`showLibraryOnLaunch`, `toggleShowMainWindowOnLaunch`→`toggleShowLibraryOnLaunch`, `openMainWindowNotification`→`openLibraryWindowNotification`, `showMainWindowOnLaunchKey`→`showLibraryOnLaunchKey`
+- **UserDefaults 마이그레이션**: `Settings` CodingKey에 `legacyShowMainWindowOnLaunch = "showMainWindowOnLaunch"` 폴백 decode 추가 → 기존 저장값 보존 (encode는 새 키로만)
+- **부수 정리**: AppDelegate의 빈 `if` 블록 잔재(`if !showLibraryOnLaunch {} else {}`) 단순화
+- 무관 항목 제외: `setupMainMenu`/`refreshMainMenu`(앱 메뉴바), `runOnMain`(스레드)
+
+### C. 단축키 별도 탭 (T-1134)
+- `SettingsTab`에 `case shortcuts = "단축키"` 추가 (아이콘 `keyboard`, 사이드바 "일반" 앞)
+- **`SettingsShortcutsTab.swift` 신규**: 기존 "일반" 탭의 전역 단축키 섹션(`GlobalShortcutRow` + `handleRecording` + `recording`/`keyMonitor`/`shortcutsVersion` 상태) 이동
+- `SettingsSystemTab`은 플레이어/앱 시작 섹션만 유지 (102줄, -127줄), `SettingsView` switch에 `case .shortcuts` 추가
+
+### D. 창별 아이콘 (T-1137)
+- **Dock 앱 아이콘**: `AppIcon.icns`(루트, 1024px 포함)가 `build-macos.sh`로 번들 복사됨 확인 — Dock에 표시됨
+- **titlebar document icon**: `WindowFactory.makeWindow`에 `titlebarIcon` 파라미터 + `WindowFactory.icon(_:)`(SF Symbol template) 추가
+  - 보관함 `square.grid.2x2` / 영상 다운로더 `arrow.down.circle` / 일괄 다운로더 `shippingbox` / 채널 다운로더 `tv` / 플레이어 `play.fill` / 설정 `gearshape` / AI `sparkle` / 정보 `info.circle` / Debug `ladybug.fill`
+
+### 검증
+- 빌드 `build_and_run.sh debug macos` 성공, 실행 확인, 최소화→복원 테스트 통과
+- 스크린샷: `docs/screenshots/` 없음 — 임시 경로 확인 (사용자 확인용)
+
+---
+
 ## v3.12 — Hallmark + ui-ux-pro-max 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS, T-1120~T-1130) ✅
 
 ### 문서/도구 (Swift 코드 무변경)

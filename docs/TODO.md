@@ -1,5 +1,21 @@
 # TODO — 작업 추적 목록
 
+## v3.13 — Dock 표시 + 메인창→보관함 용어 통일 + 단축키 별도 탭 (macOS) 🚧
+
+> PLAN_v3.13_window-dock-macos.md. macOS 창 관련 개선 3종.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1131 | **PLAN_v3.13 + TODO 등록** | high | done | docs/plans/PLAN_v3.13_window-dock-macos.md |
+| T-1132 | **A. Dock 표시** — LSUIElement false + 다운로더 2종 .miniaturizable | high | done | Info.plist + AppDelegate — activationPolicy regular 확인 |
+| T-1133 | **B. 용어 통일** — 메인창→보관함 rename 8파일 + Settings decode 폴백 | high | done | AppDelegate/StatusBar/Settings/Reducer/Constants/BatchDownload |
+| T-1134 | **C. 단축키 별도 탭** — SettingsTab .shortcuts + SettingsShortcutsTab 신규 | high | done | Settings.swift + SettingsShortcutsTab.swift |
+| T-1135 | **빌드 + 실행 검증** — Dock/축소판/단축키 탭/보관함 토글·설정값 유지 | high | done | build_and_run.sh debug macos + AXMinimized 최소화/복원 |
+| T-1136 | **문서 마감 + 커밋** — CHANGELOG/TODO/session + 커밋 3분리 | high | 예정 | A/B/C 분리 커밋 |
+| T-1137 | **창별 아이콘 적용** — Dock 앱 아이콘 + titlebar document icon 창별 SF Symbol | high | done | WindowFactory.titlebarIcon + AppDelegate 7창 |
+
+---
+
 ## v3.12 — Hallmark 디자인 스킬 도입 + 랜딩 리디자인 + 디자인 원칙 반영 (macOS) ✅
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
