@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v4.3 — okstart 흔적 완전 제거 + git 이력 재작성 (macOS, T-1179~T-1181) ✅
+
+### 브랜드 흔적 제거 (T-1179, T-1180)
+- **okstart → borasarang 전면 치환**: 번들 ID(`com.okstart.tubekeeper/tubekeep`), Buy Me a Coffee 계정명, mpv 렌더 스레드(`com.okstart.mpv.render`), 문서 16개 파일(PLAN_v3.14, DESIGN, TODO, CHANGELOG, tests/archive 등), screenshots storage.json 6개
+- **OkStart → BoRaSaRang 치환 (2차)**: `AboutView.swift` 저작권 "© 2025/2026 OkStart", 과거 `docs/AGENTS.md` 제작자 — 1차 filter-repo가 소문자만 치환해 대문자 누락 발견 후 재작성
+- **git 이력 재작성**: `git filter-repo --replace-text` — 122개 커밋 전부 재작성, 커밋 메시지 포함 (`a6cc005 "Buy Me a Coffee username okstart"` 메시지도 치환됨)
+- **검증**: `git log -S okstart -i` 0건 / 작업 트리 `rg -i okstart` 0건 / 태그 14개 전부 0건 / GitHub 코드 검색 0건
+
+### 원격 저장소 재생성 (T-1181)
+- 원인 1: 태그 force push가 "repository rule violations" 거부 — GitHub Push Protection이 이력 속 **yt-dlp `shahid.py` 내부 예제 AWS 키**(build/ 번들) 탐지
+- 원인 2: 저장소가 새로워도 계속 차단 → 기존 저장소 삭제 + `gh repo create --public` 재생성
+- **build/ 이력 제거**: `git filter-repo --invert-paths --path build/` — Push Protection 통과
+- **push 완료**: main + 태그 14개(v1.0.0~v3.11.0) force push 성공
+- **⚠️ 이력 해시 전면 변경**: 과거 커밋 해시 모두 재작성 (PR/이슈 링크 무효, 1인 프로젝트라 영향 없음)
+- **백업**: 원본 이력 `tubekeep-orig-backup.bundle` (52MB, /var/folders/.../opencode/) — 롤백용
+
 ## v4.2 — 단축키 체계 정리 + fullscreen 크래시 수정 (macOS, T-1172~T-1178) ✅
 
 ### fullscreen 크래시 수정 (T-1172) — 크래시 182552 해결

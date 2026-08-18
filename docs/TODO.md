@@ -1,5 +1,15 @@
 # TODO — 작업 추적 목록
 
+## v4.3 — okstart 흔적 완전 제거 + git 이력 재작성 (macOS, T-1179~T-1181) ✅
+
+> PLAN_v4.3_okstart-cleanup-macos.md. 이력 전체에서 okstart→borasarang 치환 + build/ 제거 + 원격 저장소 재생성 + 태그 재push.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1179 | **미커밋 정리 커밋** — v4.0~v4.2 작업 전체 1개 커밋으로 (82개 파일) | high | done | filter-repo 선행 조건 |
+| T-1180 | **git 이력 재작성** — `okstart==>borasarang` + `OkStart==>BoRaSaRang` (2회차, 대문자 누락 발견) | high | done | AboutView.swift 저작권 / AGENTS.md 제작자 |
+| T-1181 | **build/ 이력 제거 + 원격 재생성 + push** — Push Protection(AWS 키) 차단 해소, 저장소 삭제→재생성, main+태그 14개 push | high | done | yt-dlp shahid.py 예제 키 |
+
 ## v4.2 — 단축키 체계 정리 + fullscreen 크래시 수정 (macOS, T-1172~T-1178) ✅
 
 > PLAN_v4.2_shortcuts-macos.md. fullscreen 크래시 + 스페이스 토글 상쇄 + Cmd+D 3중 정의 단일화 + Cmd+W 신규 + 메뉴바 소멸 + Dock 복구.
