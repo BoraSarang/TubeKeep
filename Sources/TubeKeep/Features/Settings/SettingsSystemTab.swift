@@ -58,7 +58,6 @@ struct SettingsSystemTab: View {
                         set: { _ in store.send(.toggleShowThumbnailPreview) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -79,7 +78,6 @@ struct SettingsSystemTab: View {
                         set: { _ in store.send(.toggleLaunchAtLogin) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -93,7 +91,6 @@ struct SettingsSystemTab: View {
                         set: { _ in store.send(.toggleShowLibraryOnLaunch) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 

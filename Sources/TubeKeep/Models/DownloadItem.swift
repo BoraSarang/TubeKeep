@@ -140,6 +140,8 @@ struct DownloadItem: Identifiable, Equatable, Codable {
               let size = attrs[.size] as? Int64, size > 0
         else { return false }
         let ext = (path as NSString).pathExtension.lowercased()
+        let name = (path as NSString).lastPathComponent
+        if name.range(of: #"\.f\d+\."#, options: .regularExpression) != nil { return false }
         return Self.mediaFileExtensions.contains(ext)
     }
 

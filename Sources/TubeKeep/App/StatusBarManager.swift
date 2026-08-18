@@ -233,7 +233,7 @@ final class StatusBarManager {
         menu.addItem(NSMenuItem.separator())
         let debugItem = NSMenuItem(title: "🐛 Debug", action: nil, keyEquivalent: "")
         let debugMenu = NSMenu(title: "Debug")
-        debugMenu.addItem(withTitle: "Show/Hide Debug Panel", action: #selector(toggleDebugPanel), keyEquivalent: "d")
+        debugMenu.addItem(withTitle: "Show/Hide Debug Panel", action: #selector(toggleDebugPanel), keyEquivalent: "")
         debugMenu.addItem(.separator())
         debugMenu.addItem(withTitle: "Copy Selection", action: #selector(debugCopySelection), keyEquivalent: "c")
         debugMenu.addItem(withTitle: "Copy All for Agent", action: #selector(debugCopyAll), keyEquivalent: "a")

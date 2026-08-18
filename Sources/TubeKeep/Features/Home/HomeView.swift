@@ -68,11 +68,11 @@ struct HomeView: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(AppColors.controlBackground)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                        .stroke(AppColors.separator, lineWidth: 1)
                 )
 
                 Button {
@@ -84,7 +84,7 @@ struct HomeView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(store.clipboardMonitoring
                             ? Color.accentColor
-                            : Color(nsColor: .tertiaryLabelColor))
+                            : AppColors.tertiaryLabel)
                 }
                 .buttonStyle(.plain)
                 .help(store.clipboardMonitoring
@@ -153,7 +153,7 @@ struct HomeView: View {
         .padding(.horizontal, 4)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(AppColors.controlBackground)
         )
     }
 
@@ -175,7 +175,7 @@ struct HomeView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(AppColors.controlBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -272,11 +272,11 @@ struct HomeView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(AppColors.controlBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+                .stroke(AppColors.separator.opacity(0.5), lineWidth: 1)
         )
     }
 

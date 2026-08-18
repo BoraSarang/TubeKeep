@@ -136,7 +136,7 @@ struct ClipView: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     Rectangle()
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(AppColors.controlBackground)
                         .overlay(
                             Image(systemName: "film.stack")
                                 .font(.system(size: 26))

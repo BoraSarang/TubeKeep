@@ -20,6 +20,15 @@ struct DownloadQueueView: View {
             }
         }
         .frame(maxHeight: .infinity)
+        .overlay(alignment: .top) {
+            if let toast = store.toastMessage {
+                toastBanner(toast)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: store.toastMessage?.id)
     }
 
     private var sectionHeader: some View {
@@ -157,17 +166,16 @@ struct DownloadQueueView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppColors.controlBackground)
         .overlay(Divider(), alignment: .top)
     }
 
     private var listContent: some View {
         List {
-            if let toast = store.toastMessage {
-                toastBanner(toast)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                    .listRowSeparator(.hidden)
-            }
+            Color.clear
+                .frame(height: 4)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
 
             ForEach(Array(store.items.enumerated()).reversed(), id: \.element.id) { _, item in
                 DownloadRow(item: item, store: store)
@@ -194,7 +202,6 @@ struct DownloadQueueView: View {
         ToastBanner(toast: toast) {
             store.send(.dismissToast)
         }
-        .padding(.bottom, 4)
     }
 
 }
@@ -331,7 +338,7 @@ struct DownloadRow: View {
                 } label: {
                     Image(systemName: isHovering ? "trash.fill" : "trash")
                         .font(.system(size: 11))
-                        .foregroundStyle(isHovering ? .red : Color(nsColor: .tertiaryLabelColor))
+                        .foregroundStyle(isHovering ? .red : AppColors.tertiaryLabel)
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)

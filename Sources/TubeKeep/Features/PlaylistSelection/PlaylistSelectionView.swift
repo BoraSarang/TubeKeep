@@ -130,7 +130,7 @@ struct PlaylistRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Color.accentColor : Color(nsColor: .tertiaryLabelColor))
+                .foregroundStyle(isSelected ? Color.accentColor : AppColors.tertiaryLabel)
                 .font(.system(size: 16))
 
             CachedThumbnailView(videoId: video.id, url: video.thumbnailURL)

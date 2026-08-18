@@ -7,28 +7,37 @@ struct SettingsView: View {
     @State private var editingPreset: DownloadPreset?
 
     var body: some View {
-        HStack(spacing: 0) {
-            tabSidebar
-
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    switch store.selectedTab {
-                    case .downloads: SettingsDownloadsTab(store: store, editingPreset: $editingPreset)
-                    case .channels: SettingsChannelsTab(store: store)
-                    case .automation: SettingsAutomationTab(store: store)
-                    case .ai: SettingsAITab(store: store)
-                    case .storage: SettingsStorageTab(store: store)
-                    case .notifications: SettingsNotificationsTab(store: store)
-                    case .shortcuts: SettingsShortcutsTab(store: store)
-                    case .general: SettingsSystemTab(store: store)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+        TabView(selection: Binding(
+            get: { store.selectedTab },
+            set: { store.send(.setSelectedTab($0)) }
+        )) {
+            tabView(.downloads) {
+                SettingsDownloadsTab(store: store, editingPreset: $editingPreset)
+            }
+            tabView(.channels) {
+                SettingsChannelsTab(store: store)
+            }
+            tabView(.automation) {
+                SettingsAutomationTab(store: store)
+            }
+            tabView(.ai) {
+                SettingsAITab(store: store)
+            }
+            tabView(.storage) {
+                SettingsStorageTab(store: store)
+            }
+            tabView(.notifications) {
+                SettingsNotificationsTab(store: store)
+            }
+            tabView(.shortcuts) {
+                SettingsShortcutsTab(store: store)
+            }
+            tabView(.general) {
+                SettingsSystemTab(store: store)
             }
         }
+        .tabViewStyle(.automatic)
+        .frame(minWidth: 640, minHeight: 440)
         .sheet(item: $editingPreset) { preset in
             PresetEditorSheet(
                 preset: preset,
@@ -47,49 +56,15 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Tab Sidebar
-
-    private var tabSidebar: some View {
-        VStack(spacing: 2) {
-            ForEach(SettingsTab.allCases, id: \.self) { tab in
-                tabButton(tab)
-            }
-            Spacer()
+    private func tabView<Content: View>(_ tab: SettingsTab, @ViewBuilder content: () -> Content) -> some View {
+        ScrollView {
+            content()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
         }
-        .frame(width: 140)
-        .padding(.vertical, 12)
-    }
-
-    private func tabButton(_ tab: SettingsTab) -> some View {
-        let selected = store.selectedTab == tab
-        return Button {
-            store.send(.setSelectedTab(tab))
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                    .frame(width: 16)
-                Text(tab.rawValue)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? Color.primary : Color.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Group {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.accentColor.opacity(0.15))
-                    } else {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.clear)
-                    }
-                }
-            )
-            .contentShape(Rectangle())
+        .tabItem {
+            Label(tab.rawValue, systemImage: tab.icon)
         }
-        .buttonStyle(.plain)
+        .tag(tab)
     }
 }

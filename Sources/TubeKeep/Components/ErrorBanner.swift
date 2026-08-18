@@ -7,26 +7,26 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
+                .foregroundStyle(AppColors.warning)
             Text(message)
-                .font(.caption)
+                .font(AppFont.cellSubtitle)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Spacer()
             if let onDismiss {
                 Button("✕") { onDismiss() }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AppColors.tertiaryLabel)
             }
         }
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: AppMetrics.cornerLarge)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(AppColors.controlBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppMetrics.cornerLarge)
-                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                .stroke(AppColors.warning.opacity(0.3), lineWidth: 1)
         )
     }
 }

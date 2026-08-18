@@ -171,7 +171,7 @@ struct ChannelListView: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity)
-            .background(Color(.textBackgroundColor).opacity(0.5))
+            .background(AppColors.textBackground.opacity(0.5))
         }
         .onAppear {
             playlists = SubscribedPlaylist.loadAll()
@@ -227,7 +227,7 @@ struct ChannelListView: View {
             Spacer(minLength: 0)
             if ChannelDownloadCache.hasNewVideos(channelId: key) {
                 Circle()
-                    .fill(Color.red)
+                    .fill(AppColors.danger)
                     .frame(width: 7, height: 7)
             }
             Toggle("", isOn: Binding(
@@ -307,7 +307,7 @@ private struct ChannelRow: View {
                 .overlay(
                     hasNewVideos
                         ? Circle()
-                            .fill(Color.red)
+                            .fill(AppColors.danger)
                             .frame(width: 10, height: 10)
                             .offset(x: 10, y: -10)
                         : nil,

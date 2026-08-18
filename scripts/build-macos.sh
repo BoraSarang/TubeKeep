@@ -10,6 +10,13 @@ APP_NAME="TubeKeep"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/.build"
 
+# Code signing identity — Apple Dev 인증서(안정적 TCC 식별). 없으면 ad-hoc 폴백.
+CODE_SIGN_IDENTITY="Apple Development: leeborasarang@gmail.com (HLQNBZHQQN)"
+if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "HLQNBZHQQN"; then
+    CODE_SIGN_IDENTITY="-"
+    echo "⚠️  Apple Development 인증서 없음 — ad-hoc 서명 사용 (TCC 권한이 매번 초기화될 수 있음)"
+fi
+
 cd "$PROJECT_DIR"
 
 # Kill existing app and its children
@@ -53,14 +60,29 @@ done
 RESOURCES_DIR="$MAIN_BUNDLE/Contents/Resources"
 CACHE_DIR="$PROJECT_DIR/.build_cache"
 
-# yt-dlp
+# yt-dlp (python-build-standalone + yt-dlp-lib — 샌드박스 호환)
 mkdir -p "$CACHE_DIR"
+if [ -x "$CACHE_DIR/python3.13/bin/python3.13" ]; then
+    cp -R "$CACHE_DIR/python3.13" "$RESOURCES_DIR/python3.13"
+    echo "📦 Python 3.13 standalone from cache"
+else
+    echo "⬇️  Downloading python-build-standalone 3.13 (샌드박스용 Python 런타임)..."
+    if curl -# -f -L -o "$CACHE_DIR/cpython.tar.gz" "https://github.com/astral-sh/python-build-standalone/releases/download/20260814/cpython-3.13.15+20260814-aarch64-apple-darwin-install_only.tar.gz" 2>&1 | tail -1; then
+        rm -rf "$CACHE_DIR/python3.13"
+        tar -xzf "$CACHE_DIR/cpython.tar.gz" -C "$CACHE_DIR"
+        mv "$CACHE_DIR/python" "$CACHE_DIR/python3.13"
+        cp -R "$CACHE_DIR/python3.13" "$RESOURCES_DIR/python3.13"
+        echo "✅ Python 3.13 standalone bundled"
+    else
+        echo "❌ python-build-standalone download failed"
+    fi
+fi
+
 if [ -d "$CACHE_DIR/yt-dlp-lib" ]; then
     cp -r "$CACHE_DIR/yt-dlp-lib" "$RESOURCES_DIR/yt-dlp-lib"
-    cp "$CACHE_DIR/yt-dlp-launcher" "$RESOURCES_DIR/yt-dlp"
-    echo "📦 yt-dlp from cache"
+    echo "📦 yt-dlp-lib from cache"
 else
-    echo "⬇️  Installing yt-dlp (pip install --target)..."
+    echo "⬇️  Installing yt-dlp-lib (pip install --target)..."
     PYTHON=""
     for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
         if [ -x "$p" ]; then PYTHON="$p"; break; fi
@@ -68,50 +90,71 @@ else
     if [ -z "$PYTHON" ]; then PYTHON=$(command -v python3 2>/dev/null || true); fi
     if [ -n "$PYTHON" ]; then
         rm -rf "$CACHE_DIR/yt-dlp-lib"
-        if $PYTHON -m pip install --target "$CACHE_DIR/yt-dlp-lib" yt-dlp 2>&1 | tail -3; then
+        if $PYTHON -m pip install --target "$CACHE_DIR/yt-dlp-lib" yt-dlp 2>&1 | tail -2; then
             cp -r "$CACHE_DIR/yt-dlp-lib" "$RESOURCES_DIR/yt-dlp-lib"
-            cat > "$CACHE_DIR/yt-dlp-launcher" << 'LAUNCHER'
+            echo "✅ yt-dlp-lib installed (pip)"
+        else
+            echo "❌ pip install yt-dlp failed"
+        fi
+    else
+        echo "❌ Python 3 not found (pip install 불가)"
+    fi
+fi
+
+# deno — yt-dlp JS 런타임 (YouTube PO Token/서명 처리, 403 방지)
+DENO_BIN="$(command -v deno 2>/dev/null || true)"
+if [ -z "$DENO_BIN" ]; then
+    for d in /opt/homebrew/Cellar/deno/*/bin/deno /usr/local/Cellar/deno/*/bin/deno; do
+        [ -x "$d" ] && { DENO_BIN="$d"; break; }
+    done
+fi
+if [ -n "$DENO_BIN" ]; then
+    if [ -x "$CACHE_DIR/deno/deno" ]; then
+        cp -R "$CACHE_DIR/deno/." "$RESOURCES_DIR/"
+        echo "📦 deno from cache ($(du -h "$RESOURCES_DIR/deno" | cut -f1))"
+    else
+        echo "⬇️  deno 번들 생성 ($DENO_BIN)"
+        rm -rf "$CACHE_DIR/deno"
+        mkdir -p "$CACHE_DIR/deno/deno-libs"
+        cp "$DENO_BIN" "$CACHE_DIR/deno/deno"
+        while IFS= read -r LIB; do
+            [ -z "$LIB" ] && continue
+            LIBNAME="$(basename "$LIB")"
+            cp "$LIB" "$CACHE_DIR/deno/deno-libs/" 2>/dev/null || true
+            install_name_tool -change "$LIB" "@loader_path/deno-libs/$LIBNAME" "$CACHE_DIR/deno/deno" 2>/dev/null || true
+        done < <(otool -L "$DENO_BIN" 2>/dev/null | rg -o "/opt/homebrew/[^ ]+\.dylib|/usr/local/[^ ]+\.dylib" || true)
+        cp -R "$CACHE_DIR/deno/." "$RESOURCES_DIR/"
+        echo "✅ deno bundled (JS 런타임)"
+    fi
+else
+    echo "⚠️  deno 없음 — YouTube 다운로드 403 위험. brew install deno"
+fi
+
+cat > "$RESOURCES_DIR/yt-dlp" << 'LAUNCHER'
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
-PYTHON=""
-for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /opt/local/bin/python3 /usr/bin/python3; do
-    [ -x "$p" ] && { PYTHON="$p"; break; }
-done
-[ -z "$PYTHON" ] && PYTHON=$(command -v python3 2>/dev/null)
-if [ -z "$PYTHON" ]; then
-    echo "yt-dlp requires Python 3" >&2
+# 샌드박스 호환 yt-dlp launcher — 번들 Python + 번들 yt-dlp-lib + 컨테이너 TMPDIR + deno JS 런타임
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export PATH="$SCRIPT_DIR:$PATH"
+if [ -z "$TMPDIR" ] || [ ! -w "$TMPDIR" ]; then
+    export TMPDIR="$HOME/Library/Containers/com.borasarang.tubekeep/Data/tmp"
+    mkdir -p "$TMPDIR" 2>/dev/null
+fi
+cd "$TMPDIR" 2>/dev/null || true
+PYTHON="$SCRIPT_DIR/python3.13/bin/python3.13"
+if [ ! -x "$PYTHON" ]; then
+    echo "번들 Python을 찾을 수 없습니다: $PYTHON" >&2
     exit 1
 fi
 export PYTHONPATH="$SCRIPT_DIR/yt-dlp-lib${PYTHONPATH:+:$PYTHONPATH}"
-exec "$PYTHON" -m yt_dlp "$@"
-LAUNCHER
-            chmod +x "$CACHE_DIR/yt-dlp-launcher"
-            cp "$CACHE_DIR/yt-dlp-launcher" "$RESOURCES_DIR/yt-dlp"
-            echo "✅ yt-dlp installed (Python library + launcher)"
-        else
-            echo "⚠️  pip install failed, trying system binary..."
-            if command -v yt-dlp &> /dev/null; then
-                cp "$(command -v yt-dlp)" "$RESOURCES_DIR/yt-dlp"
-                chmod +x "$RESOURCES_DIR/yt-dlp"
-                echo "📦 yt-dlp bundled from system"
-            else
-                echo "⬇️  Falling back to standalone yt-dlp..."
-                curl -# -f -L -o "$RESOURCES_DIR/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-                chmod +x "$RESOURCES_DIR/yt-dlp"
-            fi
-        fi
-    else
-        echo "⚠️  Python 3 not found, trying system yt-dlp..."
-        if command -v yt-dlp &> /dev/null; then
-            cp "$(command -v yt-dlp)" "$RESOURCES_DIR/yt-dlp"
-            chmod +x "$RESOURCES_DIR/yt-dlp"
-        else
-            echo "⬇️  Falling back to standalone yt-dlp..."
-            curl -# -f -L -o "$RESOURCES_DIR/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-            chmod +x "$RESOURCES_DIR/yt-dlp"
-        fi
-    fi
+if [ -x "$SCRIPT_DIR/deno" ]; then
+    export DENO_DIR="$TMPDIR/deno"
+    exec "$PYTHON" -m yt_dlp --js-runtimes "deno:$SCRIPT_DIR/deno" "$@"
+else
+    exec "$PYTHON" -m yt_dlp "$@"
 fi
+LAUNCHER
+chmod +x "$RESOURCES_DIR/yt-dlp"
+echo "✅ yt-dlp launcher 작성 완료"
 
 # ffmpeg + ffprobe
 if [ -f "$CACHE_DIR/ffmpeg" ] && [ -f "$CACHE_DIR/ffprobe" ]; then
@@ -178,7 +221,7 @@ fix_whisper_binary() {
             echo "⚠️  libwhisper.dylib not found, whisper-cli may not work"
         fi
     fi
-    codesign -f -s - "$bin" 2>/dev/null || true
+    codesign -f -s "$CODE_SIGN_IDENTITY" "$bin" 2>/dev/null || true
 }
 
 if [ -f "$CACHE_DIR/$WHISPER_BIN" ]; then
@@ -216,15 +259,18 @@ if [ -f "$LIBMPV_SRC" ]; then
     install_name_tool -id @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
     install_name_tool -change /opt/homebrew/opt/mpv/lib/libmpv.2.dylib @rpath/libmpv.2.dylib "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
     install_name_tool -add_rpath @loader_path/../Frameworks "$MAIN_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
-    codesign --force --sign - "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
+    codesign --force --sign "$CODE_SIGN_IDENTITY" "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" 2>/dev/null || true
     echo "📦 libmpv embedded ($(du -h "$MAIN_BUNDLE/Contents/Frameworks/libmpv.2.dylib" | cut -f1))"
 fi
 
 # Sign embedded resource binaries individually (avoids --deep overwriting widget entitlements)
-for BIN in ffmpeg ffprobe whisper-cli; do
+for BIN in ffmpeg ffprobe whisper-cli deno; do
     if [ -f "$RESOURCES_DIR/$BIN" ]; then
-        codesign --force --sign - "$RESOURCES_DIR/$BIN" 2>/dev/null || true
+        codesign --force --sign "$CODE_SIGN_IDENTITY" "$RESOURCES_DIR/$BIN" 2>/dev/null || true
     fi
+done
+for LIB in "$RESOURCES_DIR/deno-libs/"*.dylib; do
+    [ -f "$LIB" ] && codesign --force --sign "$CODE_SIGN_IDENTITY" "$LIB" 2>/dev/null || true
 done
 
 # Install
@@ -248,9 +294,9 @@ WIDGET_BUNDLE="$INSTALL_DIR/$APP_NAME.app/Contents/PlugIns/$WIDGET_NAME.appex"
 mkdir -p "$WIDGET_BUNDLE/Contents/MacOS"
 cp "$WIDGET_EXEC" "$WIDGET_BUNDLE/Contents/MacOS/$WIDGET_NAME"
 cp "$PROJECT_DIR/Info-Widget.plist" "$WIDGET_BUNDLE/Contents/Info.plist"
-codesign --force --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeepWidget.entitlements" "$WIDGET_BUNDLE" 2>/dev/null || true
+codesign --force --sign "$CODE_SIGN_IDENTITY" --entitlements "$PROJECT_DIR/Entitlements/TubeKeepWidget.entitlements" "$WIDGET_BUNDLE" 2>/dev/null || true
 echo "📦 Widget embedded: $WIDGET_BUNDLE"
 
-codesign --force --sign - --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
+codesign --force --sign "$CODE_SIGN_IDENTITY" --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
 
 echo "[build] macOS $MODE DebugPanel: $([ "$MODE" = debug ] && echo ON || echo OFF)"

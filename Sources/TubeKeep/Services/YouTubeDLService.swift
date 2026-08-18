@@ -74,7 +74,9 @@ actor YouTubeDLService {
         }
         ProcessRegistry.register(process)
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        var args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download", "--extractor-args", Constants.youtubeExtractorArgs, url]
+        var args = [Constants.ytDlpPath, "--verbose", "--dump-json", "--no-download"]
+        args += Constants.youtubeExtractorArgs
+        args.append(url)
         process.arguments = args
 
         process.standardOutput = stdoutFile
@@ -300,20 +302,38 @@ actor YouTubeDLService {
                     )
                     continue
                 }
-                let existingScore = existing.filesize ?? 0
-                let newScore = filesize ?? 0
-                if newScore > existingScore {
-                    formatMap[height] = Format(
-                        id: formatId,
-                        label: "\(height)p",
-                        height: height,
-                        ext: ext == "webm" ? "webm" : "mp4",
-                        codec: codec,
-                        filesize: filesize,
-                        fps: fps,
-                        isVideoOnly: isVideoOnly,
-                        isAudioOnly: isAudioOnly
-                    )
+                let existingIsMP4 = existing.ext == "mp4"
+                let newIsMP4 = ext == "mp4"
+                if newIsMP4 != existingIsMP4 {
+                    if newIsMP4 {
+                        formatMap[height] = Format(
+                            id: formatId,
+                            label: "\(height)p",
+                            height: height,
+                            ext: ext == "webm" ? "webm" : "mp4",
+                            codec: codec,
+                            filesize: filesize,
+                            fps: fps,
+                            isVideoOnly: isVideoOnly,
+                            isAudioOnly: isAudioOnly
+                        )
+                    }
+                } else {
+                    let existingScore = existing.filesize ?? 0
+                    let newScore = filesize ?? 0
+                    if newScore > existingScore {
+                        formatMap[height] = Format(
+                            id: formatId,
+                            label: "\(height)p",
+                            height: height,
+                            ext: ext == "webm" ? "webm" : "mp4",
+                            codec: codec,
+                            filesize: filesize,
+                            fps: fps,
+                            isVideoOnly: isVideoOnly,
+                            isAudioOnly: isAudioOnly
+                        )
+                    }
                 }
             } else {
                 formatMap[height] = Format(

@@ -21,7 +21,6 @@ struct SettingsChannelsTab: View {
                         set: { _ in store.send(.toggleShowChannelBadge) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -48,11 +47,11 @@ struct SettingsChannelsTab: View {
                 .padding(6)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(AppColors.controlBackground)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        .stroke(AppColors.separator, lineWidth: 0.5)
                 )
             }
 

@@ -160,7 +160,7 @@ struct DiskCleanupView: View {
                             .aspectRatio(contentMode: .fill)
                     } else {
                         Rectangle()
-                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .fill(AppColors.controlBackground)
                             .overlay(Image(systemName: "film").foregroundStyle(.secondary))
                     }
                 }
@@ -168,7 +168,7 @@ struct DiskCleanupView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(selectedIDs.contains(item.id) ? Color.accentColor : Color(.separatorColor), lineWidth: selectedIDs.contains(item.id) ? 2 : 0.5)
+                        .stroke(selectedIDs.contains(item.id) ? Color.accentColor : AppColors.separator, lineWidth: selectedIDs.contains(item.id) ? 2 : 0.5)
                 )
                 .overlay(alignment: .bottomLeading) {
                     Text(formatBytes(sizes[item.id] ?? 0))

@@ -92,7 +92,7 @@ struct GlobalShortcutRow: View {
             Spacer()
             if isRecording {
                 HStack(spacing: 4) {
-                    ProgressView().controlSize(.mini)
+                    ProgressView().controlSize(.small)
                     Text("키 입력 대기 중...")
                         .font(.system(size: 11))
                         .foregroundStyle(.orange)

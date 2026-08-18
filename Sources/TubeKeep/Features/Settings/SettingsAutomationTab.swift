@@ -22,7 +22,6 @@ struct SettingsAutomationTab: View {
                         set: { _ in store.send(.toggleClipboardMonitoring) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -56,7 +55,6 @@ struct SettingsAutomationTab: View {
                             set: { _ in store.send(.toggleIdleAutoSummary) }
                         )
                     )
-                    .toggleStyle(.switch)
                     .controlSize(.small)
                 }
 
@@ -68,7 +66,6 @@ struct SettingsAutomationTab: View {
                             set: { _ in store.send(.toggleIdleAutoPodcast) }
                         )
                     )
-                    .toggleStyle(.switch)
                     .controlSize(.small)
                 }
             }

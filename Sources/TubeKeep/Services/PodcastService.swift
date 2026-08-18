@@ -15,6 +15,12 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
     private var currentVideoId: String?
     private var playCompletion: ((Bool) -> Void)?
 
+    private func podcastRootPath() -> String {
+        _ = BookmarkManager.ensureAccess()
+        let dir = Settings.loadSettings().storageDirectory
+        return (dir as NSString).appendingPathComponent("Podcasts")
+    }
+
     // TTS 음성 식별자 (LanguageService.ttsVoice로 동적 결정)
 
     enum PodcastError: LocalizedError {
@@ -164,9 +170,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
         if let id = currentVideoId {
             stopPodcast()
         }
-        let root = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/TubeKeep/Podcasts")
-            .path
+        let root = podcastRootPath()
         if FileManager.default.fileExists(atPath: root) {
             try? FileManager.default.removeItem(atPath: root)
             log("[Podcast] 전체 팟캐스트 폴더 삭제 — \(root)")
@@ -174,9 +178,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
     }
 
     func podcastFilesInfo() -> (files: Int, bytes: Int64) {
-        let root = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/TubeKeep/Podcasts")
-            .path
+        let root = podcastRootPath()
         var fileCount = 0
         var totalBytes: Int64 = 0
         guard let enumerator = FileManager.default.enumerator(atPath: root) else {
@@ -578,9 +580,7 @@ final class PodcastService: NSObject, AVAudioPlayerDelegate {
     }
 
     private func podcastDirectory(for videoId: String) -> String {
-        let docsPath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/TubeKeep/Podcasts")
-            .path
+        let docsPath = podcastRootPath()
         return (docsPath as NSString).appendingPathComponent(videoId)
     }
 

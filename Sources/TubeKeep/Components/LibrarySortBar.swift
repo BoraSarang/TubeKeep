@@ -27,10 +27,10 @@ struct LibrarySortBar: View {
                     Image(systemName: showThumbnailPreview ? "checkmark.square.fill" : "square")
                         .font(AppFont.count)
                 }
-                .foregroundStyle(showThumbnailPreview ? .white : .secondary)
+                .foregroundStyle(showThumbnailPreview ? AppColors.accent : .secondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(showThumbnailPreview ? AppColors.accent : Color(nsColor: .controlBackgroundColor))
+                .background(AppColors.controlBackground)
                 .clipShape(RoundedRectangle(cornerRadius: AppMetrics.cornerSmall))
             }
             .buttonStyle(.plain)

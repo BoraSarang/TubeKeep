@@ -167,6 +167,9 @@ struct DownloadQueueReducer {
                 }
 
             case let .itemsLoaded(items):
+                let loadedSettings = Settings.loadSettings()
+                state.storageDirectory = loadedSettings.storageDirectory
+                state.filenameTemplate = loadedSettings.filenameTemplate
                 var mapped = items
                 var completedNew: [DownloadItem] = []
                 var invalidated: [String] = []
@@ -272,6 +275,9 @@ struct DownloadQueueReducer {
                 return .send(.saveQueue)
 
             case let .addItem(item):
+                let loadedSettings = Settings.loadSettings()
+                state.storageDirectory = loadedSettings.storageDirectory
+                state.filenameTemplate = loadedSettings.filenameTemplate
                 guard !state.items.contains(where: { $0.videoInfo.id == item.videoInfo.id }) else {
                     state.toastMessage = ToastMessage(id: UUID(), message: "이미 목록에 있습니다", type: .info)
                     return .none
@@ -287,6 +293,9 @@ struct DownloadQueueReducer {
                 return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .addItems(newItems):
+                let loadedSettings = Settings.loadSettings()
+                state.storageDirectory = loadedSettings.storageDirectory
+                state.filenameTemplate = loadedSettings.filenameTemplate
                 var skipCount = 0
                 let historyIDs = Set(
                     DatabaseManager.shared.loadDownloadHistory()
@@ -398,7 +407,6 @@ struct DownloadQueueReducer {
                 guard state.items[id: id]?.status == .retrying else { return .none }
                 state.items[id: id]?.status = .pending
                 state.items[id: id]?.downloadStartTime = nil
-                state.items[id: id]?.retryCount = 0
                 return .merge(tryStartNextDownloads(state: &state), .send(.saveQueue))
 
             case let .updateProgress(id, progress, speed):

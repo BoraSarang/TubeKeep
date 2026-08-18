@@ -206,7 +206,7 @@ struct ChannelContentView: View {
                             .onTapGesture { openChannel(channel) }
                         if hasNewVideos {
                             Circle()
-                                .fill(Color.red)
+                                .fill(AppColors.danger)
                                 .frame(width: 8, height: 8)
                         }
                     }
@@ -249,7 +249,7 @@ struct ChannelContentView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.orange.opacity(0.1))
+                .background(AppColors.warning.opacity(0.1))
             }
         }
     }
@@ -342,7 +342,7 @@ struct ChannelContentView: View {
                     .font(.system(size: 11))
             }
             .padding(6)
-            .background(Color(.textBackgroundColor))
+            .background(AppColors.textBackground)
             .clipShape(RoundedRectangle(cornerRadius: 6))
 
             Text("전체 \(filteredVideos.count)개")

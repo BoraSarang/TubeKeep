@@ -67,7 +67,7 @@ struct SelectionBar: View {
             }
             .font(AppFont.count)
             .buttonStyle(.plain)
-            .foregroundStyle(.red)
+            .foregroundStyle(AppColors.danger)
         }
         .padding(.horizontal, AppMetrics.paddingStandard)
         .padding(.vertical, 4)

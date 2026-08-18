@@ -23,7 +23,7 @@ struct WidgetSnapshot: Codable {
 // MARK: - Provider
 
 struct Provider: TimelineProvider {
-    static let groupID = "group.com.tubekeep"
+    static let groupID = "6GPJQ7BQC9.com.borasarang.tubekeep"
     static let snapshotKey = "widget_snapshot"
 
     func placeholder(in context: Context) -> DownloadEntry {

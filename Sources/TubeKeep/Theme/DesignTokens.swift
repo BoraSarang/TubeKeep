@@ -17,36 +17,56 @@ enum AppColors {
     static let badgePodcast = Color.purple
     static let badgeResume = Color.accentColor
 
-    static let progressActive = Color.blue.opacity(0.08)
-    static let progressCompleted = Color.green.opacity(0.06)
-    static let progressTrack = Color.black.opacity(0.4)
+    static let progressActive = Color.accentColor.opacity(0.12)
+    static let progressCompleted = Color.green.opacity(0.10)
+    static let progressTrack = Color.primary.opacity(0.1)
     static let selectionRow = Color.accentColor.opacity(0.1)
 
     static let waveBaseGradient: [Color] = [
-        Color(red: 0.1, green: 0.4, blue: 0.9).opacity(0.35),
-        Color(red: 0.0, green: 0.6, blue: 0.8).opacity(0.25),
-        Color(red: 0.2, green: 0.3, blue: 0.8).opacity(0.35),
+        Color.accentColor.opacity(0.28),
+        Color.teal.opacity(0.16),
+        Color.accentColor.opacity(0.30),
     ]
-    static let waveShimmer = Color.white.opacity(0.2)
-    static let waveAccentLine = Color(red: 0.2, green: 0.6, blue: 1.0).opacity(0.5)
+    static let waveShimmer = Color.white.opacity(0.25)
+    static let waveAccentLine = Color.accentColor.opacity(0.5)
 
     static let overlayBadge = Color.black.opacity(0.75)
-    static let cardShadow = Color.black.opacity(0.2)
+    static let cardShadow = Color.black.opacity(0.18)
+
+    // macOS semantic 계열 — 라이트/다크 자동 대응
+    static let selectedContentBackground = Color(nsColor: .selectedContentBackgroundColor)
+    static let hoverRow = Color.primary.opacity(0.05)
+    static let sidebarBackground = Color(nsColor: .underPageBackgroundColor)
+    static let controlBackground = Color(nsColor: .controlBackgroundColor)
+    static let textBackground = Color(nsColor: .textBackgroundColor)
+    static let separator = Color(nsColor: .separatorColor)
+    static let secondaryLabel = Color(nsColor: .secondaryLabelColor)
+    static let tertiaryLabel = Color(nsColor: .tertiaryLabelColor)
+}
+
+// MARK: - 재질 토큰
+
+enum AppMaterial {
+
+    static let regular = Material.regular
+    static let thin = Material.thin
+    static let ultraThin = Material.ultraThin
+    static let bar = Material.bar
 }
 
 // MARK: - 폰트 토큰
 
 enum AppFont {
 
-    static let cellTitle = Font.system(size: 12, weight: .medium)
-    static let cellSubtitle = Font.system(size: 11)
-    static let meta = Font.system(size: 10)
-    static let count = Font.system(size: 11)
-    static let badge = Font.system(size: 10, weight: .semibold)
-    static let badgeIcon = Font.system(size: 10, weight: .bold)
-    static let sidebarRow = Font.system(size: 12)
-    static let sectionHeader = Font.system(size: 11, weight: .semibold)
-    static let statusBarText = Font.system(size: 10, design: .monospaced)
+    static let cellTitle = Font.system(.callout, weight: .medium)
+    static let cellSubtitle = Font.system(.caption)
+    static let meta = Font.system(.caption2)
+    static let count = Font.system(.caption)
+    static let badge = Font.system(.caption2, weight: .semibold)
+    static let badgeIcon = Font.system(.caption2, weight: .bold)
+    static let sidebarRow = Font.system(.callout)
+    static let sectionHeader = Font.system(.caption, weight: .semibold)
+    static let statusBarText = Font.system(.caption2, design: .monospaced)
 }
 
 // MARK: - 메트릭 토큰

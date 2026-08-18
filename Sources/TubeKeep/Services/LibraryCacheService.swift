@@ -529,10 +529,12 @@ final class LibraryCacheService {
     }
 
     nonisolated static func calculateDiskUsage() -> Int64 {
+        _ = BookmarkManager.ensureAccess()
         let fm = FileManager.default
         var total: Int64 = 0
 
-        let podcastDir = (NSHomeDirectory() as NSString).appendingPathComponent("Documents/TubeKeep/Podcasts")
+        let storageDir = Settings.loadSettings().storageDirectory
+        let podcastDir = (storageDir as NSString).appendingPathComponent("Podcasts")
         let cacheDir = (try? fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false))
             .flatMap { $0.appendingPathComponent("com.tubekeep").path }
         var dirs: [String] = [Constants.channelStorageDirectory, podcastDir]

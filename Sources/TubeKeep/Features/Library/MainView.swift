@@ -113,22 +113,6 @@ struct MainView: View {
                 Spacer()
 
                 AlwaysOnTopToggle(isPinned: $isPinned, windowIdentifier: "lib")
-
-                Button {
-                    if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "lib" }) {
-                        window.close()
-                    }
-                } label: {
-                    Image(systemName: "xmark.circle")
-                }
-                .help("창 닫기")
-
-                Button {
-                    NSApp.terminate(nil)
-                } label: {
-                    Image(systemName: "power")
-                }
-                .help("프로그램 종료")
             }
         }
         .onAppear {

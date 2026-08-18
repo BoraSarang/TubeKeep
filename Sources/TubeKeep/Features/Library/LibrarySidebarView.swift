@@ -125,7 +125,7 @@ struct LibrarySidebarView: View {
                 .help("용량 새로고침")
             }
         }
-        .background(Color(.windowBackgroundColor))
+        .background(AppColors.sidebarBackground)
         .onChange(of: store.library.items) { _, newItems in
             updateChannelNames(newItems)
             updateLibraryCategoryRows(newItems)
@@ -418,20 +418,20 @@ struct LibrarySidebarView: View {
 
             Image(systemName: category.systemIcon)
                 .font(.system(size: 12))
-                .foregroundStyle(isSelected ? .white : .secondary)
+                .foregroundStyle(isSelected ? .primary : .secondary)
                 .frame(width: 20, height: 20)
 
             Text(category.rawValue)
                 .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? .white : .primary)
+                .foregroundStyle(.primary)
 
             Spacer()
 
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-        .background(isSelected ? Color.accentColor : isDropTarget ? Color.accentColor.opacity(0.08) : Color.clear)
+        .background(isSelected ? AppColors.selectedContentBackground : isDropTarget ? AppColors.hoverRow : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             store.send(.library(.selectDiscoverCategory(category)))
@@ -632,17 +632,17 @@ struct LibrarySidebarView: View {
             Text(channel.name)
                 .font(.system(size: 12))
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? .white : .primary)
+                .foregroundStyle(.primary)
 
             Spacer()
 
             Text("\(channel.count)")
                 .font(.system(size: 11))
-                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor : isDropTarget ? Color.accentColor.opacity(0.08) : Color.clear)
+            .background(isSelected ? AppColors.selectedContentBackground : isDropTarget ? AppColors.hoverRow : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             store.send(.library(.setFilterMode(.all)))

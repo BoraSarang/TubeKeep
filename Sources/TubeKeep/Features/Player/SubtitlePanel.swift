@@ -176,7 +176,7 @@ struct SubtitlePanel: View {
             }
         }
         .frame(width: 320)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppColors.controlBackground)
     }
 
     private func formatTime(_ seconds: Double) -> String {

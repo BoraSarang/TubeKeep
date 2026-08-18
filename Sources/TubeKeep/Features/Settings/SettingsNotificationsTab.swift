@@ -21,7 +21,6 @@ struct SettingsNotificationsTab: View {
                         set: { _ in store.send(.togglePlaySound) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -35,7 +34,6 @@ struct SettingsNotificationsTab: View {
                         set: { _ in store.send(.toggleShowMenuBarNotifications) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 

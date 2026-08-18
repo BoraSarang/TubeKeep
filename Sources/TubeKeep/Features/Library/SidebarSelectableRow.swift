@@ -12,6 +12,7 @@ struct SidebarSelectableRow: View {
     var trailing: (() -> AnyView)?
 
     private let action: () -> Void
+    @State private var isHovering = false
 
     init(
         title: String,
@@ -39,30 +40,43 @@ struct SidebarSelectableRow: View {
                 if let icon {
                     Image(systemName: icon)
                         .font(.system(size: iconSize))
-                        .foregroundStyle(isSelected ? .white : .secondary)
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .frame(width: iconFrame, height: iconFrame)
                 }
 
                 Text(title)
                     .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                     .lineLimit(1)
-                    .foregroundStyle(isSelected ? .white : .primary)
+                    .foregroundStyle(.primary)
 
                 Spacer()
 
                 if let count {
                     Text("\(count)")
                         .font(.system(size: 11))
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                        .foregroundStyle(.secondary)
                 } else if let trailing {
                     trailing()
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor : Color.clear)
+            .background(rowBackground)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+
+    private var rowBackground: Color {
+        if isSelected {
+            return AppColors.selectedContentBackground
+        }
+        if isHovering {
+            return AppColors.hoverRow
+        }
+        return .clear
     }
 }

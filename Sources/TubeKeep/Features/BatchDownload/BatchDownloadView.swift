@@ -185,11 +185,11 @@ struct BatchDownloadView: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(AppColors.controlBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    .stroke(AppColors.separator, lineWidth: 1)
             )
             .overlay(alignment: .topLeading) {
                 if urlText.isEmpty {
@@ -246,11 +246,11 @@ struct BatchDownloadView: View {
         .frame(minHeight: 100)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(AppColors.controlBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                .stroke(AppColors.separator, lineWidth: 1)
         )
     }
 

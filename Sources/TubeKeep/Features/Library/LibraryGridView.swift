@@ -212,7 +212,7 @@ struct LibraryGridCell: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(isSelected ? Color.accentColor : Color(.separatorColor), lineWidth: isSelected ? 2 : 0.5)
+                            .stroke(isSelected ? Color.accentColor : AppColors.separator, lineWidth: isSelected ? 2 : 0.5)
                     )
                     .overlay(
                         Group {
@@ -338,7 +338,7 @@ struct LibraryGridCell: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     Rectangle()
-                        .fill(Color(.textBackgroundColor))
+                        .fill(AppColors.textBackground)
                         .overlay(
                             Image(systemName: "film")
                                 .foregroundStyle(.secondary)
@@ -677,11 +677,11 @@ struct HoverPreviewPanel: NSViewRepresentable {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(.separatorColor), lineWidth: 1.5)
+                            .stroke(AppColors.separator, lineWidth: 1.5)
                     )
             } else {
                 Rectangle()
-                    .fill(Color(.textBackgroundColor))
+                    .fill(AppColors.textBackground)
                     .frame(width: 360, height: 203)
                     .overlay(
                         Image(systemName: "film")
@@ -691,7 +691,7 @@ struct HoverPreviewPanel: NSViewRepresentable {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(.separatorColor), lineWidth: 1.5)
+                            .stroke(AppColors.separator, lineWidth: 1.5)
                     )
             }
         }

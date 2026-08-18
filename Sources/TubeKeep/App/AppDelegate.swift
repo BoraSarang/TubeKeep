@@ -17,11 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var channelUpdateService: ChannelUpdateService?
     private var idleSubtitleService: IdleSubtitleService?
     private var videoDownloaderWindow: NSWindow?
-    private var libraryWindowController: FixedWidthWindowController?
-    private var settingsWindow: NSWindow?
+    private var libraryWindow: NSWindow?
     private var aiWindow: NSWindow?
     private var channelDownloaderWindow: NSWindow?
     private var playerWindow: NSWindow?
+    private var settingsWindow: NSWindow?
     private var playerStore: Store<PlayerReducer.State, PlayerReducer.Action>?
 
     var isPlayerPlaying: Bool {
@@ -171,10 +171,16 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         let keyHandler = KeyCommandHandler(
             isPlayerKeyWindow: { [weak self] in
                 guard let player = self?.playerWindow else { return false }
-                return player.isKeyWindow
+                return player.isKeyWindow || (player.isVisible && NSApp.isActive)
             },
             onTogglePlayerPlayPause: {
+                #if DEBUG
+                DebugLogManager.shared?.append("[Key] post togglePlayPause")
+                #endif
                 NotificationCenter.default.post(name: Constants.playerTogglePlayPauseNotification, object: nil)
+            },
+            onVolumeChange: { delta in
+                NotificationCenter.default.post(name: Constants.playerVolumeChangeNotification, object: nil, userInfo: ["delta": delta])
             },
             onOpenSettings: { [weak self] in self?.openSettingsWindow() },
             onToggleDebugPanel: debugPanelHandler,
@@ -188,14 +194,24 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
 
         DispatchQueue.main.async {
+            self.setupMainMenu()
             self.migrateLibraryData()
-            BookmarkManager.ensureAccess()
+            if BookmarkManager.ensureAccess() {
+                DebugLogManager.shared?.append("[STORAGE] 시작 시 저장 폴더 접근 활성화")
+            } else {
+                DebugLogManager.shared?.append("[ERROR] E-MAC-STOR-1001 시작 시 저장 폴더 접근 실패")
+                BookmarkManager.promptReselectStorageDirectoryIfNeeded()
+            }
             SwiftDataMigration.migrateIfNeeded(context: PersistenceController.shared.context)
 
             if Settings.loadSettings().showLibraryOnLaunch {
                 self.openLibraryWindow()
             }
             self.clipboardMonitor?.start(statusItem: self.statusManager?.statusItem)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // SwiftUI가 시작 직후 기본 메뉴로 NSApp.mainMenu를 교체할 수 있어 한 번 더 복구한다.
+            self.setupMainMenu()
         }
     }
 
@@ -250,6 +266,13 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         appMenu.addItem(withTitle: "TubeKeep 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
 
+        let fileMenuItem = NSMenuItem()
+        mainMenu.addItem(fileMenuItem)
+        let fileMenu = NSMenu(title: "파일")
+        let closeItem = fileMenu.addItem(withTitle: "창 닫기", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        closeItem.target = nil
+        fileMenuItem.submenu = fileMenu
+
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
         let editMenu = NSMenu(title: "편집")
@@ -269,7 +292,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         mainMenu.addItem(debugMenuItem)
         let debugMenu = NSMenu(title: "Debug")
 
-        let showHideItem = debugMenu.addItem(withTitle: "Show/Hide Debug Panel", action: #selector(toggleDebugLogWindow), keyEquivalent: "d")
+        let showHideItem = debugMenu.addItem(withTitle: "Show/Hide Debug Panel (⌘D)", action: #selector(toggleDebugLogWindow), keyEquivalent: "")
         showHideItem.target = self
 
         debugMenu.addItem(.separator())
@@ -296,6 +319,18 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         #endif
 
         NSApp.mainMenu = mainMenu
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        setupMainMenu()
+    }
+
+    /// Dock 아이콘 클릭 시 보관함 창이 없으면 다시 연다.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            openLibraryWindow()
+        }
+        return true
     }
 
     private func addShortcutMenu(to mainMenu: NSMenu) {
@@ -348,7 +383,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     // MARK: - Library Window
 
     @objc func openLibraryWindow() {
-        if let controller = libraryWindowController, let window = controller.window {
+        if let window = libraryWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -368,13 +403,12 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: localizedTitle,
             rootView: rootView,
             contentSize: NSSize(width: 840, height: 640),
-            minSize: NSSize(width: 840, height: 500),
+            minSize: NSSize(width: 720, height: 480),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             titlebarIcon: WindowFactory.icon("square.grid.2x2")
         )
-        let controller = FixedWidthWindowController(window: window)
-        libraryWindowController = controller
         WindowFactory.present(window)
+        libraryWindow = window
     }
 
     // MARK: - Video Downloader Window
@@ -398,9 +432,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: "영상 다운로더",
             rootView: rootView,
             contentSize: NSSize(width: 520, height: 480),
-            minSize: NSSize(width: 520, height: 300),
+            minSize: NSSize(width: 480, height: 320),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            zoomEnabled: false,
             titlebarIcon: WindowFactory.icon("arrow.down.circle")
         )
         WindowFactory.present(window)
@@ -438,9 +471,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: "일괄 다운로더",
             rootView: rootView,
             contentSize: NSSize(width: 480, height: 420),
-            minSize: NSSize(width: 480, height: 340),
+            minSize: NSSize(width: 440, height: 340),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            zoomEnabled: false,
             titlebarIcon: WindowFactory.icon("shippingbox")
         )
         WindowFactory.present(window)
@@ -478,10 +510,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: "채널 다운로더",
             rootView: rootView,
             contentSize: NSSize(width: 720, height: 520),
-            minSize: NSSize(width: 720, height: 400),
-            maxSize: NSSize(width: 720, height: 9999),
+            minSize: NSSize(width: 640, height: 400),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            zoomEnabled: false,
             titlebarIcon: WindowFactory.icon("tv")
         )
         WindowFactory.present(window)
@@ -522,8 +552,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "settings",
             title: "설정",
             rootView: SettingsView(store: store.scope(state: \.settings, action: \.settings)),
-            contentSize: NSSize(width: 640, height: 420),
-            titlebarIcon: WindowFactory.icon("gearshape")
+            contentSize: NSSize(width: 640, height: 420)
         )
         window.contentMinSize = window.frame.size
         window.contentMaxSize = window.frame.size

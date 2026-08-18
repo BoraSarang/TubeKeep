@@ -26,8 +26,11 @@ struct AlwaysOnTopModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.background(
             WindowAccessor { window in
-                window.level = isOnTop ? .floating : .normal
                 window.identifier = NSUserInterfaceItemIdentifier(windowIdentifier)
+                // fullscreen 전환 중에는 level 변경 금지 — AppKit 전체화면 전환 로직과 충돌해
+                // 뷰 계층 해제 경쟁 크래시(_NSExitFullScreenTransitionController)를 유발한다.
+                guard !window.styleMask.contains(.fullScreen) else { return }
+                window.level = isOnTop ? .floating : .normal
             }
         )
     }

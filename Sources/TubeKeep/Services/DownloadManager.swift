@@ -34,6 +34,18 @@ final class DownloadManager: @unchecked Sendable {
         completionHandler: @escaping @Sendable (UUID, Bool, String?, String?) -> Void,
         logHandler: (@Sendable (UUID, String) -> Void)? = nil
     ) {
+        if !BookmarkManager.ensureAccess() {
+            let msg = "저장 폴더에 접근할 수 없습니다. 설정에서 저장 폴더를 다시 선택해 주세요."
+            DebugLogManager.shared?.append("[ERROR] E-MAC-STOR-1001 다운로드 시작 시 \(msg)")
+            completionHandler(item.id, false, nil, msg)
+            return
+        }
+
+        stateLock.withLock {
+            $0.canceledItems.remove(item.id)
+            $0.pausedItems.remove(item.id)
+        }
+
         let s = stateLock.withLock { $0.settings }
         let outputDir = s.storageDirectory
         let tmpl = stateLock.withLock { $0.filenameTemplate }
@@ -45,6 +57,8 @@ final class DownloadManager: @unchecked Sendable {
                 try Task.checkCancellation()
             } catch { return }
             if stateLock.withLock({ $0.canceledItems.contains(item.id) }) { return }
+
+            Self.cleanupPartialFiles(videoId: item.videoInfo.id, in: outputDir)
 
             var args = buildDownloadArgs(item: item, outputDir: outputDir, settings: s, filenameTemplate: tmpl)
             #if DEBUG
@@ -106,8 +120,10 @@ final class DownloadManager: @unchecked Sendable {
                     #if DEBUG
                     if !data.isEmpty {
                         let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
-                        Task { @MainActor in
-                            DebugLogManager.shared?.append("[DownloadManager] stdout RAW[\(data.count)]: \(preview)")
+                        if !preview.contains("%|") {
+                            Task { @MainActor in
+                                DebugLogManager.shared?.append("[DownloadManager] stdout RAW[\(data.count)]: \(preview)")
+                            }
                         }
                     }
                     #endif
@@ -132,8 +148,10 @@ final class DownloadManager: @unchecked Sendable {
                             box.lastPercent = pct
                             box.lastSpeed = spdStr
                             #if DEBUG
-                            Task { @MainActor in
-                                DebugLogManager.shared?.append("[DownloadManager] 진행률 \(pct)%")
+                            if Int(pct) % 5 == 0 || pct >= 100 {
+                                Task { @MainActor in
+                                    DebugLogManager.shared?.append("[DownloadManager] 진행률 \(pct)%")
+                                }
                             }
                             #endif
                             progressHandler(item.id, pct / 100.0, spdStr)
@@ -191,11 +209,16 @@ final class DownloadManager: @unchecked Sendable {
                         // 1) Try after_move:filepath first
                         let afterMovePath: String? = {
                             guard let data = try? Data(contentsOf: URL(fileURLWithPath: outputPathFile)),
-                                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                                  !path.isEmpty
+                                  let content = String(data: data, encoding: .utf8)
                             else { return nil }
                             try? fm.removeItem(atPath: outputPathFile)
-                            return path
+                            let lines = content.components(separatedBy: .newlines)
+                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                .filter { !$0.isEmpty }
+                            for line in lines.reversed() where Self.isValidMediaFile(line) {
+                                return line
+                            }
+                            return nil
                         }()
                         // 2) Validate: file must exist and be a real media file (ignore .part/.webp/.jpg/.png)
                         if let path = afterMovePath, Self.isValidMediaFile(path) {
@@ -213,14 +236,14 @@ final class DownloadManager: @unchecked Sendable {
                         return nil
                     }()
 
-                    if process.terminationStatus == 0 || (actualPath.map { FileManager.default.fileExists(atPath: $0) } ?? false) {
+                    if let path = actualPath, FileManager.default.fileExists(atPath: path) {
                         #if DEBUG
                         Task { @MainActor in
                             DebugLogManager.shared?.append("[DownloadManager] 완료 처리: status=\(process.terminationStatus) path=\(actualPath ?? "nil")")
                         }
                         #endif
-                        if item.includeSubtitles, let path = actualPath {
-                            Self.saveSubtitlesToDB(videoPath: path)
+                        if item.includeSubtitles, let mediaPath = actualPath {
+                            Self.saveSubtitlesToDB(videoPath: mediaPath)
                         }
                         completionHandler(item.id, true, actualPath, nil)
                         if s.playSoundOnComplete {
@@ -229,6 +252,7 @@ final class DownloadManager: @unchecked Sendable {
                             }
                         }
                     } else {
+                        Self.cleanupPartialFiles(videoId: item.videoInfo.id, in: outputDir)
                         completionHandler(item.id, false, nil, ErrorMessageMapper.map(errMsg))
                     }
                 }
@@ -302,9 +326,12 @@ final class DownloadManager: @unchecked Sendable {
             if id.contains("/") || id.contains("+") {
                 return id
             }
+            let heightLimit = max(item.selectedFormat.height, settings.defaultResolution)
             if item.selectedFormat.isVideoOnly {
-                let height = item.selectedFormat.height
-                return "\(id)+bestaudio/bestvideo[height<=\(height)]+bestaudio/best[height<=\(height)]+bestaudio/best"
+                if item.selectedFormat.ext == "webm" {
+                    return "bestvideo[ext=mp4][height<=\(heightLimit)]+bestaudio[ext=m4a]/bestvideo[ext=mp4][height<=\(heightLimit)]+bestaudio/bestvideo[height<=\(heightLimit)]+bestaudio/best[height<=\(heightLimit)]+bestaudio/best"
+                }
+                return "bestvideo[ext=mp4][height<=\(heightLimit)]+bestaudio[ext=m4a]/\(id)+bestaudio[ext=m4a]/\(id)+bestaudio/bestvideo[height<=\(heightLimit)]+bestaudio/best[height<=\(heightLimit)]+bestaudio/best"
             }
             if id.hasPrefix("best") {
                 let bracket = id.firstIndex(of: "[") ?? id.endIndex
@@ -317,7 +344,9 @@ final class DownloadManager: @unchecked Sendable {
             "--newline",
             "--progress",
             "--no-warnings",
-            "--extractor-args", Constants.youtubeExtractorArgs,
+        ]
+        args += Constants.youtubeExtractorArgs
+        args += [
             "-f", formatId,
             "--merge-output-format", "mp4",
             "--remux-video", "mp4",
@@ -375,6 +404,23 @@ final class DownloadManager: @unchecked Sendable {
         return "\(channelDir)/\(ytdlTemplate).%(id)s.%(ext)s"
     }
 
+    static func cleanupPartialFiles(videoId: String, in outputDir: String) {
+        guard let channels = try? FileManager.default.contentsOfDirectory(atPath: outputDir) else { return }
+        for channel in channels {
+            let dir = "\(outputDir)/\(channel)"
+            guard let files = try? FileManager.default.contentsOfDirectory(atPath: dir) else { continue }
+            for file in files where file.contains(videoId) {
+                let ext = (file as NSString).pathExtension.lowercased()
+                let isPartial = file.hasSuffix(".part")
+                    || ["webp", "jpg", "png", "jpeg"].contains(ext)
+                    || file.range(of: #"\.f\d+\."#, options: .regularExpression) != nil
+                if isPartial {
+                    try? FileManager.default.removeItem(atPath: "\(dir)/\(file)")
+                }
+            }
+        }
+    }
+
     /// 실미디어 파일인지 검증한다. (.part/.webp/.jpg/.png 등 임시·썸네일은 제외)
     static func isValidMediaFile(_ path: String) -> Bool {
         let fm = FileManager.default
@@ -383,6 +429,8 @@ final class DownloadManager: @unchecked Sendable {
               let size = attrs[.size] as? Int64, size > 0
         else { return false }
         let ext = (path as NSString).pathExtension.lowercased()
+        let name = (path as NSString).lastPathComponent
+        if name.range(of: #"\.f\d+\."#, options: .regularExpression) != nil { return false }
         return DownloadItem.mediaFileExtensions.contains(ext)
     }
 

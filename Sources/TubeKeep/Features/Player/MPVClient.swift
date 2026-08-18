@@ -30,10 +30,17 @@ final class MPVClient: ObservableObject {
     private var loopA: Double?
     private var loopB: Double?
     private var renderCallbackLogCount = 0
+    private var isFullscreenTransition = false
+    private let transitionLock = NSLock()
+    private var fullscreenObservers: [NSObjectProtocol] = []
 
-    init() { setupMPV() }
+    init() {
+        setupMPV()
+        setupFullscreenObservers()
+    }
 
     deinit {
+        fullscreenObservers.forEach { NotificationCenter.default.removeObserver($0) }
         stopDisplayLink()
         renderQueue.sync {}
         if let rc = renderContext { mpv_render_context_free(rc) }
@@ -79,6 +86,37 @@ final class MPVClient: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             self?.setupOpenGL()
         }
+    }
+
+    /// fullscreen 진입/종료 전환 중에는 GL 컨텍스트가 재구성되는 순간이라
+    /// displayLink 렌더링을 잠시 중단한다 (glBlit/CGLSetVirtualScreen 크래시 방지).
+    private func setupFullscreenObservers() {
+        let center = NotificationCenter.default
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setFullscreenTransition(note, transitioning: true)
+        })
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setFullscreenTransition(note, transitioning: false)
+        })
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setFullscreenTransition(note, transitioning: true)
+        })
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setFullscreenTransition(note, transitioning: false)
+        })
+    }
+
+    private func setFullscreenTransition(_ note: Notification, transitioning: Bool) {
+        guard let window = note.object as? NSWindow else { return }
+        // fullscreen 전환 중에는 뷰가 윈도우에서 잠시 분리되어 renderView.window가 nil이 될 수 있다.
+        // 플레이어 윈도우가 아님을 확실히 알 수 있을 때만 무시한다.
+        if let renderWindow = renderView?.window, renderWindow !== window { return }
+        transitionLock.lock()
+        isFullscreenTransition = transitioning
+        transitionLock.unlock()
+        #if DEBUG
+        DebugLogManager.shared?.append("[mpv] fullscreen transition=\(transitioning)")
+        #endif
     }
 
     private func setupOpenGL() {
@@ -146,7 +184,11 @@ final class MPVClient: ObservableObject {
         guard let ctx = renderContext, let view = renderView else { return }
         guard view.bounds.width > 0, view.bounds.height > 0 else { return }
         // 창이 사라진 뒤(윈도우 닫힘/재생성 중) GL 컨텍스트가 무효한 시점의 렌더링을 차단 — glBlit 크래시 방지
-        guard view.window != nil else { return }
+        guard let window = view.window, window.screen != nil else { return }
+        transitionLock.lock()
+        let transitioning = isFullscreenTransition
+        transitionLock.unlock()
+        guard !transitioning else { return }
         guard let glCtx = view.openGLContext else { return }
         glContext = glCtx
         let scale = view.window?.backingScaleFactor ?? 2
@@ -367,6 +409,11 @@ final class MPVClient: ObservableObject {
         guard let mpv else { return }
         var r = max(0.25, min(4.0, rate))
         mpv_set_property(mpv, "speed", MPV_FORMAT_DOUBLE, &r)
+    }
+
+    func setLoopFile(_ enabled: Bool) {
+        guard let mpv else { return }
+        mpv_set_property_string(mpv, "loop-file", enabled ? "inf" : "no")
     }
 
     func setALoop(at time: Double) {

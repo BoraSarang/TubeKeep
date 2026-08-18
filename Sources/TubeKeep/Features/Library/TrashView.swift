@@ -145,7 +145,7 @@ struct TrashView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Rectangle()
-                    .fill(Color(.textBackgroundColor))
+                    .fill(AppColors.textBackground)
                     .overlay(
                         Image(systemName: "play.rectangle")
                             .foregroundStyle(.secondary)

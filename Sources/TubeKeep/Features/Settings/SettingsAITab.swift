@@ -36,7 +36,6 @@ struct SettingsAITab: View {
                             store.send(.checkWhisperModelStatus)
                         }
                     ))
-                    .toggleStyle(.switch)
                     .controlSize(.small)
                 }
 
@@ -198,7 +197,7 @@ struct SettingsAITab: View {
                     Text("Google Gemini")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("유료 · API 키 필요 (1순위. 할당량 초과 시 자동 폴백)")
+                    Text("유료 · API 키 필요")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -220,11 +219,11 @@ struct SettingsAITab: View {
                             .padding(6)
                             .background(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
+                                    .fill(AppColors.controlBackground)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                                    .stroke(AppColors.separator, lineWidth: 0.5)
                             )
 
                             Button("발급 받기") {
@@ -251,7 +250,7 @@ struct SettingsAITab: View {
                     Text("OpenRouter")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("무료 · API 키 필요 · openrouter.ai 가입 (2순위 폴백)")
+                    Text("무료 · API 키 필요 · openrouter.ai 가입")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -273,11 +272,11 @@ struct SettingsAITab: View {
                             .padding(6)
                             .background(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
+                                    .fill(AppColors.controlBackground)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                                    .stroke(AppColors.separator, lineWidth: 0.5)
                             )
 
                             Button("무료 가입") {
@@ -303,11 +302,11 @@ struct SettingsAITab: View {
                         .padding(6)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(nsColor: .controlBackgroundColor))
+                                .fill(AppColors.controlBackground)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                                .stroke(AppColors.separator, lineWidth: 0.5)
                         )
                         .fixedSize()
                     }
@@ -326,7 +325,7 @@ struct SettingsAITab: View {
                     Text("yTeaser")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text("무료 · API 키 불필요 · 50회/일 (3순위 폴백)")
+                    Text("무료 · API 키 불필요 · 50회/일")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -343,27 +342,6 @@ struct SettingsAITab: View {
                     }
                 }
                 .padding(.leading, 20)
-            }
-            .padding(.leading, 20)
-
-            // 폴백 순서
-            SettingsComponents.sectionSubHeader()
-
-            VStack(spacing: 0) {
-                SettingsComponents.divider()
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("폴백 순서")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text("요약: Gemini → OpenRouter → yTeaser")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Text("태깅: Gemini → OpenRouter → 규칙 기반")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 10)
             }
             .padding(.leading, 20)
         }

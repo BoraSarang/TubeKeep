@@ -15,7 +15,7 @@ struct WidgetSnapshot: Codable {
     var recentCompleted: [Recent] = []
     var updatedAt: Date = Date()
 
-    static let groupID = "group.com.tubekeep"
+    static let groupID = "6GPJQ7BQC9.com.borasarang.tubekeep"
     static let snapshotKey = "widget_snapshot"
 
     func save() {

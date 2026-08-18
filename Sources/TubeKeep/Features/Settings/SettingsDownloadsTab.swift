@@ -50,11 +50,11 @@ struct SettingsDownloadsTab: View {
                 .padding(6)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(AppColors.controlBackground)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        .stroke(AppColors.separator, lineWidth: 0.5)
                 )
             }
 
@@ -83,7 +83,6 @@ struct SettingsDownloadsTab: View {
                         set: { _ in store.send(.toggleSkipIndexOnFailure) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -121,7 +120,6 @@ struct SettingsDownloadsTab: View {
                         set: { _ in store.send(.toggleSponsorBlock) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -135,7 +133,6 @@ struct SettingsDownloadsTab: View {
                         set: { _ in store.send(.toggleEmbedMetadata) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -169,7 +166,6 @@ struct SettingsDownloadsTab: View {
                         set: { _ in store.send(.toggleShowOnlyVideo) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 
@@ -190,7 +186,6 @@ struct SettingsDownloadsTab: View {
                         set: { _ in store.send(.toggleSmartMode) }
                     )
                 )
-                .toggleStyle(.switch)
                 .controlSize(.small)
             }
 

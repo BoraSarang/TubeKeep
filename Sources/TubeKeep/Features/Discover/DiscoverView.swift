@@ -196,7 +196,7 @@ struct DiscoverCard: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 16))
                             .foregroundStyle(.white)
-                            .background(Circle().fill(Color.green).frame(width: 14, height: 14))
+                            .background(Circle().fill(AppColors.success).frame(width: 14, height: 14))
                             .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                             .padding(6)
                     }
@@ -230,7 +230,7 @@ struct DiscoverCard: View {
                                 }
                                 .foregroundStyle(.white)
                                 .frame(width: 110, height: 26)
-                                .background(Capsule().fill(Color.green))
+                                .background(Capsule().fill(AppColors.success))
                                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                             } else {
                                 Button {
@@ -293,7 +293,7 @@ struct DiscoverCard: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     Rectangle()
-                        .fill(Color(.textBackgroundColor))
+                        .fill(AppColors.textBackground)
                         .overlay(
                             Image(systemName: "play.rectangle")
                                 .foregroundStyle(.secondary)

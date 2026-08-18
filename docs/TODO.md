@@ -1,5 +1,64 @@
 # TODO — 작업 추적 목록
 
+## v4.2 — 단축키 체계 정리 + fullscreen 크래시 수정 (macOS, T-1172~T-1178) ✅
+
+> PLAN_v4.2_shortcuts-macos.md. fullscreen 크래시 + 스페이스 토글 상쇄 + Cmd+D 3중 정의 단일화 + Cmd+W 신규 + 메뉴바 소멸 + Dock 복구.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1172 | **fullscreen 크래시 수정** — renderFrame/updateGLContext window.screen 가드 + isFullscreenTransition 락 | high | done | MPVClient.swift + MPVVideoView.swift |
+| T-1173 | **스페이스 토글 상쇄 해결** — PlayerWindow post object: self + PlayerView 자기 창 비교 | high | done | PlayerWindow.swift + PlayerView.swift |
+| T-1174 | **Cmd+D 단일화** — KeyCommandHandler 복원 + AppDelegate/StatusBarManager keyEquivalent "d" 제거 | high | done | 이중 토글 "떴다 사라져" 해결 |
+| T-1175 | **Cmd+W 신규** — 파일 > 창 닫기 메뉴 + local monitor case 6 (keyWindow.performClose) | high | done | 삐 소리 해결 |
+| T-1176 | **메뉴바 소멸 방지** — 실행 0.3초 후 setupMainMenu 재호출 (SwiftUI 기본 메뉴 덮어쓰기) | high | done | AppDelegate.swift |
+| T-1177 | **텍스트 가드 재구성** — cmd 조합은 텍스트 입력 중에도 항상 처리 | high | done | KeyCommandHandler.swift |
+| T-1178 | **Dock 클릭 복구** — applicationShouldHandleReopen 추가 | medium | done | AppDelegate.swift |
+
+## v4.0 — macOS UI/UX 전면 개편 (맥 앱답게) 🚧
+
+> PLAN_v4.0_macos_ui.md. 전 창·화면·디버그 패널 macOS 표준 디자인으로 개편 (P1 토큰 → P2 설정 Scene → P3 사이드바/리스트 → P4 화면별 → P5 플레이어/디버그).
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1151 | **PLAN_v4.0 + TODO 등록** | high | done | docs/plans/PLAN_v4.0_macos_ui.md |
+| T-1152 | **P1 DesignTokens 재작성** — RGB 제거 + Display P3 브랜드 + semantic/material + 다크 가정 제거 | high | done | Material.sidebar→regular 수정, semantic 9종 + AppMaterial 신설 |
+| T-1153 | **P1 AppFont 시스템 상대 스타일 전환** (Dynamic Type 연동) | high | done | .callout/.caption/.caption2 — 크기 동일 보존 |
+| T-1154 | **P1 공통 컴포넌트 교체** — AppSearchField/ErrorBanner/StatusBadge/SidebarSelectableRow/LibrarySortBar/SelectionBar | high | done | NSSearchField 네이티브 + selectedContent + hover |
+| T-1155 | **P1 빌드 + 검증 + 문서 마감** | high | done | build 성공 + 실행(pid 49284) + a11y-dump v4.0p1 + CHANGELOG |
+| T-1156 | **P2 TubeKeepApp Settings Scene 추가** | high | done | SwiftUI.Settings(모델 Settings와 이름 충돌 → 명시적) |
+| T-1157 | **P2 AppDelegate 설정 창 생성부 제거 + openWhisperSettings 대응** | high | done | showSettingsWindow: 경유 + settingsWindow 프로퍼티 제거 |
+| T-1158 | **P2 SettingsView 상단 TabView 전환** (140px 사이드바 제거) | high | done | TabView + tabItem Label, selectedTab 바인딩 유지, min 640×440 |
+| T-1159 | **P2 상태바/메뉴바 설정 경로 연결** | high | done | openSettingsWindow() 일원화로 자동 연결 + 메뉴바 SwiftUI 덮어쓰기 → setupMainMenu async 재호출로 복구 |
+| T-1160 | **P3 MainView NavigationSplitView 전환** | medium | pending | 사용자 결정: 구조 유지로 보류 |
+| T-1161 | **P3 LibrarySidebarView 사이드바 시각 표준화** | medium | done | underPageBackground + selectedContentBackground, 드래그 재정렬 유지 |
+| T-1162 | **P3 LibraryListView 표준 List 전환** | medium | pending | 썸네일 120x68 + contextMenu |
+| T-1163 | **P3 보관함 고정 폭 해제 + 툴바 xmark/power 제거** | medium | done | FixedWidthWindowController 삭제, minSize 720×480, libraryWindow 전환 |
+| T-1164 | **P4 화면별 토큰 적용 + 창 고정 크기 해제** | medium | done | NSColor 16건 토큰 치환(control/separator/tertiary/textBackground/success/danger/warning) + downloader/batch/channel zoom 복구 + channel maxSize 해제 |
+| T-1165 | **P4 설정 탭 표준화** (switch→Toggle, mini 제거, SecureField) | low | done | toggleStyle(.switch) 16건 제거 → 기본 체크박스, ProgressView .mini→.small, Settings controlBackground/separator 토큰 |
+| T-1168 | **설정 폴백 순서 표시 제거** | low | done | SettingsAITab LLM 섹션 — "(1순위/2순위/3순위 폴백)" 라벨 + "폴백 순서" 섹션 제거 |
+| T-1166 | **P5 Player 상시 컨트롤 + 자유 리사이즈** | low | pending | PlayerView:443-521, 22-23 |
+| T-1167 | **P5 DebugLog macOS 콘솔 스타일** | low | pending | DebugLogView:126 + AppDelegate:640-651 |
+| T-1169 | **플레이어 스페이스바 일시정지 버그** | high | done | isPlayerKeyWindow 판정 완화(key+visible+active) + 텍스트 입력 시 통과 (AppDelegate:172-177, KeyCommandHandler) |
+| T-1170 | **↑/↓ 볼륨 조절 단축키** | high | done | KeyCommandHandler keyCode 126/125 → playerVolumeChangeNotification → PlayerView volume 동기화 |
+| T-1171 | **현재 영상 반복 재생 토글** | medium | done | MPVClient.setLoopFile(loop-file=inf) + controlBar 반복 버튼 |
+
+---
+
+## v3.14 — 샌드박스 전환 + yt-dlp 다운로드 안정화 (macOS) 🚧
+
+> PLAN_v3.14_macos.md. TCC 팝업 근본 해결 + 다운로드 완료 오인/포맷 수정.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1143 | yt-dlp 403 해결 (deno 번들 + player_client=default,android_vr) | high | done | deno 2.9.4 + extractor-args |
+| T-1144 | 저장 폴더 security-scoped 북마크 저장/복원 | high | done | BookmarkManager .withSecurityScope |
+| T-1145 | DownloadQueueReducer 저장 폴더 동기화 버그 | high | done | 완료→대기 표시 방지 |
+| T-1146 | 재시도 무한 루프 방지 (ensureAccess 실패 즉시 실패) | high | done | retryCount=0 리셋 제거 |
+| T-1147 | 진행률 디버그 로그 5% 단위 정리 | high | done | %\| RAW 제외 |
+| T-1148 | 저장 폴더 북마크 `.withSecurityScope` resolve — 재선택 없이 접근 복원 | high | done | ensureAccess resolve 옵션 + 폴백 |
+| T-1149 | 다운로드 완료 오인 + webm(video-only) 미병합 + 부분 파일 난립 수정 | high | done | mp4 우선 포맷 + .fXXX 제외 + 잔류물 정리 |
+| T-1150 | 재다운로드 검증 (mp4 h264+aac + 소리 + 완료 표시 정확) | high | done | 한그루브/소름 재다운로드 ffprobe — av1/정지+aac, 재생 OK |
+
 ## v3.13 — Dock 표시 + 메인창→보관함 용어 통일 + 단축키 별도 탭 (macOS) 🚧
 
 > PLAN_v3.13_window-dock-macos.md. macOS 창 관련 개선 3종.

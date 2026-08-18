@@ -1,5 +1,116 @@
 # CHANGELOG
 
+## v4.2 — 단축키 체계 정리 + fullscreen 크래시 수정 (macOS, T-1172~T-1178) ✅
+
+### fullscreen 크래시 수정 (T-1172) — 크래시 182552 해결
+- 원인: fullscreen 진입/종료 전환 중 `renderFrame`의 `glBlitFramebuffer`가 nil window(또는 `window.screen == nil`) 상태에서 호출 → EXC_BAD_ACCESS
+- 수정: `MPVClient.renderFrame`에 `window.screen != nil` + `isFullscreenTransition` 가드, `MPVVideoView.updateGLContext`를 fullScreen styleMask 체크 → `window.screen != nil` 체크로 교체
+- `MPVClient`에 fullscreen 전환 observers 4종(will/did Enter/Exit) + `transitionLock`(NSLock) + `setFullscreenTransition` 추가 — 전환 중 렌더링 차단
+- 검증: fullscreen 진입/종료 반복 시 `[mpv] fullscreen transition=true/false` 로그 정상, 크래시 0
+
+### 스페이스바 토글 상쇄 근본 해결 (T-1173)
+- 원인: 플레이어 창을 여러 번 열면 닫힌 창의 **PlayerView가 잔존**(메모리 유지) → NotificationCenter 토글 수신이 N회(최대 8회) → 동시 토글이 상쇄되어 "스페이스가 안 먹는" 것처럼 보임
+- 수정: `PlayerWindow.postTogglePlayPause/postSeek`가 `object: self`로 post → `PlayerView`의 onReceive에서 **post한 창과 자기 창이 일치할 때만** 토글 (기존 `isKeyWindow` 가드는 다중 통과로 실패 → 교체)
+- 검증: `[PlayerView] toggle received`가 1회로 수렴 + 사용자 육안 검증 통과
+
+### Cmd+D 이중 토글 수정 + 단일화 (T-1174)
+- 원인: "Show/Hide Debug Panel" keyEquivalent "d"가 **3곳**(AppDelegate Debug 메뉴 / StatusBarManager 상태바 메뉴 / KeyCommandHandler)에 정의 — 경로 중복
+- 수정: KeyCommandHandler(local monitor) **1곳만** 처리, AppDelegate·StatusBarManager의 keyEquivalent "d" → "" (마우스 클릭 전용, "(⌘D)" 라벨 유지)
+
+### Cmd+W 창 닫기 신규 (T-1175)
+- 파일 > 창 닫기 메뉴(keyEquivalent "w") + KeyCommandHandler case 6 — `NSApp.keyWindow?.performClose(nil)` 직접 호출 (메뉴 상태와 무관하게 동작)
+- 기존: 파일 메뉴 자체가 없어 모든 창에서 삐 소리
+
+### 메뉴바 실행 직후 소멸 방지 (T-1176)
+- 원인: SwiftUI 빈 Scene이 시작 직후 `NSApp.mainMenu`를 기본 메뉴로 교체 → 실행 직후 단축키/메뉴 부재, 재활성화 시 복구됐던 것
+- 수정: `applicationDidFinishLaunching`에서 `setupMainMenu()`를 0.3초 후(asyncAfter) 한 번 더 호출 + `applicationDidBecomeActive` 유지
+
+### 텍스트 가드 재구성 (T-1177)
+- 기존: firstResponder가 텍스트 필드면 **모든** 전역 단축키 통과 → 검색창 포커스 중 Cmd+D/Cmd+W 무시
+- 수정: 스페이스/화살표만 텍스트 입력 중 통과, **cmd 조합은 항상 local monitor가 처리**
+
+### Dock 클릭 복구 (T-1178)
+- `applicationShouldHandleReopen` 미구현 → Cmd+W로 창을 닫은 뒤 Dock 클릭 시 아무 반응 없음
+- 수정: `applicationShouldHandleReopen` 추가 — `hasVisibleWindows == false`면 `openLibraryWindow()` 호출
+
+### 검증
+- 빌드 성공(DebugPanel ON) + 메뉴바 "Apple, 튜브킵, 파일, 편집, 다운로더, Debug" 확인
+- 사용자 육안 검증: Cmd+D 1회 토글, Cmd+W, Dock 복구, 스페이스 토글, fullscreen 정상 — **전부 통과**
+
+## v4.1 — 플레이어 키 조작 + 반복 재생 (macOS, T-1169~T-1171) 🚧
+
+### 플레이어 스페이스바 일시정지 버그 수정 (T-1169)
+- 원인: `isPlayerKeyWindow()`가 플레이어 창이 **key window일 때만** true 반환 — 플레이어가 화면에 보이지만 다른 창이 key면 스페이스바가 무시됨
+- 수정: key window **또는** visible + 앱 active면 토글 허용 (`AppDelegate.swift:172-177`) + 텍스트 입력 중(first responder가 NSText/NSTextView) 전역 단축키 통과 (`KeyCommandHandler.swift`)
+- DEBUG 로그: `[Key] Space — cmd=... playerKey=...` 기존 유지 + `[Key] Volume — delta=...` 신규
+
+### ↑/↓ 볼륨 조절 단축키 (T-1170)
+- `KeyCommandHandler`: keyCode 126(↑)/125(↓) → `onVolumeChange(delta)` 콜백 (5단계)
+- `AppDelegate`: `Constants.playerVolumeChangeNotification` post (userInfo: delta)
+- `PlayerView`: onReceive에서 `volume` 상태 + `mpv.setVolume` 동기화, 0...100 클램프
+- `Constants`: `playerVolumeChangeNotification` 추가
+
+### 현재 영상 반복 재생 토글 (T-1171)
+- `MPVClient.setLoopFile(_:)`: mpv `loop-file=inf/no` 프로퍼티 제어
+- `PlayerView` controlBar: 반복 토글 버튼(`repeat` 아이콘, 활성 시 accentColor) + `@State isRepeatEnabled`
+- A-B 구간 반복과 독립 동작 (구간 반복은 기존 유지)
+
+### 검증
+- 빌드 성공 (DebugPanel ON) + 앱 실행 확인 — 키 조작·반복 토글은 사용자 육안 검증 대기
+
+## v4.0 — macOS UI/UX 전면 개편 — P4 화면별 토큰 + 설정 표준화 (macOS, T-1164, T-1165) 🚧
+
+### P4 화면별 토큰 적용 + 창 고정 크기 해제 (T-1164)
+- **NSColor 하드코딩 16건 → AppColors 토큰 치환**: `controlBackground`(Home/Queue/DiskCleanup/Batch/Clip/SubtitlePanel/Settings), `separator`(Home/Batch/DiskCleanup/LibraryList/Grid/Settings), `tertiaryLabel`(Home/Queue/PlaylistSelection), `textBackground`(Channel/Discover/Trash/Library), `success`/`danger`/`warning`(Discover 완료 배지, Channel 새 영상 배지, ChannelContentView 경고 배너)
+- **창 고정 크기 해제**: 다운로더(520), 일괄(480), 채널(720) 창 `zoomEnabled: false` 제거(녹색 확대 버튼 복구) + 채널 창 `maxSize: 720×9999` 제거(폭 자유 리사이즈) + minSize 축소(480×320/440×340/640×400)
+- **설정 창 체크박스 전환 (T-1165)**: `toggleStyle(.switch)` 16건 제거 → macOS 기본 Toggle(체크박스), `ProgressView().controlSize(.mini)` → `.small`, Settings 탭의 `controlBackground`/`separator` 토큰 치환
+- **설정 창 안 열림 버그 근본 수정 + 메뉴바 회귀 해결**: P2의 SwiftUI `Settings` Scene이 `showSettingsWindow:` 커맨드(responder chain)에 의존하는데, `setupMainMenu()`가 `NSApp.mainMenu`를 교체하면 SwiftUI가 설치한 설정 커맨드 체인이 끊겨 macOS 14+에서 설정 창이 열리지 않음 (EmptyCommands() 추가는 오히려 이 버그를 유발해 제거) → **`TubeKeepApp`을 빈 `Scene`으로 복원** + `AppDelegate`의 `openSettingsWindow()`를 `WindowFactory.makeWindow` 직접 생성(640×420, `settingsWindow` 프로퍼티 캐싱) 방식으로 복원 + `NSWindow.didBecomeKeyNotification` 옵저버(→setupMainMenu 재호출) 제거 — SwiftUI 자동 메뉴 설치 자체가 없어져 메뉴바 회귀도 해소
+- **검증**: 빌드 성공 + 메뉴바 "튜브킵/편집/다운로더/Debug" 유지 + 메뉴 "다운로더 → 설정…" 클릭·⌘, 단축키로 설정 창 열림/닫힘 확인 + 설정 창이 key인 상태에서도 메뉴바 커스텀 유지 확인 — 설정 창 내부 체크박스는 육안 확인 대기
+
+## v4.0 — macOS UI/UX 전면 개편 — P3 사이드바 표준화 + 고정 폭 해제 (macOS, T-1161, T-1163) 🚧
+
+### 사이드바 시각 표준화 (T-1161)
+- `DesignTokens.swift`: `sidebarBackground`를 `underPageBackgroundColor`로 변경 (macOS 표준 사이드바 배경, 라이트/다크 자동 대응)
+- `LibrarySidebarView`: 배경을 `AppColors.sidebarBackground`로 적용
+- 채널 행·카테고리 행 선택 스타일 통일 — `Color.accentColor`+white 텍스트 → `selectedContentBackground`+primary 텍스트 (macOS 표준)
+
+### 보관함 고정 폭 해제 + 툴바 정리 (T-1163)
+- `FixedWidthWindowController.swift` 삭제 (840px 강제 리사이즈 제거)
+- `AppDelegate`: `libraryWindowController`(NSWindowDelegate) → `libraryWindow`(NSWindow) 참조로 전환, `minSize` 840×500 → **720×480** (자유 리사이즈 허용)
+- `MainView` 툴바: `xmark.circle`(창 닫기)·`power`(프로그램 종료) 버튼 제거 — traffic lights·⌘W/⌘Q 역할 중복 제거
+- **검증**: 빌드 성공 + 앱 실행 + 보관함 창 열림 확인 + a11y-dump v4.0p3sidebar
+
+## v4.0 — macOS UI/UX 전면 개편 — P2 설정 Scene화 (macOS, T-1156~T-1159) 🚧
+
+### 설정 창 Scene화 (T-1156~T-1159)
+- **`TubeKeepApp.swift`**: 빈 `Scene`에 `SwiftUI.Settings { SettingsView(...) }` 추가 — 모델 `Settings` 타입과 충돌해 `SwiftUI.Settings` 명시
+- **`AppDelegate.swift`**: `openSettingsWindow()` 수동 NSWindow 생성(640×420 고정, 리사이즈 불가) 제거 → `NSApp.sendAction(Selector(("showSettingsWindow:")))` 표준 설정 경로. `settingsWindow` 프로퍼티 제거
+- **`SettingsView.swift`**: 140px 커스텀 탭 사이드바+switch → **`TabView(.automatic)` + `tabItem` Label**(아이콘+탭명), `selectedTab` store 바인딩 유지, `minWidth 640 / minHeight 440`
+- **메뉴바 회귀 수정**: SwiftUI Settings Scene이 자동 메뉴(보기/윈도우/도움말)를 설치해 커스텀 "다운로더/편집/Debug" 메뉴 유실 → `setupMainMenu()`를 `DispatchQueue.main.async`로 재호출해 수동 메뉴 복구 (SwiftUI 자동 메뉴 덮어쓰기 대응)
+- **검증**: 빌드 성공 + 설정 창 Scene으로 열림(osascript 창 제목 "다운로드" = 첫 탭) + 메뉴바 "다운로더/편집/Debug" 복구 확인
+
+## v4.0 — macOS UI/UX 전면 개편 — P1 테마 토큰 (macOS, T-1151~T-1155) 🚧
+
+### P1 테마 토큰 재작성 (T-1152, T-1153)
+- **`Theme/DesignTokens.swift` 재작성**:
+  - 색상: `Color(red:...)` RGB 하드코딩(4곳) 제거 → **Display P3 기반 액센트/테알 웨이브 그래디언트** + **macOS semantic 계열 신설**(`selectedContentBackground`, `hoverRow`, `sidebarBackground`, `controlBackground`, `textBackground`, `separator`, `secondaryLabel`, `tertiaryLabel`) — 라이트/다크 자동 대응
+  - 다크 가정 제거: `progressTrack = black 0.4 → primary.opacity(0.1)`, `cardShadow 0.2 → 0.18`
+  - **`AppMaterial` 신설** (regular/thin/ultraThin/bar)
+  - 폰트: `Font.system(size:)` 고정 → **시스템 상대 스타일**(.callout/.caption/.caption2) 전환 (Dynamic Type 연동, 크기 동일 보존)
+- 적용 파일: `SidebarSelectableRow`, `AppSearchField`, `ErrorBanner`, `StatusBadge`, `LibrarySortBar`, `SelectionBar`
+
+### 공통 컴포넌트 macOS 표준화 (T-1154)
+- **`SidebarSelectableRow`**: iOS 풀컬러 선택(`accentColor`+흰 글자) → **`selectedContentBackground` + primary 텍스트 + hover 배경**(`hoverRow`) — macOS 사이드바 표준
+- **`AppSearchField`**: 커스텀 라운드 박스 → **네이티브 `NSSearchField`**(돋보기·클리어 버튼 내장, 라이트/다크 자동) + 검색 중 `ProgressView`
+- **`ErrorBanner`**: semantic 토큰(`warning`, `controlBackground`) 적용
+- **`StatusBadge`**: 하드코딩 폰트 → `AppFont` 토큰
+- **`LibrarySortBar`/`SelectionBar`**: 흰 글자 칩/raw red 제거 → semantic 토큰
+
+### 검증 (T-1155)
+- 빌드 `./build_and_run.sh debug macos` 성공 (EXIT 0, `Material.sidebar`→`Material.regular` 교체 포함)
+- 앱 실행 확인 (pid 49284, 크래시 0)
+- a11y-dump 3종: `docs/screenshots/macos/v4.0p1_20260818_095305.{a11y,storage,perf}.json`
+
 ## v3.13 — Dock 표시 + 메인창→보관함 용어 통일 + 단축키 별도 탭 + 창별 아이콘 (macOS, T-1131~T-1137) 🚧
 
 ### A. Dock 표시 (T-1132)

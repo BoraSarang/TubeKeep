@@ -154,7 +154,7 @@ private struct LibraryListRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? Color.accentColor : Color(.separatorColor), lineWidth: isSelected ? 2 : 0.5)
+                        .stroke(isSelected ? Color.accentColor : AppColors.separator, lineWidth: isSelected ? 2 : 0.5)
                 )
 
             VStack(alignment: .leading, spacing: 1) {
@@ -258,7 +258,7 @@ private struct LibraryListRow: View {
                     .frame(width: 48, height: 27)
             } else {
                 Rectangle()
-                    .fill(Color(.textBackgroundColor))
+                    .fill(AppColors.textBackground)
                     .overlay(
                         Image(systemName: "film")
                             .foregroundStyle(.secondary)

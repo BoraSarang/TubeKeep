@@ -25,14 +25,14 @@ final class PlayerWindow: NSWindow {
     private func postTogglePlayPause() {
         NotificationCenter.default.post(
             name: Constants.playerTogglePlayPauseNotification,
-            object: nil
+            object: self
         )
     }
 
     private func postSeek(direction: Double) {
         NotificationCenter.default.post(
             name: Constants.playerSeekNotification,
-            object: nil,
+            object: self,
             userInfo: ["direction": direction]
         )
     }

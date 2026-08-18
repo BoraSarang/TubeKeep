@@ -31,7 +31,7 @@ struct AIWindowView: View {
         .overlay {
             if store.library.librarySummaryLoading {
                 ZStack {
-                    Color.primary.opacity(0.05)
+                    AppColors.hoverRow
                         .background(.regularMaterial)
                     VStack(spacing: 12) {
                         ProgressView()
@@ -250,7 +250,7 @@ struct AIWindowView: View {
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
-        .background(available ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05))
+        .background(available ? Color.accentColor.opacity(0.15) : AppColors.hoverRow)
         .foregroundStyle(available ? Color.accentColor : Color.secondary.opacity(0.5))
         .clipShape(Capsule())
     }

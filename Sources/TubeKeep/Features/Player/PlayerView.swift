@@ -12,6 +12,7 @@ struct PlayerView: View {
     @State private var showControls = false
     @State private var controlsTask: Task<Void, Never>?
     @State private var similarThumbnails: [String: NSImage] = [:]
+    @State private var isRepeatEnabled = false
 
     private let videoWidth: CGFloat = 854
     private let videoHeight: CGFloat = 480
@@ -40,6 +41,12 @@ struct PlayerView: View {
             setupPlayer: { setupPlayer() }
         ))
         .background(WindowAccessor { win in DispatchQueue.main.async { window = win } })
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerVolumeChangeNotification)) { notif in
+            guard let delta = notif.userInfo?["delta"] as? Double else { return }
+            let newVolume = min(max(volume + delta, 0), 100)
+            volume = newVolume
+            mpv.setVolume(newVolume)
+        }
     }
 
     private struct PlaybackReactionsModifier: ViewModifier {
@@ -66,10 +73,18 @@ struct PlayerView: View {
                     let step = Settings.loadSettings().seekStepSeconds
                     mpv.seekRelative(direction * step)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: Constants.playerTogglePlayPauseNotification)) { _ in
-                    if mpv.isLoaded || mpv.isPlaying {
-                        mpv.togglePlayPause()
-                    }
+                .onReceive(NotificationCenter.default.publisher(for: Constants.playerTogglePlayPauseNotification)) { notif in
+                    // keyDown은 keyWindow에서만 발생하므로 post한 PlayerWindow와 자기 창이
+                    // 일치할 때만 토글한다. (잔존 PlayerView가 여럿이어도 1회만 처리)
+                    guard let postWindow = notif.object as? NSWindow,
+                          let win = windowProvider(),
+                          postWindow === win else { return }
+                    #if DEBUG
+                    DebugLogManager.shared?.append("[PlayerView] toggle received — isLoaded=\(mpv.isLoaded) isPlaying=\(mpv.isPlaying)")
+                    #endif
+                    // EOF 후에도 스페이스바로 다시 재생할 수 있어야 하므로
+                    // isLoaded/isPlaying 조건 없이 항상 토글한다. (mpv nil 가드는 내부에 있음)
+                    mpv.togglePlayPause()
                 }
                 .onChange(of: store.showSubtitlePanel) { _, _ in setContentSize() }
                 .onChange(of: store.showQueue) { _, _ in setContentSize() }
@@ -476,6 +491,14 @@ struct PlayerView: View {
                     .padding(.horizontal, 6).padding(.vertical, 3).background(RoundedRectangle(cornerRadius: 4).fill(store.bLoop == nil ? .white.opacity(0.15) : .accentColor.opacity(0.85)))
             }.buttonStyle(.plain).disabled(store.aLoop == nil)
                 .help(store.bLoop == nil ? "현재 위치를 반복 끝점(B)으로 설정 (A→B 반복 시작)" : "반복 해제")
+            Button {
+                isRepeatEnabled.toggle()
+                mpv.setLoopFile(isRepeatEnabled)
+            } label: {
+                Image(systemName: "repeat").font(.system(size: 13))
+                    .foregroundColor(isRepeatEnabled ? Color.accentColor : .white)
+            }.buttonStyle(.plain)
+                .help(isRepeatEnabled ? "반복 재생 해제" : "현재 영상 반복 재생")
             Button { store.send(.saveClip) } label: {
                 Group {
                     if store.isSavingClip {

@@ -95,7 +95,7 @@ struct ChannelDownloaderView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color(.textBackgroundColor))
+                .background(AppColors.textBackground)
             }
 
             if let error = errorMessage {
@@ -111,7 +111,7 @@ struct ChannelDownloaderView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color(.textBackgroundColor))
+                .background(AppColors.textBackground)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }

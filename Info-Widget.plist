@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>TubeKeepWidget</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.borasarang.tubekeeper.widget</string>
+	<string>com.borasarang.tubekeep.widget</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

@@ -31,10 +31,10 @@ struct StatusBadge: View {
         case .inline:
             HStack(spacing: 2) {
                 Image(systemName: icon)
-                    .font(.system(size: 9))
+                    .font(AppFont.meta)
                 if let text {
                     Text(text)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppFont.badge)
                 }
             }
             .foregroundStyle(color)

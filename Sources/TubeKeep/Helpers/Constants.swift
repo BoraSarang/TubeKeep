@@ -2,7 +2,7 @@ import Foundation
 
 enum Constants {
     static let appName = "TubeKeep"
-    static let appGroupSuiteName = "group.com.tubekeep"
+    static let appGroupSuiteName = "6GPJQ7BQC9.com.borasarang.tubekeep"
     static let defaultResolution = 360
     static let defaultConcurrentDownloads = 2
     static let minConcurrentDownloads = 1
@@ -14,8 +14,9 @@ enum Constants {
     static let defaultFilenameTemplate = "{index} - {title}.{id}"
     static let defaultOpenRouterModel = "openrouter/free"
 
-    static var youtubeExtractorArgs: String {
-        return "youtube:lang=\(LanguageService.systemLanguageCode)"
+    static var youtubeExtractorArgs: [String] {
+        ["--extractor-args", "youtube:lang=\(LanguageService.systemLanguageCode)",
+         "--extractor-args", "youtube:player_client=default,android_vr"]
     }
 
     static let settingsSaveKey = "appSettings"
@@ -38,6 +39,7 @@ enum Constants {
     static let openPlayerWindowNotification = Notification.Name("com.tubekeep.openPlayerWindow")
     static let playerSeekNotification = Notification.Name("com.tubekeep.playerSeek")
     static let playerTogglePlayPauseNotification = Notification.Name("com.tubekeep.playerTogglePlayPause")
+    static let playerVolumeChangeNotification = Notification.Name("com.tubekeep.playerVolumeChange")
     static let downloadHistoryDidChangeNotification = Notification.Name("com.tubekeep.downloadHistoryDidChange")
     static let openWhisperSettingsNotification = Notification.Name("com.tubekeep.openWhisperSettings")
     static let videoAIDidChangeNotification = Notification.Name("com.tubekeep.videoAIDidChange")

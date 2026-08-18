@@ -9,7 +9,8 @@ final class ClipService {
     private var context: ModelContext { PersistenceController.shared.context }
 
     static func clipsRootDirectory() -> URL {
-        URL(fileURLWithPath: Settings.loadSettings().storageDirectory)
+        _ = BookmarkManager.ensureAccess()
+        return URL(fileURLWithPath: Settings.loadSettings().storageDirectory)
             .appendingPathComponent("Clips", isDirectory: true)
     }
 

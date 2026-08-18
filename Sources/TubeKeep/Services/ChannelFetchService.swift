@@ -35,7 +35,7 @@ actor ChannelFetchService {
             arguments: [
                 "--dump-json",
                 "--no-download",
-                "--extractor-args", Constants.youtubeExtractorArgs,
+            ] + Constants.youtubeExtractorArgs + [
                 "--flat-playlist",
                 "--playlist-end", "1",
                 "--ignore-errors",
@@ -72,7 +72,7 @@ actor ChannelFetchService {
                 arguments: [
                     "--dump-json",
                     "--no-download",
-                    "--extractor-args", Constants.youtubeExtractorArgs,
+                ] + Constants.youtubeExtractorArgs + [
                     "--playlist-end", "1",
                     "--ignore-errors",
                     "--no-warnings",
@@ -113,7 +113,7 @@ actor ChannelFetchService {
         var arguments: [String] = [
             "--flat-playlist",
             "--dump-json",
-            "--extractor-args", Constants.youtubeExtractorArgs,
+        ] + Constants.youtubeExtractorArgs + [
             "--ignore-errors",
             "--no-warnings",
         ]
@@ -172,7 +172,7 @@ actor ChannelFetchService {
             arguments: [
                 "--flat-playlist",
                 "--dump-json",
-                "--extractor-args", Constants.youtubeExtractorArgs,
+            ] + Constants.youtubeExtractorArgs + [
                 "--ignore-errors",
                 "--no-warnings",
                 "--playlist-items", "1-\(probeItems)",
