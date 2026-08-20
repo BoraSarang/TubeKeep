@@ -34,6 +34,9 @@ struct PlayerReducer {
         var isLoadingSimilar = false
         var similarError: String? = nil
 
+        // AI Panel (v4.6)
+        var showAIPanel = false
+
         // v3.0 Phase B
         var playbackRate: Double = 1.0
         var aLoop: Double?
@@ -98,6 +101,7 @@ struct PlayerReducer {
         case similarVideosFailed(String)
         case toggleSimilarVideos
         case clearSimilarVideos
+        case toggleAIPanel
 
         // Clip (A-B 저장)
         case saveClip
@@ -641,6 +645,15 @@ struct PlayerReducer {
                 state.isLoadingSimilar = false
                 state.similarVideos = []
                 state.similarError = nil
+                return .none
+
+            case .toggleAIPanel:
+                state.showAIPanel.toggle()
+                if state.showAIPanel {
+                    state.showQueue = false
+                    state.showSubtitlePanel = false
+                    state.showSimilarVideos = false
+                }
                 return .none
             }
         }

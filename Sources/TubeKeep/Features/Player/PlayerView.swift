@@ -4,23 +4,23 @@ import ComposableArchitecture
 
 struct PlayerView: View {
     let store: StoreOf<PlayerReducer>
+    let appStore: StoreOf<AppReducer>
     @StateObject private var mpv = MPVClient()
     @State private var window: NSWindow?
     @State private var volume: Double = 100
     @State private var isSeeking = false
     @State private var seekTime: Double = 0
-    @State private var showControls = false
-    @State private var controlsTask: Task<Void, Never>?
     @State private var similarThumbnails: [String: NSImage] = [:]
     @State private var isRepeatEnabled = false
+    @State private var controlsVisible = true
+    @State private var controlsHideTask: Task<Void, Never>?
 
     private let videoWidth: CGFloat = 854
     private let videoHeight: CGFloat = 480
     private let controlBarHeight: CGFloat = 44
     private let panelWidth: CGFloat = 320
-    private let controlsAutoHideDelay: Duration = .seconds(3)
 
-    private var windowWidth: CGFloat { videoWidth + (store.showQueue || store.showSubtitlePanel || store.showSimilarVideos ? panelWidth : 0) }
+    private var windowWidth: CGFloat { videoWidth + (store.showQueue || store.showSubtitlePanel || store.showSimilarVideos || store.showAIPanel ? panelWidth : 0) }
     private var windowHeight: CGFloat { videoHeight }
 
     var body: some View {
@@ -46,6 +46,34 @@ struct PlayerView: View {
             let newVolume = min(max(volume + delta, 0), 100)
             volume = newVolume
             mpv.setVolume(newVolume)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerToggleQueueNotification)) { notif in
+            guard let postWindow = notif.object as? NSWindow,
+                  let win = window,
+                  postWindow === win else { return }
+            store.send(.toggleQueue)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerToggleSubtitlePanelNotification)) { notif in
+            guard let postWindow = notif.object as? NSWindow,
+                  let win = window,
+                  postWindow === win else { return }
+            store.send(.toggleSubtitlePanel)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerToggleSimilarVideosNotification)) { notif in
+            guard let postWindow = notif.object as? NSWindow,
+                  let win = window,
+                  postWindow === win else { return }
+            store.send(.toggleSimilarVideos)
+        }
+        .onChange(of: store.showAIPanel) { _, visible in
+            window?.setContentSize(NSSize(width: windowWidth, height: windowHeight))
+            if visible { loadAISummaryForCurrentVideo() }
+        }
+    }
+
+    private func loadAISummaryForCurrentVideo() {
+        if let videoId = store.playerItem.videoId {
+            appStore.send(.library(.showSummaryInPanel(videoId)))
         }
     }
 
@@ -124,6 +152,8 @@ struct PlayerView: View {
                 subtitlePanel.frame(width: panelWidth)
             } else if store.showSimilarVideos {
                 similarVideosPanel.frame(width: panelWidth)
+            } else if store.showAIPanel {
+                aiPanel.frame(width: panelWidth)
             }
         }
     }
@@ -131,47 +161,61 @@ struct PlayerView: View {
     // MARK: - Video Area
 
     private var videoArea: some View {
-        ZStack {
-            Color.black
-            playbackView
-            if store.isStreamLoading || (!mpv.isLoaded && store.playerItem.videoId != nil) {
-                loadingView
-            }
-            if store.fileMissing { fileMissingView }
-            if let err = mpv.error { errorView(err) }
-            if store.showSubtitleOverlay {
-                SubtitleOverlay(cues: store.subtitles, currentTime: mpv.currentTime)
-            }
-            if store.showUpNext { upNextOverlay.transition(.opacity) }
-            if let msg = store.clipSaveMessage {
-                clipMessageBanner(msg)
-                    .transition(.opacity)
-            }
-            VStack {
-                Spacer()
-                if showControls { controlBar.frame(height: controlBarHeight).background(.ultraThinMaterial).transition(.move(edge: .bottom).combined(with: .opacity)) }
-            }
-            if showControls { fullscreenButton.transition(.opacity) }
-        }
-        .frame(minWidth: videoWidth, maxWidth: .infinity, minHeight: videoHeight, maxHeight: .infinity)
-        .clipped()
-        .onTapGesture(count: 1) { store.send(.toggleSubtitleOverlay) }
-        .onTapGesture(count: 2) { toggleFullscreen() }
-        .onContinuousHover { phase in
-            switch phase {
-            case .active:
-                showControls = true
-                controlsTask?.cancel()
-                controlsTask = Task {
-                    try? await Task.sleep(for: controlsAutoHideDelay)
-                    guard !Task.isCancelled else { return }
-                    if store.isSavingClip { return }
-                    await MainActor.run { showControls = false }
+        GeometryReader { geo in
+            let fittedHeight = min(geo.size.height, geo.size.width * 9 / 16)
+            let fittedWidth = fittedHeight * 16 / 9
+            ZStack {
+                Color.black
+                ZStack {
+                    playbackView
+                    if store.isStreamLoading || (!mpv.isLoaded && store.playerItem.videoId != nil) {
+                        loadingView
+                    }
+                    if store.fileMissing { fileMissingView }
+                    if let err = mpv.error { errorView(err) }
+                    if store.showSubtitleOverlay {
+                        SubtitleOverlay(cues: store.subtitles, currentTime: mpv.currentTime)
+                    }
+                    if store.showUpNext { upNextOverlay.transition(.opacity) }
+                    if let msg = store.clipSaveMessage {
+                        clipMessageBanner(msg)
+                            .transition(.opacity)
+                    }
+                    VStack {
+                        Spacer()
+                        controlBar
+                            .frame(height: controlBarHeight)
+                            .background(.ultraThinMaterial)
+                            .opacity(controlsVisible ? 1 : 0)
+                            .offset(y: controlsVisible ? 0 : controlBarHeight)
+                            .allowsHitTesting(controlsVisible)
+                    }
                 }
-            case .ended:
-                showControls = false
-                controlsTask?.cancel()
+                .frame(width: fittedWidth, height: fittedHeight)
+                fullscreenButton
+                    .opacity(controlsVisible ? 1 : 0)
             }
+            .clipped()
+            .onTapGesture(count: 1) { store.send(.toggleSubtitleOverlay) }
+            .onTapGesture(count: 2) { toggleFullscreen() }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active, .ended:
+                    scheduleControlsHide()
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: controlsVisible)
+        }
+        .frame(minWidth: videoWidth, minHeight: videoHeight)
+    }
+
+    private func scheduleControlsHide() {
+        controlsHideTask?.cancel()
+        controlsVisible = true
+        controlsHideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            controlsVisible = false
         }
     }
 
@@ -383,6 +427,47 @@ struct PlayerView: View {
         }
     }
 
+    // MARK: - AI Panel (v4.6)
+
+    private var aiPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("AI 기능").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button { store.send(.toggleAIPanel) } label: {
+                    Image(systemName: "xmark").font(.system(size: 11))
+                }.buttonStyle(.plain).help("닫기")
+            }
+            .padding(10)
+
+            Divider()
+
+            if let videoId = store.playerItem.videoId {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        AISummarySection(store: appStore)
+                        Divider()
+                        AIChapterSection(store: appStore)
+                        Divider()
+                        AIMindmapSection(store: appStore, videoId: videoId)
+                        Divider()
+                        AIQnASection(store: appStore)
+                    }
+                    .padding(12)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "sparkles").font(.system(size: 24)).foregroundStyle(.secondary)
+                    Text("로컬 파일에서는 AI 기능을 사용할 수 없습니다")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            }
+        }
+        .background(.regularMaterial)
+    }
+
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
@@ -400,6 +485,10 @@ struct PlayerView: View {
             Button { store.send(.toggleSimilarVideos) } label: {
                 Image(systemName: store.showSimilarVideos ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack")
             }.help("비슷한 영상")
+            Button { store.send(.toggleAIPanel) } label: {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(store.showAIPanel ? Color.accentColor : Color.primary)
+            }.help("AI 기능")
             Spacer()
             Button { store.send(.toggleAlwaysOnTop) } label: {
                 Image(systemName: store.isAlwaysOnTop ? "pin.fill" : "pin")
@@ -407,9 +496,6 @@ struct PlayerView: View {
             Button(action: toggleFullscreen) {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
             }.help("전체 화면")
-            Button { mpv.stop(); window?.close() } label: {
-                Image(systemName: "xmark.circle")
-            }.help("창 닫기")
         }
     }
 

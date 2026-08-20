@@ -1,5 +1,53 @@
 # CHANGELOG
 
+## v4.6 — 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1205) 🚧
+
+### 플레이어 AI 패널 + 네이티브 개선 (T-1201) 🔄
+- **AI 패널 통합**: `PlayerReducer`에 `showAIPanel`/`toggleAIPanel` 추가(기존 3개 패널과 상호 배타), `PlayerView`에 `AppReducer` store 주입, 툴바 sparkles 버튼으로 AI 패널 토글
+- **AI 공용 컴포넌트**: `AISectionViews.swift` 신설 — 요약/챕터/마인드맵/Q&A 4섹션을 `AISummarySection`/`AIChapterSection`/`AIMindmapSection`/`AIQnASection`으로 추출, AI 창과 플레이어 패널이 공유
+- **showSummaryInPanel 액션**: AI 창을 열지 않고 패널에서만 요약 로드 (기존 `showSummary` 로직을 `handleShowSummary(state:videoId:openWindow:)`로 추출)
+- **컨트롤바 자동 숨김**: 마우스 움직임 감지 2.5초 후 숨김(전체 화면 포함), 움직이면 복귀
+- **비디오 16:9 유지**: GeometryReader로 창 크기와 무관하게 레터박스
+- **툴바 정리**: 플레이어/AI 창의 `xmark.circle`(닫기) 제거 → traffic lights 위임
+- **AI 창 리팩토링**: 4섹션 중복 코드 제거, 공용 컴포넌트 사용, 툴바 pin만 유지
+
+### 그리드 셀 #카테고리 표시 (T-1205) ✅
+- 보관함 그리드 셀 채널명 오른쪽에 `#카테고리명` 버튼 표시(첫 번째 태그), 클릭 시 사이드바 카테고리 필터(`setSelectedCategory`) 적용
+- **검증**: a11y help로 버튼 8개 확인 + AXPress 클릭으로 필터 동작(9개→3개 항목) + 빌드 성공
+
+## v4.5 — 캐릭터 대화 + macOS 네이티브 디자인 리빌딩 (macOS, T-1184~T-1197) 🚧
+
+### 캐릭터 대화 기능 (T-1184~T-1187) ✅
+- **KeychainHelper 신설**: `SecItemCopyMatching` 기반 키체인 읽기/저장/삭제, `chatAPIKey()` OPENROUTER 우선 → NVIDIA 폴백
+- **CharacterChatService**: OpenRouter `nvidia/nemotron-3-super-120b-a12b:free` + `reasoning.enabled=false` + 3 페르소나(튜브 시니어/코딩 버디/북웜), 히스토리 UserDefaults 저장(최근 50건)
+- **CharacterChatView**: 새 창(id "chat", 460×640), 캐릭터 피커 + 키 소스 라벨 + 대화 버블 + ⌘↩ 전송 + 초기화
+- **에러코드**: E-MAC-AI-1004 (error_message_ko.json)
+- **검증**: 키체인 키 감지 라벨("OpenRouter") + 실제 한국어 페르소나 응답 수신 성공
+
+### 디자인 리빌딩 (T-1188~T-1197) ✅
+- **P0**: Package.swift macOS 15+ 상향 + WindowFactory `fullSizeTitlebar`/`autosaveName`/`icon()`/`restore()`/`isLiquidGlassAvailable` + 7개 창 autosave 적용
+- **P1**: MainView `HStack` → `NavigationSplitView` 2열(sidebar+detail) + 보관함 창 1000×700/min 840×520 + 사이드바 커스텀 배경 제거
+- **P2**: 설정 8탭 전부 `Form(.grouped)` 전환(커스텀 divider/ScrollView 제거, Section 기반) + 메뉴바 보기/창/도움말 신설(⌘1~4/⇧⌘A/⇧⌘C/설정/도움말, 파일 메뉴 캐릭터 대화→보기 이동)
+- **P3**: 다운로더 계열 창 확대(영상 640×560/일괄 560×500/채널 800×600) + material 배경 3창 + DownloadRow `ProgressView(.linear)` + Player 컨트롤 상시 표시 + 패널 단축키 ⌘⇧S/Q/P + StatusBar `NSProgressIndicator`(aggregateProgress)
+- **검증**: a11y 덤프로 설정 8탭 Section/컨트롤 확인, 메뉴 9종 등록 확인, 창 크기/배열 확인, 빌드 성공
+
+### 설정 회귀 수정 + 사이드바 전환 (T-1198) ✅
+- **원인**: T-1192의 Form(.grouped) 전환이 커스텀 SettingsRow(VStack+HStack)와 충돌 — 설정 탭마다 컨트롤이 오른쪽 끝으로 밀리고 "속도 0 0" 같은 깨진 표시 발생
+- **수정**: 8개 탭 전부 원래 `ScrollView + VStack + sectionHeader + divider` 구조로 복원, SettingsRow를 LabeledContent 시도 후 원래 VStack+HStack으로 원복
+- **설정 창 사이드바 전환**: SettingsView를 NavigationSplitView(List(.sidebar) 180px + detail ScrollView)로 재작성, 창 760×500 (사용자 요청)
+- **검증**: 빌드 성공 + a11y로 컨트롤 오른쪽 정렬/incrementor·TextField·팝업 위치 확인
+
+### 재생목록 기능 제거 (T-1199) ✅
+- **배경**: 채널 다운로더 사이드바 하단 재생목록 섹션이 180px 폭에 토글 2개+삭제 버튼이 들어가 쥐꼬리만하게 표시되고, 재생목록 선택 시 영상 목록/다운로드가 없어 용도 불명 — 사용자 결정으로 제거
+- **제거**: ChannelListView 재생목록 섹션(addPlaylist/deletePlaylist/playlistRow) + ChannelUpdateService 재생목록 감시 루프 + ChannelModels `SubscribedPlaylist` 구조체
+- **검증**: 빌드 성공 + a11y 전체 덤프로 재생목록 요소 0건 + 디버그 로그 ERROR 없음(알림 권한 실패는 기존 사항)
+
+### 캐릭터 대화 기능 제거 (T-1200) ✅
+- **배경**: 캐릭터 대화(T-1184~T-1187)는 사용자 AI+NVIDIA 연동 요청이 다른 프로젝트에 전달된 것으로 오인돼 추가 — 쓸 곳이 없어 제거 결정
+- **제거**: `CharacterChatView.swift`/`CharacterChatService.swift`/`KeychainHelper.swift` 삭제 + AppDelegate(보기 메뉴 "캐릭터 대화"·`openCharacterChatWindow`·`chatWindow`) + error_message_ko.json `E-MAC-AI-1004`
+- **보존**: 키체인 `OPENROUTER_API_KEY`/`NVIDIA_API_KEY` 항목은 타 기능/프로젝트 사용 가능성으로 그대로 둠
+- **검증**: 빌드 성공 + 보기 메뉴 a11y에서 "캐릭터 대화" 0건
+
 ## v4.3 — okstart 흔적 완전 제거 + git 이력 재작성 (macOS, T-1179~T-1181) ✅
 
 ### 브랜드 흔적 제거 (T-1179, T-1180)

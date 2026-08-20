@@ -1,5 +1,50 @@
 # TODO — 작업 추적 목록
 
+## v4.5 — 캐릭터 대화 기능 + macOS 네이티브 디자인 리빌딩 (macOS, T-1184~T-1197) 🚧
+
+> PLAN_v4.5_char-chat-native-redesign-macos.md. OpenRouter(nemotron-3-super:free)+키체인 키로 캐릭터 대화 신설 + macOS 15+ 타깃 상향 + 사이드바/설정 네이티브 전환(List/Form) + 창 구조/재질 리빌딩.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1184 | **KeychainHelper 신설** — SecItemCopyMatching, OPENROUTER 우선→NVIDIA 폴백 | high | ✅ done | Constants.swift |
+| T-1185 | **CharacterChatService** — nemotron-3-super:free + reasoning off + 한국어 프롬프트 + 히스토리 | high | ✅ done | E-MAC-AI-1004 |
+| T-1186 | **CharacterChatView UI** — 새 창(id "chat", 460×640), 대화 버블/입력/초기화 | high | ✅ done | |
+| T-1187 | **창/메뉴 연결 + 빌드 검증** — openCharacterChatWindow + 단축키 | high | ✅ done | |
+| T-1188 | **디자인 P0** — Package.swift macOS15 + WindowFactory unified/autosave + GlassHelper | medium | ✅ done | autosave 7창 적용 |
+| T-1189 | **디자인 P1** — MainView NavigationSplitView 2열 + 창 1000×700 (T-1160 흡수) | medium | ✅ done | PLAN에서 3단→2열 수정 |
+| T-1190 | **디자인 P1** — LibrarySidebarView 커스텀 배경 제거 (List 전환은 드래그 복잡성으로 절충) | medium | ✅ done | 부분 완료 |
+| T-1191 | **디자인 P1** — LibraryListView 표준 List 전환 (T-1162) + 툴바 unified/searchable + 빌드 | medium | pending | |
+| T-1192 | **디자인 P2** — SettingsView Form(.grouped) 8탭 (SettingsComponents 제거) | medium | ✅ done | ScrollView 래퍼 제거 + a11y 검증 |
+| T-1193 | **디자인 P2** — 메뉴바 보기/창/도움말 + About 시스템 패널 | medium | ✅ done | 보기(⌘1~4/⇧⌘A/⇧⌘C/설정)/창/도움말 + 파일 메뉴 캐릭터 대화→보기 이동 |
+| T-1194 | **디자인 P2** — 빌드 + 디버그 로그 + 스크린샷 | medium | pending | |
+| T-1195 | **디자인 P3** — Material/glass + 다운로더 창 크기 + DownloadRow ProgressView | medium | ✅ done | material 배경 3창 + 다운로더 640×560/일괄 560×500/채널 800×600 + ProgressView(.linear) |
+| T-1196 | **디자인 P3** — Player 상시 컨트롤(T-1166) + 패널 단축키 + DebugLog 콘솔(T-1167) | medium | ✅ done | 컨트롤 상시 표시 + ⌘⇧S/Q/P + 콘솔 스타일 기존 유지 |
+| T-1197 | **디자인 P3** — StatusBar NSProgressIndicator + Toast 정리 + 전체 빌드/검증 | medium | ✅ done | aggregateProgress + 막대 표시 + Toast material 유지 |
+| T-1198 | **설정 VStack 복원 + 사이드바 전환** — Form(.grouped)이 SettingsRow와 충돌(컨트롤 오른쪽 밀림) → 8탭 VStack 복원 + SettingsRow 원복 + NavigationSplitView 사이드바(760×500) | medium | ✅ done | T-1192 반전 + 사용자 불만 해결 |
+| T-1199 | **재생목록 기능 제거** — 사이드바 재생목록 섹션(쥐꼬리 UI) + ChannelUpdateService 감시 루프 + SubscribedPlaylist 모델 삭제 | medium | ✅ done | 사용자 선택(제거) + a11y 검증 |
+| T-1200 | **캐릭터 대화 기능 제거** — 다른 프로젝트(사용자 AI+NVIDIA 연동) 요청이 잘못 전달된 기능. CharacterChatView/Service/KeychainHelper 삭제 + 메뉴·에러코드·chatWindow 제거 | high | ✅ done | 키체인 데이터는 보존 |
+
+## v4.6 — macOS 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1204) 🚧
+
+> PLAN_v4.6_macos.md. 플레이어에 AI 패널 통합 + 컨트롤바 자동 숨김 + 비디오 16:9 유지 + AI 창 보관함 전용 + 다운로더 3종 네이티브 표준화.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1201 | **플레이어** — AI 패널 5번째 토글(AppReducer 주입) + 컨트롤바 자동 숨김(2.5s) + 비디오 16:9 레터박스 + 툴바 닫기 제거 + 패널 material | high | 진행중 | |
+| T-1202 | **AI 창** — 4섹션(요약/챕터/마인드맵/Q&A) 공용 컴포넌트 추출(플레이어 공유) + 보관함 전용 + 폰트/색상 표준화 | high | 예정 | |
+| T-1203 | **다운로더 3종** — 툴바 닫기 제거 + 폰트/색상 표준화 + 창 크기(일괄 확대, 채널 사이드바 200px) | medium | 예정 | |
+| T-1204 | **문서·검증** — 빌드 + a11y + 스크린샷 + CHANGELOG v4.6 | medium | 예정 | |
+| T-1205 | **그리드 셀 #카테고리 표시** — 채널명 오른쪽에 #태그 버튼, 클릭 시 setSelectedCategory 필터 | high | ✅ done | a11y 클릭 검증 완료(9→3개 항목) |
+
+## v4.4 — 오디오 다운로드 실패 수정 (macOS, T-1182~T-1183) 🚧
+
+> PLAN_v4.4_fix-audio-download-macos.md. storyboard(sb*) 포맷이 vcodec=none으로 오디오로 오인되어 선택 → mhtml 저장 → 실패. 실제 오디오 포맷(height=0) 목록 누락도 수정.
+
+| ID | 작업 | 우선순위 | 상태 | 비고 |
+|----|------|---------|------|------|
+| T-1182 | **parseFormats 수정** — sb*/mhtml 제외 + height=0 오디오 포맷 포함 + 오디오 품질순 정렬 | high | done | YouTubeDLService.swift |
+| T-1183 | **재빌드 + 번들 교체 + 앱 검증** — 오디오/비디오 각 1건 다운로드 확인 | high | pending | build-macos.sh |
+
 ## v4.3 — okstart 흔적 완전 제거 + git 이력 재작성 (macOS, T-1179~T-1181) ✅
 
 > PLAN_v4.3_okstart-cleanup-macos.md. 이력 전체에서 okstart→borasarang 치환 + build/ 제거 + 원격 저장소 재생성 + 태그 재push.

@@ -239,6 +239,7 @@ struct LibraryReducer {
 
         // Summary
         case showSummary(String)
+        case showSummaryInPanel(String)
         case resummarize(String)
         case summaryResult(videoId: String, overview: String, keyPoints: [String], chapters: [ChapterInfo], provider: String)
         case summaryFailed(videoId: String, error: String)
@@ -910,52 +911,10 @@ case .trashItem(let id):
 
             // Summary
             case let .showSummary(videoId):
-                guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
-                state.librarySummaryVideoId = videoId
-                // 기존 요약이 있으면 API 호출 없이 표시
-                if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
-                    state.librarySummaryText = existing
-                    state.librarySummaryLoading = false
-                    return .merge(
-                        .send(.mindmap(.resetForVideo(videoId))),
-                        .send(.qna(.resetForVideo(videoId))),
-                        .run { _ in
-                            await MainActor.run {
-                                NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
-                            }
-                        }
-                    )
-                }
-                state.librarySummaryLoading = true
-                state.summaryProgressMessage = "자막 확인 중..."
-                state.librarySummaryText = nil
-                let summaryTitle = item.title
-                let summaryChannel = item.channelName
-                return .merge(
-                    .send(.mindmap(.resetForVideo(videoId))),
-                    .send(.qna(.resetForVideo(videoId))),
-                    .run { send in
-                        await MainActor.run {
-                        NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
-                    }
-                    let progress: @Sendable (String) -> Void = { message in
-                        Task { @MainActor in
-                            await send(.summaryProgressUpdate(videoId: videoId, message: message))
-                        }
-                    }
-                    let service = SummarizationService()
-                    let keys = Settings.loadAPIKeys()
-                    do {
-                        let result = try await service.summarizeVideo(videoId: videoId, title: summaryTitle, channel: summaryChannel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini, progress: progress)
-                        await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
-                    } catch let error as SummarizationService.SummaryError {
-                        if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
-                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                    } catch {
-                        await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
-                    }
-                }
-                )
+                return handleShowSummary(state: &state, videoId: videoId, openWindow: true)
+
+            case let .showSummaryInPanel(videoId):
+                return handleShowSummary(state: &state, videoId: videoId, openWindow: false)
 
             case let .resummarize(videoId):
                 guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
@@ -1097,5 +1056,58 @@ case .trashItem(let id):
                 return .none
             }
         }
+    }
+
+    private func handleShowSummary(state: inout State, videoId: String, openWindow: Bool) -> Effect<Action> {
+        guard let item = state.items.first(where: { $0.id == videoId }) else { return .none }
+        state.librarySummaryVideoId = videoId
+        // 기존 요약이 있으면 API 호출 없이 표시
+        if let existing = item.summary, !existing.isEmpty, !existing.hasPrefix("요약 실패") {
+            state.librarySummaryText = existing
+            state.librarySummaryLoading = false
+            return .merge(
+                .send(.mindmap(.resetForVideo(videoId))),
+                .send(.qna(.resetForVideo(videoId))),
+                .run { _ in
+                    await MainActor.run {
+                        if openWindow {
+                            NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                        }
+                    }
+                }
+            )
+        }
+        state.librarySummaryLoading = true
+        state.summaryProgressMessage = "자막 확인 중..."
+        state.librarySummaryText = nil
+        let summaryTitle = item.title
+        let summaryChannel = item.channelName
+        return .merge(
+            .send(.mindmap(.resetForVideo(videoId))),
+            .send(.qna(.resetForVideo(videoId))),
+            .run { send in
+                await MainActor.run {
+                    if openWindow {
+                        NotificationCenter.default.post(name: Constants.openAIWindowNotification, object: nil)
+                    }
+                }
+                let progress: @Sendable (String) -> Void = { message in
+                    Task { @MainActor in
+                        await send(.summaryProgressUpdate(videoId: videoId, message: message))
+                    }
+                }
+                let service = SummarizationService()
+                let keys = Settings.loadAPIKeys()
+                do {
+                    let result = try await service.summarizeVideo(videoId: videoId, title: summaryTitle, channel: summaryChannel, openRouterAPIKey: keys.openRouter, geminiAPIKey: keys.gemini, progress: progress)
+                    await send(.summaryResult(videoId: videoId, overview: result.overview, keyPoints: result.keyPoints, chapters: result.chapters, provider: result.provider))
+                } catch let error as SummarizationService.SummaryError {
+                    if case .quotaExceeded = error { await send(.setGeminiKeyAlert(true)) }
+                    await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                } catch {
+                    await send(.summaryFailed(videoId: videoId, error: error.localizedDescription))
+                }
+            }
+        )
     }
 }

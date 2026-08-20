@@ -71,9 +71,10 @@ struct LibraryGridView: View {
                              onDelete: { store.send(.library(.trashItem(item.id))) },
                              onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
                               onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                               onOpenAI: { store.send(.library(.showSummary(item.id))) },
-                              onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
-                              onPlaySnippet: snip != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
+onOpenAI: { store.send(.library(.showSummary(item.id))) },
+                               onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
+                               onOpenCategory: { tag in store.send(.library(.setSelectedCategory(tag))) },
+                               onPlaySnippet: snip != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
                          )
                             .onAppear {
                                 loadThumbnail(for: item)
@@ -201,6 +202,7 @@ struct LibraryGridCell: View {
     let onChannelDownload: () -> Void
     let onOpenAI: () -> Void
     let onToggleSelection: () -> Void
+    let onOpenCategory: ((String) -> Void)?
     let onPlaySnippet: (() -> Void)?
     @State private var bounceUp = false
     @State private var isHovering = false
@@ -267,11 +269,26 @@ struct LibraryGridCell: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
 
-            Text(item.channelName)
-                .font(AppFont.cellSubtitle)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            HStack(spacing: 4) {
+                Text(item.channelName)
+                    .font(AppFont.cellSubtitle)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let tag = item.tags.first, let onOpenCategory {
+                    Button {
+                        onOpenCategory(tag)
+                    } label: {
+                        Text("#\(tag)")
+                            .font(AppFont.cellSubtitle)
+                            .foregroundStyle(Color.accentColor)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .help("카테고리 \(tag)로 이동")
+                }
+                Spacer(minLength: 0)
+            }
 
             if let snippet = snippet {
                 Button {

@@ -287,6 +287,36 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 
         addShortcutMenu(to: mainMenu)
 
+        let viewMenuItem = NSMenuItem()
+        mainMenu.addItem(viewMenuItem)
+        let viewMenu = NSMenu(title: "보기")
+        addWindowMenuItem(to: viewMenu, title: "보관함", action: #selector(openLibraryWindow), keyEquivalent: "1", modifiers: [.command])
+        addWindowMenuItem(to: viewMenu, title: "영상 다운로더", action: #selector(openVideoDownloaderWindow), keyEquivalent: "2", modifiers: [.command])
+        addWindowMenuItem(to: viewMenu, title: "일괄 다운로더", action: #selector(openBatchDownloadWindow), keyEquivalent: "3", modifiers: [.command])
+        addWindowMenuItem(to: viewMenu, title: "채널 다운로더", action: #selector(openChannelDownloaderWindow), keyEquivalent: "4", modifiers: [.command])
+        viewMenu.addItem(.separator())
+        addWindowMenuItem(to: viewMenu, title: "AI 질문", action: #selector(openAIWindow), keyEquivalent: "a", modifiers: [.command, .shift])
+        viewMenu.addItem(.separator())
+        addWindowMenuItem(to: viewMenu, title: "설정…", action: #selector(openSettingsWindow), keyEquivalent: ",", modifiers: [.command])
+        viewMenuItem.submenu = viewMenu
+
+        let windowMenuItem = NSMenuItem()
+        mainMenu.addItem(windowMenuItem)
+        let windowMenu = NSMenu(title: "창")
+        windowMenu.addItem(withTitle: "창 닫기", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: "최소화", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(.separator())
+        let frontItem = windowMenu.addItem(withTitle: "모든 창 앞으로", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        frontItem.target = NSApp
+        windowMenuItem.submenu = windowMenu
+
+        let helpMenuItem = NSMenuItem()
+        mainMenu.addItem(helpMenuItem)
+        let helpMenu = NSMenu(title: "도움말")
+        let helpItem = helpMenu.addItem(withTitle: "TubeKeep 도움말", action: #selector(openHelpURL), keyEquivalent: "")
+        helpItem.target = self
+        helpMenuItem.submenu = helpMenu
+
         #if DEBUG
         let debugMenuItem = NSMenuItem()
         mainMenu.addItem(debugMenuItem)
@@ -367,6 +397,16 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         menu.addItem(item)
     }
 
+    private func addWindowMenuItem(to menu: NSMenu, title: String, action: Selector, keyEquivalent: String, modifiers: NSEvent.ModifierFlags) {
+        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: keyEquivalent)
+        item.keyEquivalentModifierMask = modifiers
+        item.target = self
+    }
+
+    @objc private func openHelpURL() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/borasarang/TubeKeep")!)
+    }
+
     @objc private func refreshMainMenu() {
         setupMainMenu()
     }
@@ -402,10 +442,11 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "lib",
             title: localizedTitle,
             rootView: rootView,
-            contentSize: NSSize(width: 840, height: 640),
-            minSize: NSSize(width: 720, height: 480),
+            contentSize: NSSize(width: 1000, height: 700),
+            minSize: NSSize(width: 840, height: 520),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            titlebarIcon: WindowFactory.icon("square.grid.2x2")
+            titlebarIcon: WindowFactory.icon("square.grid.2x2"),
+            autosaveName: "TubeKeepMain"
         )
         WindowFactory.present(window)
         libraryWindow = window
@@ -431,10 +472,11 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "downloader",
             title: "영상 다운로더",
             rootView: rootView,
-            contentSize: NSSize(width: 520, height: 480),
-            minSize: NSSize(width: 480, height: 320),
+            contentSize: NSSize(width: 640, height: 560),
+            minSize: NSSize(width: 560, height: 420),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            titlebarIcon: WindowFactory.icon("arrow.down.circle")
+            titlebarIcon: WindowFactory.icon("arrow.down.circle"),
+            autosaveName: "TubeKeepDownloader"
         )
         WindowFactory.present(window)
         videoDownloaderWindow = window
@@ -470,10 +512,11 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "batch",
             title: "일괄 다운로더",
             rootView: rootView,
-            contentSize: NSSize(width: 480, height: 420),
-            minSize: NSSize(width: 440, height: 340),
+            contentSize: NSSize(width: 560, height: 500),
+            minSize: NSSize(width: 500, height: 400),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            titlebarIcon: WindowFactory.icon("shippingbox")
+            titlebarIcon: WindowFactory.icon("shippingbox"),
+            autosaveName: "TubeKeepBatch"
         )
         WindowFactory.present(window)
     }
@@ -509,10 +552,11 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "channel",
             title: "채널 다운로더",
             rootView: rootView,
-            contentSize: NSSize(width: 720, height: 520),
-            minSize: NSSize(width: 640, height: 400),
+            contentSize: NSSize(width: 800, height: 600),
+            minSize: NSSize(width: 700, height: 480),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            titlebarIcon: WindowFactory.icon("tv")
+            titlebarIcon: WindowFactory.icon("tv"),
+            autosaveName: "TubeKeepChannel"
         )
         WindowFactory.present(window)
         channelDownloaderWindow = window
@@ -552,7 +596,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "settings",
             title: "설정",
             rootView: SettingsView(store: store.scope(state: \.settings, action: \.settings)),
-            contentSize: NSSize(width: 640, height: 420)
+            contentSize: NSSize(width: 760, height: 500),
+            autosaveName: "TubeKeepSettings"
         )
         window.contentMinSize = window.frame.size
         window.contentMaxSize = window.frame.size
@@ -583,7 +628,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             title: "AI 기능",
             rootView: AIWindowView(store: store),
             contentSize: NSSize(width: 560, height: windowHeight),
-            titlebarIcon: WindowFactory.icon("sparkle")
+            titlebarIcon: WindowFactory.icon("sparkle"),
+            autosaveName: "TubeKeepAI"
         )
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -625,7 +671,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         if playerItem.fileURL == nil, playerItem.videoId != nil {
             newStore.send(.loadVideo(playerItem))
         }
-        let playerView = PlayerView(store: newStore)
+        let playerView = PlayerView(store: newStore, appStore: store)
         let hostingCtrl = NSHostingController(rootView: playerView)
         let window = PlayerWindow(contentViewController: hostingCtrl)
         window.title = playerItem.title
