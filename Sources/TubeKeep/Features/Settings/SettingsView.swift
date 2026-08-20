@@ -7,37 +7,23 @@ struct SettingsView: View {
     @State private var editingPreset: DownloadPreset?
 
     var body: some View {
-        TabView(selection: Binding(
-            get: { store.selectedTab },
-            set: { store.send(.setSelectedTab($0)) }
-        )) {
-            tabView(.downloads) {
-                SettingsDownloadsTab(store: store, editingPreset: $editingPreset)
+        NavigationSplitView {
+            List(selection: Binding(
+                get: { store.selectedTab },
+                set: { store.send(.setSelectedTab($0)) }
+            )) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .tag(tab)
+                }
             }
-            tabView(.channels) {
-                SettingsChannelsTab(store: store)
-            }
-            tabView(.automation) {
-                SettingsAutomationTab(store: store)
-            }
-            tabView(.ai) {
-                SettingsAITab(store: store)
-            }
-            tabView(.storage) {
-                SettingsStorageTab(store: store)
-            }
-            tabView(.notifications) {
-                SettingsNotificationsTab(store: store)
-            }
-            tabView(.shortcuts) {
-                SettingsShortcutsTab(store: store)
-            }
-            tabView(.general) {
-                SettingsSystemTab(store: store)
-            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 180, max: 220)
+            .navigationTitle("설정")
+        } detail: {
+            detailContent
         }
-        .tabViewStyle(.automatic)
-        .frame(minWidth: 640, minHeight: 440)
+        .frame(minWidth: 760, minHeight: 480)
         .sheet(item: $editingPreset) { preset in
             PresetEditorSheet(
                 preset: preset,
@@ -56,15 +42,30 @@ struct SettingsView: View {
         }
     }
 
-    private func tabView<Content: View>(_ tab: SettingsTab, @ViewBuilder content: () -> Content) -> some View {
+    @ViewBuilder
+    private var detailContent: some View {
         ScrollView {
-            content()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            switch store.selectedTab {
+            case .downloads:
+                SettingsDownloadsTab(store: store, editingPreset: $editingPreset)
+            case .channels:
+                SettingsChannelsTab(store: store)
+            case .automation:
+                SettingsAutomationTab(store: store)
+            case .ai:
+                SettingsAITab(store: store)
+            case .storage:
+                SettingsStorageTab(store: store)
+            case .notifications:
+                SettingsNotificationsTab(store: store)
+            case .shortcuts:
+                SettingsShortcutsTab(store: store)
+            case .general:
+                SettingsSystemTab(store: store)
+            }
         }
-        .tabItem {
-            Label(tab.rawValue, systemImage: tab.icon)
-        }
-        .tag(tab)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

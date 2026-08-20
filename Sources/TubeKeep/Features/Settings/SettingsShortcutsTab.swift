@@ -27,14 +27,17 @@ struct SettingsShortcutsTab: View {
                         shortcutsVersion += 1
                     }
                 )
-                .padding(.horizontal, 20)
-                .padding(.vertical, 3)
+                .padding(.vertical, 4)
+
+                Divider()
             }
 
             Text("단축키 버튼을 누른 뒤 조합을 입력하세요 (예: ⌘⇧1)")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-                .padding(.top, 4)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
         }
         .id(shortcutsVersion)
         .onChange(of: recording) { _, newValue in

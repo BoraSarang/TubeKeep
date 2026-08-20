@@ -68,7 +68,6 @@ struct ChannelListView: View {
     @State private var dragIndex: Int?
     @State private var dropTargetIndex: Int?
     @State private var rowFrames: [Int: CGRect] = [:]
-    @State private var playlists: [SubscribedPlaylist] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -156,10 +155,6 @@ struct ChannelListView: View {
 
             Divider()
 
-            playlistSection
-
-            Divider()
-
             HStack {
                 Image(systemName: "rectangle.3.group")
                     .foregroundStyle(.secondary)
@@ -173,120 +168,6 @@ struct ChannelListView: View {
             .frame(maxWidth: .infinity)
             .background(AppColors.textBackground.opacity(0.5))
         }
-        .onAppear {
-            playlists = SubscribedPlaylist.loadAll()
-        }
-    }
-
-    // MARK: - 재생목록
-
-    private var playlistSection: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("재생목록")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    addPlaylist()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10))
-                }
-                .buttonStyle(.plain)
-                .help("재생목록 구독 추가")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-
-            if playlists.isEmpty {
-                Text("구독 중인 재생목록 없음")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
-            } else {
-                ForEach(playlists) { playlist in
-                    playlistRow(playlist)
-                }
-                .padding(.bottom, 6)
-            }
-        }
-    }
-
-    private func playlistRow(_ playlist: SubscribedPlaylist) -> some View {
-        let key = SubscribedPlaylist.storageKey(for: playlist.id)
-        return HStack(spacing: 6) {
-            Image(systemName: "music.note.list")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Text(playlist.title)
-                .font(.system(size: 11))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if ChannelDownloadCache.hasNewVideos(channelId: key) {
-                Circle()
-                    .fill(AppColors.danger)
-                    .frame(width: 7, height: 7)
-            }
-            Toggle("", isOn: Binding(
-                get: { ChannelDownloadCache.isNotificationEnabled(channelId: key) },
-                set: { ChannelDownloadCache.setNotificationEnabled(channelId: key, enabled: $0) }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .help("새 영상 알림")
-            Toggle("", isOn: Binding(
-                get: { ChannelDownloadCache.isAutoDownloadEnabled(channelId: key) },
-                set: { enabled in
-                    var settings = ChannelDownloadCache.loadAutoSettings(channelId: key)
-                    settings.enabled = enabled
-                    ChannelDownloadCache.saveAutoSettings(channelId: key, settings: settings)
-                }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .help("새 영상 자동 다운로드")
-            Button {
-                deletePlaylist(playlist)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 10))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 3)
-    }
-
-    private func addPlaylist() {
-        let alert = NSAlert()
-        alert.messageText = "재생목록 구독 추가"
-        alert.informativeText = "YouTube 재생목록 URL을 입력하세요"
-        alert.addButton(withTitle: "추가")
-        alert.addButton(withTitle: "취소")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        field.placeholderString = "https://www.youtube.com/playlist?list=..."
-        alert.accessoryView = field
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let urlString = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let playlistID = SubscribedPlaylist.playlistID(from: urlString), !playlistID.isEmpty else { return }
-        guard !playlists.contains(where: { $0.id == playlistID }) else { return }
-        var list = playlists
-        list.append(SubscribedPlaylist(id: playlistID, title: "재생목록 (\(playlistID.prefix(6)))", url: urlString))
-        SubscribedPlaylist.saveAll(list)
-        playlists = list
-    }
-
-    private func deletePlaylist(_ playlist: SubscribedPlaylist) {
-        playlists.removeAll { $0.id == playlist.id }
-        SubscribedPlaylist.saveAll(playlists)
-        let key = SubscribedPlaylist.storageKey(for: playlist.id)
-        ChannelDownloadCache.clearNewVideoIds(channelId: key)
-        ChannelDownloadCache.clearFetchDate(channelId: key)
     }
 }
 

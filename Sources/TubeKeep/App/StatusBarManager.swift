@@ -8,6 +8,7 @@ final class StatusBarManager {
     private var statusIconView: NSImageView!
     private var statusLabel1: NSTextField!
     private var statusLabel2: NSTextField!
+    private var statusProgress: NSProgressIndicator!
     private let statusBarHeight: CGFloat = 22
     private var menuActiveItem: NSMenuItem?
     private var menuCompletedItem: NSMenuItem?
@@ -74,11 +75,20 @@ final class StatusBarManager {
         statusLabel2.frame = NSRect(x: textX, y: 2, width: textW, height: 9)
         statusLabel2.lineBreakMode = .byTruncatingTail
 
+        statusProgress = NSProgressIndicator(frame: NSRect(x: textX, y: 0, width: textW, height: 2))
+        statusProgress.style = .bar
+        statusProgress.isIndeterminate = false
+        statusProgress.minValue = 0
+        statusProgress.maxValue = 1
+        statusProgress.doubleValue = 0
+        statusProgress.isHidden = true
+
         let container = NSView(frame: NSRect(x: 0, y: 0, width: totalWidth, height: statusBarHeight))
         container.wantsLayer = true
         container.addSubview(iconView)
         container.addSubview(statusLabel1)
         container.addSubview(statusLabel2)
+        container.addSubview(statusProgress)
         statusItem.button?.addSubview(container)
 
         rebuildMenu()
@@ -142,6 +152,13 @@ final class StatusBarManager {
     private func updateStatusBarText() {
         let s = store.statusBar
         let showsStatus = !s.statusText.isEmpty && s.statusText != "대기 중"
+        if s.hasActiveDownloads {
+            statusProgress.isHidden = false
+            statusProgress.doubleValue = s.overallProgress
+        } else {
+            statusProgress.isHidden = true
+            statusProgress.doubleValue = 0
+        }
         if s.hasActiveDownloads, !s.downloadSpeed.isEmpty {
             if showsStatus {
                 statusLabel1.alignment = .left

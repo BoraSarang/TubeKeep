@@ -169,8 +169,6 @@ struct SettingsDownloadsTab: View {
                 .controlSize(.small)
             }
 
-            SettingsComponents.sectionSubHeader()
-
             SettingsComponents.sectionHeader(
                 title: "다운로드 프리셋",
                 subtitle: "자주 쓰는 다운로드 옵션을 저장해 한 번에 적용합니다"
@@ -211,9 +209,9 @@ struct SettingsDownloadsTab: View {
                 .opacity(store.smartMode ? 1 : 0.4)
             }
 
-            if !store.presets.isEmpty {
-                SettingsComponents.divider()
+            SettingsComponents.divider()
 
+            if !store.presets.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(store.presets.enumerated()), id: \.offset) { _, preset in
                         HStack {
@@ -239,10 +237,9 @@ struct SettingsDownloadsTab: View {
                         .padding(.vertical, 4)
                     }
                 }
-                .padding(.leading, 20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
             }
-
-            SettingsComponents.divider()
 
             Button("프리셋 추가") {
                 editingPreset = DownloadPreset(id: UUID(), name: "", formatType: .video, resolution: 1080, includeSubtitles: false, sponsorBlock: false, embedMetadata: true)
@@ -250,8 +247,10 @@ struct SettingsDownloadsTab: View {
             .buttonStyle(.plain)
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(Color.accentColor)
-            .padding(.top, 6)
-            .padding(.leading, 20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
     }
 }

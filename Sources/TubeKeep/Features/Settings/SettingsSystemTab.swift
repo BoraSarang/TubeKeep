@@ -61,8 +61,6 @@ struct SettingsSystemTab: View {
                 .controlSize(.small)
             }
 
-            SettingsComponents.sectionSubHeader()
-
             SettingsComponents.sectionHeader(
                 title: "앱 시작",
                 subtitle: "TubeKeep을 실행하는 방식을 설정합니다"
@@ -86,15 +84,13 @@ struct SettingsSystemTab: View {
             SettingsRow(title: "보관함 자동 표시", description: "실행 시 보관함을 자동으로 엽니다") {
                 Toggle(
                     "",
-                    isOn: Binding(
-                        get: { store.showLibraryOnLaunch },
-                        set: { _ in store.send(.toggleShowLibraryOnLaunch) }
+                        isOn: Binding(
+                            get: { store.showLibraryOnLaunch },
+                            set: { _ in store.send(.toggleShowLibraryOnLaunch) }
+                        )
                     )
-                )
-                .controlSize(.small)
-            }
-
-            SettingsComponents.divider()
+                    .controlSize(.small)
+                }
         }
     }
 }

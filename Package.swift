@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TubeKeep",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v15)],
     dependencies: [
         .package(
             url: "https://github.com/pointfreeco/swift-composable-architecture",

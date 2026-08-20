@@ -38,6 +38,8 @@ struct SettingsNotificationsTab: View {
             }
 
             if store.showMenuBarNotifications {
+                SettingsComponents.divider()
+
                 SettingsRow(title: "알림 지속 시간", description: "메뉴바 알림이 사라질 때까지 시간 (초)") {
                     Stepper(
                         "\(store.menuBarNotificationDuration)초",
@@ -51,8 +53,6 @@ struct SettingsNotificationsTab: View {
                     .controlSize(.small)
                 }
             }
-
-            SettingsComponents.divider()
         }
     }
 }

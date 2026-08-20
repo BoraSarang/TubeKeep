@@ -38,6 +38,7 @@ struct AppReducer {
         state.statusBar.totalCount = state.downloadQueue.items.count
         state.statusBar.completedCount = state.downloadQueue.completedCount
         state.statusBar.downloadETA = state.downloadQueue.aggregateETA
+        state.statusBar.overallProgress = state.downloadQueue.aggregateProgress
     }
 
     /// 큐에 아이템 추가 공통 처리 (중복 검사 + 기존 파일 확인 + append + shouldStart 계산)

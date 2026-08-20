@@ -25,8 +25,6 @@ struct SettingsAutomationTab: View {
                 .controlSize(.small)
             }
 
-            SettingsComponents.sectionSubHeader()
-
             SettingsComponents.sectionHeader(
                 title: "유휴 자동화",
                 subtitle: "Mac을 사용하지 않는 동안 자막과 AI 콘텐츠를 자동으로 생성합니다"
@@ -58,6 +56,8 @@ struct SettingsAutomationTab: View {
                     .controlSize(.small)
                 }
 
+                SettingsComponents.divider()
+
                 SettingsRow(title: "팟캐스트 자동 생성", description: "요약 생성 후 팟캐스트도 함께 생성합니다 (시간이 다소 걸립니다)") {
                     Toggle(
                         "",
@@ -70,20 +70,6 @@ struct SettingsAutomationTab: View {
                 }
             }
 
-            SettingsComponents.divider()
-
-            activityLogSection
-        }
-        .onAppear {
-            refreshLogs()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: ActivityLogStore.activityLogDidChangeNotification)) { _ in
-            refreshLogs()
-        }
-    }
-
-    private var activityLogSection: some View {
-        VStack(spacing: 0) {
             SettingsComponents.sectionHeader(
                 title: "행동 로그",
                 subtitle: "유휴 자동화가 실행한 작업을 순서대로 기록합니다"
@@ -102,12 +88,10 @@ struct SettingsAutomationTab: View {
                 .font(.system(size: 11))
                 .disabled(activityLogs.isEmpty)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
-            if activityLogs.isEmpty {
-                EmptyView()
-            } else {
+            if !activityLogs.isEmpty {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(activityLogs.enumerated()), id: \.offset) { _, line in
@@ -120,7 +104,6 @@ struct SettingsAutomationTab: View {
                                     .font(.system(size: 11))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(.horizontal, 16)
                             .padding(.vertical, 4)
                             Divider()
                                 .opacity(0.4)
@@ -129,8 +112,12 @@ struct SettingsAutomationTab: View {
                 }
                 .frame(maxHeight: 260)
             }
-
-            SettingsComponents.divider()
+        }
+        .onAppear {
+            refreshLogs()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ActivityLogStore.activityLogDidChangeNotification)) { _ in
+            refreshLogs()
         }
     }
 

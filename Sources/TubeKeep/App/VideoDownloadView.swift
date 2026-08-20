@@ -25,6 +25,7 @@ struct VideoDownloadView: View {
             .frame(maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(.regularMaterial)
         .alwaysOnTop(alwaysOnTop)
         .toolbar {
             ToolbarItemGroup {

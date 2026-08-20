@@ -10,6 +10,22 @@ final class PlayerWindow: NSWindow {
     }
 
     override func keyDown(with event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if modifiers.contains(.command), modifiers.contains(.shift) {
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "s":
+                NotificationCenter.default.post(name: Constants.playerToggleSubtitlePanelNotification, object: self)
+                return
+            case "q":
+                NotificationCenter.default.post(name: Constants.playerToggleQueueNotification, object: self)
+                return
+            case "p":
+                NotificationCenter.default.post(name: Constants.playerToggleSimilarVideosNotification, object: self)
+                return
+            default:
+                break
+            }
+        }
         switch event.keyCode {
         case 49: // Space (macOS virtual keycode)
             postTogglePlayPause()

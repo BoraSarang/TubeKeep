@@ -75,6 +75,12 @@ struct DownloadQueueReducer {
             return formatSpeed(total)
         }
 
+        var aggregateProgress: Double {
+            let active = items.filter { $0.status == .downloading }
+            guard !active.isEmpty else { return 0 }
+            return active.reduce(0) { $0 + max(0, min(1, $1.progress)) } / Double(active.count)
+        }
+
         var aggregateETA: String {
             let remainingTimes = items.compactMap { $0.estimatedRemaining }
             guard !remainingTimes.isEmpty else { return "" }

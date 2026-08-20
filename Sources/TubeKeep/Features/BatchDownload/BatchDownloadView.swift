@@ -175,6 +175,7 @@ struct BatchDownloadView: View {
                 .help("창 닫기")
             }
         }
+        .background(.regularMaterial)
     }
 
     private var urlInputEditor: some View {

@@ -125,7 +125,6 @@ struct LibrarySidebarView: View {
                 .help("용량 새로고침")
             }
         }
-        .background(AppColors.sidebarBackground)
         .onChange(of: store.library.items) { _, newItems in
             updateChannelNames(newItems)
             updateLibraryCategoryRows(newItems)

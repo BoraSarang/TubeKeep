@@ -54,8 +54,6 @@ struct SettingsChannelsTab: View {
                         .stroke(AppColors.separator, lineWidth: 0.5)
                 )
             }
-
-            SettingsComponents.divider()
         }
     }
 }

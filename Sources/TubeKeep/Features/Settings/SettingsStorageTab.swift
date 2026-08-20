@@ -50,10 +50,6 @@ struct SettingsStorageTab: View {
                 )
             }
 
-            SettingsComponents.divider()
-
-            SettingsComponents.sectionSubHeader()
-
             SettingsComponents.sectionHeader(
                 title: "데이터 초기화",
                 subtitle: "생성된 AI 파생 데이터를 삭제합니다"
@@ -67,8 +63,6 @@ struct SettingsStorageTab: View {
                     .controlSize(.small)
                     .tint(.red)
             }
-
-            SettingsComponents.divider()
         }
         .alert("AI 파생 데이터 초기화", isPresented: $showClearConfirm) {
             Button("취소", role: .cancel) {}

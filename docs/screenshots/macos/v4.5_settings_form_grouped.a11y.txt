@@ -1,0 +1,1 @@
+67:82: execution error: System Events에 오류 발생: window "설정" of process "TubeKeep"을(를) 가져올 수 없습니다. (-1728)

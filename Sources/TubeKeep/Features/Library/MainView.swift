@@ -11,45 +11,13 @@ struct MainView: View {
     @State private var shortcutsVersion = 0
 
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView {
             LibrarySidebarView(store: store)
-                .frame(width: 200)
-
-            Divider()
-
-            switch store.library.sidebarMode {
-            case .library:
-                switch store.library.viewMode {
-                case .grid:
-                    LibraryGridView(store: store)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .list:
-                    LibraryListView(store: store)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            case .discover:
-                DiscoverView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .history:
-                HistoryView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .profile:
-                ProfileView(store: store.scope(state: \.profile, action: \.profile))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .report:
-                ReportView(store: store.scope(state: \.library, action: \.library))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .clips:
-                ClipView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .diskCleanup:
-                DiskCleanupView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .trash:
-                TrashView(store: store)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+                .navigationSplitViewColumnWidth(min: 200, ideal: 200, max: 260)
+        } detail: {
+            detailContent
         }
+        .navigationSplitViewStyle(.balanced)
         .onAppear {
             ClipService.shared.regenerateThumbnailsIfNeeded()
         }
@@ -123,6 +91,42 @@ struct MainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Constants.libraryDataDidChangeNotification)) { _ in
             store.send(.library(.loadFromDisk))
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch store.library.sidebarMode {
+        case .library:
+            switch store.library.viewMode {
+            case .grid:
+                LibraryGridView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .list:
+                LibraryListView(store: store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case .discover:
+            DiscoverView(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .history:
+            HistoryView(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .profile:
+            ProfileView(store: store.scope(state: \.profile, action: \.profile))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .report:
+            ReportView(store: store.scope(state: \.library, action: \.library))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .clips:
+            ClipView(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .diskCleanup:
+            DiskCleanupView(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .trash:
+            TrashView(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

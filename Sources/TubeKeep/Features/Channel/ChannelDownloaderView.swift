@@ -190,6 +190,7 @@ struct ChannelDownloaderView: View {
                 .help("창 닫기")
             }
         }
+        .background(.regularMaterial)
     }
 
     private var addChannelDialog: some View {

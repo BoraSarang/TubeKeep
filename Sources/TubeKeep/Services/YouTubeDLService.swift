@@ -264,11 +264,15 @@ actor YouTubeDLService {
         }
 
         var formatMap: [Int: Format] = [:]
+        var audioFormats: [Format] = []
 
         for fmt in formatsJSON {
             guard let formatId = fmt["format_id"] as? String,
                   let ext = fmt["ext"] as? String
             else { continue }
+
+            // storyboard 미리보기(sb0~sb3, ext=mhtml) 제외 — vcodec=none이라 오디오로 오인되어 mhtml만 저장되는 버그 방지
+            if formatId.hasPrefix("sb") || ext == "mhtml" { continue }
 
             let height = fmt["height"] as? Int ?? 0
             let codec = (fmt["vcodec"] as? String ?? "unknown")
@@ -283,6 +287,22 @@ actor YouTubeDLService {
             let isVideoOnly = (fmt["vcodec"] as? String ?? "") != "none" &&
                 (fmt["acodec"] as? String ?? "") == "none"
             let isAudioOnly = (fmt["vcodec"] as? String ?? "") == "none"
+
+            // 순수 오디오 포맷(height=0, 예: 139/140/249/250/251) — 별도 수집해 목록에 포함
+            if isAudioOnly && height == 0 {
+                audioFormats.append(Format(
+                    id: formatId,
+                    label: "Audio",
+                    height: 0,
+                    ext: ext == "webm" ? "webm" : "mp4",
+                    codec: codec,
+                    filesize: filesize,
+                    fps: fps,
+                    isVideoOnly: false,
+                    isAudioOnly: true
+                ))
+                continue
+            }
 
             guard height > 0 else { continue }
 
@@ -351,9 +371,13 @@ actor YouTubeDLService {
         }
 
         let hasAnySize = formatMap.values.contains { $0.filesize != nil }
-        return formatMap.values
+        let videos = formatMap.values
             .filter { $0.filesize != nil || !hasAnySize }
             .sorted { $0.height > $1.height }
+        let audios = audioFormats
+            .filter { $0.filesize != nil || !hasAnySize }
+            .sorted { ($0.filesize ?? 0) > ($1.filesize ?? 0) }
+        return audios + videos
     }
 
     private func parsePlaylistItem(from json: [String: Any]) throws -> VideoInfo {

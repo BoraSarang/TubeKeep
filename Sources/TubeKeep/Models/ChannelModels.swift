@@ -59,35 +59,6 @@ struct ChannelAutoSettings: Codable, Equatable {
     var dailyLimit: Int = 0
 }
 
-struct SubscribedPlaylist: Identifiable, Codable, Equatable {
-    var id: String
-    var title: String
-    var url: String
-
-    static func loadAll() -> [SubscribedPlaylist] {
-        guard let data = UserDefaults.standard.data(forKey: "subscribedPlaylists"),
-              let list = try? JSONDecoder().decode([SubscribedPlaylist].self, from: data)
-        else { return [] }
-        return list
-    }
-
-    static func saveAll(_ playlists: [SubscribedPlaylist]) {
-        guard let data = try? JSONEncoder().encode(playlists) else { return }
-        UserDefaults.standard.set(data, forKey: "subscribedPlaylists")
-    }
-
-    static func playlistID(from url: String) -> String? {
-        guard let components = URLComponents(string: url),
-              let query = components.queryItems
-        else { return nil }
-        return query.first(where: { $0.name == "list" })?.value
-    }
-
-    static func storageKey(for id: String) -> String {
-        "playlist:\(id)"
-    }
-}
-
 struct ChannelDownloadCache {
     private static let cacheKey = "channelDownloads"
     private static let fetchTimestampsKey = "channelFetchTimestamps"

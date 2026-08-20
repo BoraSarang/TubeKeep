@@ -289,6 +289,13 @@ struct DownloadRow: View {
                         }
                     }
                 }
+
+                if item.status == .downloading {
+                    ProgressView(value: max(0, min(1, item.progress)))
+                        .progressViewStyle(.linear)
+                        .controlSize(.small)
+                        .tint(AppColors.info)
+                }
             }
 
             Spacer(minLength: 4)

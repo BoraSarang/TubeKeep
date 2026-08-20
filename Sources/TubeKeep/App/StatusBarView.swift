@@ -14,6 +14,7 @@ struct StatusBarReducer {
         var totalCount: Int = 0
         var completedCount: Int = 0
         var downloadETA: String = ""
+        var overallProgress: Double = 0
         var displayText: String {
             if hasActiveDownloads, !downloadSpeed.isEmpty {
                 return downloadSpeed
