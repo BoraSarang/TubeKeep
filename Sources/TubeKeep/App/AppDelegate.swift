@@ -446,6 +446,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             minSize: NSSize(width: 840, height: 520),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             titlebarIcon: WindowFactory.icon("square.grid.2x2"),
+            fullSizeTitlebar: true,
             autosaveName: "TubeKeepMain"
         )
         WindowFactory.present(window)

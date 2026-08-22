@@ -80,6 +80,16 @@ struct MainView: View {
 
                 Spacer()
 
+                // 표준 unified 툴바 검색 필드 — 기존 검증된 AppSearchField 재사용 (T-1191)
+                AppSearchField(
+                    placeholder: "영상 검색",
+                    text: Binding(
+                        get: { store.library.searchText },
+                        set: { store.send(.library(.setSearchText($0))) }
+                    )
+                )
+                .frame(width: 180)
+
                 AlwaysOnTopToggle(isPinned: $isPinned, windowIdentifier: "lib")
             }
         }

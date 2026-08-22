@@ -23,6 +23,13 @@
 - **폰트 표준화**: HomeView/DownloadQueueView의 8~9px → 10px 상향 (아이콘/메타 텍스트)
 - **검증**: 빌드 성공 + a11y로 3개 다운로더 창 툴바에서 핀 버튼만 존재 확인 (닫기 0건)
 
+### 보관함 리스트 뷰 표준 List 전환 + unified 툴바 검색 (T-1191/T-1162/T-1194, v4.5 잔여) ✅
+- **LibraryListView**: ScrollView+LazyVStack → SwiftUI `List(.inset)` 전환, 썸네일 48×27 → **120×68**, 행 라운드 하이라이트
+- **인터랙션 표준화**: 좌클릭 커스텀 메뉴(LeftClickMenu) → 더블클릭 열기 + 클릭 선택 토글 + 우클릭 `contextMenu` (Finder 스타일)
+- **unified 툴바 검색**: 보관함 창에 `fullSizeTitlebar` 적용 + 툴바 오른쪽에 네이티브 `AppSearchField`(NSSearchField 래퍼) 배치. 사이드바 중복 검색 필드 제거
+- **시행착오**: `.searchable`(detail 부착)은 macOS 26에서 툴바 필드는 생성되지만 바인딩 갱신이 AX 입력에서 미확인 — 검증된 AppSearchField 재사용으로 전환 후 확정 동작
+- **검증**: 빌드 성공 + a11y 타이핑으로 필터 동작 확인("e"→15→2개 항목, "ezzz"→0개 항목+빈 상태 화면) + 클리어 복원 + 스크린샷 /tmp/tubekeep_v46_list_toolbar.png
+
 ### 플레이어 크래시 수정 — mpv 렌더 glBlit SIGSEGV (T-1206) ✅
 - **증상**: 영상 재생 중 재생목록 패널 토글 시 앱 크래시 2건(8/23 00:25, 00:26). 과거 8/18 3건 포함 총 5건 모두 동일 스택
 - **원인**: GL 컨텍스트 경합 — 렌더 스레드(renderQueue)의 `glBlitFramebuffer`가 진행 중일 때 메인 스레드에서 패널 토글 → `setContentSize` → 창 리사이즈 → `MPVOpenGLView.reshape/update()`의 drawable 재구성(`openGLContext?.update()`)이 겹침. NSOpenGLContext는 스레드 안전하지 않아 macOS 26 AppleMetalOpenGLRenderer(GL-on-Metal 계층)가 해제된 텍스처 리소스를 참조 (`GLDTextureRec::getTextureResource` SIGSEGV, pointer authentication failure)

@@ -39,10 +39,7 @@ struct LibrarySidebarView: View {
             Group {
                 if store.library.sidebarMode == .library {
                     VStack(spacing: 0) {
-                        searchField
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 8)
-                        Divider()
+                        // 검색은 창 툴바(.searchable)로 이동 (T-1191)
                         filterSection
                             .padding(.vertical, 4)
                         Divider()
@@ -463,12 +460,7 @@ struct LibrarySidebarView: View {
 
     // MARK: - Search
 
-    private var searchField: some View {
-        AppSearchField(placeholder: "검색...", text: Binding(
-            get: { store.library.searchText },
-            set: { store.send(.library(.setSearchText($0))) }
-        ))
-    }
+    // 보관함 검색 필드는 창 툴바(.searchable)로 이동됨 (T-1191)
 
     // MARK: - Filter
 

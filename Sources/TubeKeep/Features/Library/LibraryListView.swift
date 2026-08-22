@@ -80,36 +80,36 @@ struct LibraryListView: View {
     }
 
     private var listContent: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                let snippetMap = Dictionary(uniqueKeysWithValues: store.library.searchResults.compactMap { result in
-                    result.snippet.map { (result.item.id, $0) }
-                })
-                ForEach(store.library.filteredItems) { item in
-                    LibraryListRow(
-                        item: item,
-                        thumbnail: thumbnailImages[item.id],
-                        snippet: snippetMap[item.id],
-                        isSelected: store.library.selectedIds.contains(item.id),
-                        hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
-                        hasPodcast: store.library.podcast.availableIds.contains(item.id),
-                        onOpen: { store.send(.library(.openFile(item.id))) },
-                        onReveal: { store.send(.library(.revealInFinder(item.id))) },
-                        onDelete: { store.send(.library(.trashItem(item.id))) },
-                        onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
-                        onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
-                        onOpenAI: { store.send(.library(.showSummary(item.id))) },
-                        onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
-                        onPlaySnippet: snippetMap[item.id] != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
-                    )
-                    .onAppear {
-                        loadThumbnail(for: item)
-                    }
-                    Divider()
-                        .padding(.leading, 72)
+        List {
+            let snippetMap = Dictionary(uniqueKeysWithValues: store.library.searchResults.compactMap { result in
+                result.snippet.map { (result.item.id, $0) }
+            })
+            ForEach(store.library.filteredItems) { item in
+                LibraryListRow(
+                    item: item,
+                    thumbnail: thumbnailImages[item.id],
+                    snippet: snippetMap[item.id],
+                    isSelected: store.library.selectedIds.contains(item.id),
+                    hasSubtitles: store.library.subtitleAvailableIds.contains(item.id),
+                    hasPodcast: store.library.podcast.availableIds.contains(item.id),
+                    onOpen: { store.send(.library(.openFile(item.id))) },
+                    onReveal: { store.send(.library(.revealInFinder(item.id))) },
+                    onDelete: { store.send(.library(.trashItem(item.id))) },
+                    onDownloadSubtitles: { store.send(.library(.downloadSubtitles(item.id))) },
+                    onChannelDownload: { store.send(.library(.openChannelDownload(channelId: item.channelId, channelName: item.channelName))) },
+                    onOpenAI: { store.send(.library(.showSummary(item.id))) },
+                    onToggleSelection: { store.send(.library(.toggleSelection(item.id))) },
+                    onPlaySnippet: snippetMap[item.id] != nil ? { store.send(.library(.playSearchMatch(item.id))) } : nil
+                )
+                .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                .listRowSeparator(.hidden)
+                .onAppear {
+                    loadThumbnail(for: item)
                 }
             }
         }
+        .listStyle(.inset)
+        .scrollContentBackground(.hidden)
     }
 
     private func loadThumbnail(for item: LibraryItem) {
@@ -148,12 +148,12 @@ private struct LibraryListRow: View {
     let onPlaySnippet: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             thumbnailView
-                .frame(width: 48, height: 27)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .frame(width: 120, height: 68)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: 6)
                         .stroke(isSelected ? Color.accentColor : AppColors.separator, lineWidth: isSelected ? 2 : 0.5)
                 )
 
@@ -189,7 +189,7 @@ private struct LibraryListRow: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: 9))
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                             SnippetTextView(text: snippet)
                                 .lineLimit(1)
@@ -228,25 +228,30 @@ private struct LibraryListRow: View {
                         .foregroundStyle(.tertiary)
                 }
                 Text("다운로드 " + item.downloadDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(.quaternary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-        .leftClickMenu(entries: [
-            .action(title: "열기", icon: "play.fill", action: onOpen),
-            .separator,
-            .action(title: "AI 기능", icon: "sparkles", action: onOpenAI),
-            .separator,
-            .action(title: "자막 다운로드", icon: "captions.bubble", action: onDownloadSubtitles, enabled: !hasSubtitles),
-            .action(title: "채널 다운로더 실행", icon: "tv", action: onChannelDownload),
-            .separator,
-            .action(title: "Finder에서 보기", icon: "folder", action: onReveal),
-            .separator,
-            .action(title: "휴지통으로 이동", icon: "trash", action: onDelete, destructive: true)
-        ], onToggleSelection: onToggleSelection)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        // 표준 인터랙션: 더블클릭 열기, 클릭 선택 토글, 우클릭 contextMenu (T-1191)
+        .onTapGesture(count: 2) { onOpen() }
+        .onTapGesture { onToggleSelection() }
+        .contextMenu {
+            Button { onOpen() } label: { Label("열기", systemImage: "play.fill") }
+            Button { onOpenAI() } label: { Label("AI 기능", systemImage: "sparkles") }
+            Divider()
+            Button { onDownloadSubtitles() } label: { Label("자막 다운로드", systemImage: "captions.bubble") }
+                .disabled(hasSubtitles)
+            Button { onChannelDownload() } label: { Label("채널 다운로더 실행", systemImage: "tv") }
+            Divider()
+            Button { onReveal() } label: { Label("Finder에서 보기", systemImage: "folder") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label("휴지통으로 이동", systemImage: "trash") }
+        }
     }
 
     private var thumbnailView: some View {
@@ -255,16 +260,16 @@ private struct LibraryListRow: View {
                 Image(nsImage: img)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 48, height: 27)
+                    .frame(width: 120, height: 68)
             } else {
                 Rectangle()
                     .fill(AppColors.textBackground)
                     .overlay(
                         Image(systemName: "film")
                             .foregroundStyle(.secondary)
-                            .font(.system(size: 10))
+                            .font(.system(size: 14))
                     )
-                    .frame(width: 48, height: 27)
+                    .frame(width: 120, height: 68)
             }
         }
         .overlay(alignment: .bottom) {

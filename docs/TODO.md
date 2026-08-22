@@ -13,10 +13,10 @@
 | T-1188 | **디자인 P0** — Package.swift macOS15 + WindowFactory unified/autosave + GlassHelper | medium | ✅ done | autosave 7창 적용 |
 | T-1189 | **디자인 P1** — MainView NavigationSplitView 2열 + 창 1000×700 (T-1160 흡수) | medium | ✅ done | PLAN에서 3단→2열 수정 |
 | T-1190 | **디자인 P1** — LibrarySidebarView 커스텀 배경 제거 (List 전환은 드래그 복잡성으로 절충) | medium | ✅ done | 부분 완료 |
-| T-1191 | **디자인 P1** — LibraryListView 표준 List 전환 (T-1162) + 툴바 unified/searchable + 빌드 | medium | pending | |
+| T-1191 | **디자인 P1** — LibraryListView 표준 List 전환 (T-1162) + 툴바 unified/searchable + 빌드 | medium | ✅ done | 2026-08-23 완료 |
 | T-1192 | **디자인 P2** — SettingsView Form(.grouped) 8탭 (SettingsComponents 제거) | medium | ✅ done | ScrollView 래퍼 제거 + a11y 검증 |
 | T-1193 | **디자인 P2** — 메뉴바 보기/창/도움말 + About 시스템 패널 | medium | ✅ done | 보기(⌘1~4/⇧⌘A/⇧⌘C/설정)/창/도움말 + 파일 메뉴 캐릭터 대화→보기 이동 |
-| T-1194 | **디자인 P2** — 빌드 + 디버그 로그 + 스크린샷 | medium | pending | |
+| T-1194 | **디자인 P2** — 빌드 + 디버그 로그 + 스크린샷 | medium | ✅ done | a11y 필터 검증(15→2→0개) + /tmp/tubekeep_v46_list_toolbar.png |
 | T-1195 | **디자인 P3** — Material/glass + 다운로더 창 크기 + DownloadRow ProgressView | medium | ✅ done | material 배경 3창 + 다운로더 640×560/일괄 560×500/채널 800×600 + ProgressView(.linear) |
 | T-1196 | **디자인 P3** — Player 상시 컨트롤(T-1166) + 패널 단축키 + DebugLog 콘솔(T-1167) | medium | ✅ done | 컨트롤 상시 표시 + ⌘⇧S/Q/P + 콘솔 스타일 기존 유지 |
 | T-1197 | **디자인 P3** — StatusBar NSProgressIndicator + Toast 정리 + 전체 빌드/검증 | medium | ✅ done | aggregateProgress + 막대 표시 + Toast material 유지 |
@@ -85,9 +85,9 @@
 | T-1157 | **P2 AppDelegate 설정 창 생성부 제거 + openWhisperSettings 대응** | high | done | showSettingsWindow: 경유 + settingsWindow 프로퍼티 제거 |
 | T-1158 | **P2 SettingsView 상단 TabView 전환** (140px 사이드바 제거) | high | done | TabView + tabItem Label, selectedTab 바인딩 유지, min 640×440 |
 | T-1159 | **P2 상태바/메뉴바 설정 경로 연결** | high | done | openSettingsWindow() 일원화로 자동 연결 + 메뉴바 SwiftUI 덮어쓰기 → setupMainMenu async 재호출로 복구 |
-| T-1160 | **P3 MainView NavigationSplitView 전환** | medium | pending | 사용자 결정: 구조 유지로 보류 |
+| T-1160 | **P3 MainView NavigationSplitView 전환** | medium | ✅ done | v4.5에서 전환 완료(MainView:14) — 2026-08-23 코드 확인 후 상태 갱신 |
 | T-1161 | **P3 LibrarySidebarView 사이드바 시각 표준화** | medium | done | underPageBackground + selectedContentBackground, 드래그 재정렬 유지 |
-| T-1162 | **P3 LibraryListView 표준 List 전환** | medium | pending | 썸네일 120x68 + contextMenu |
+| T-1162 | **P3 LibraryListView 표준 List 전환** | medium | ✅ done | T-1191에서 수행 — List 전환 + 120×68 + contextMenu |
 | T-1163 | **P3 보관함 고정 폭 해제 + 툴바 xmark/power 제거** | medium | done | FixedWidthWindowController 삭제, minSize 720×480, libraryWindow 전환 |
 | T-1164 | **P4 화면별 토큰 적용 + 창 고정 크기 해제** | medium | done | NSColor 16건 토큰 치환(control/separator/tertiary/textBackground/success/danger/warning) + downloader/batch/channel zoom 복구 + channel maxSize 해제 |
 | T-1165 | **P4 설정 탭 표준화** (switch→Toggle, mini 제거, SecureField) | low | done | toggleStyle(.switch) 16건 제거 → 기본 체크박스, ProgressView .mini→.small, Settings controlBackground/separator 토큰 |
@@ -877,9 +877,9 @@
 
 | ID | 작업 | 우선순위 | 상태 | 비고 |
 |----|------|---------|------|------|
-| T-1084 | **SimilarVideoService 신규** — AI 검색어 생성(OpenRouter→Gemini→규칙 폴백) + UserDefaults 캐시(7일) + 병렬 검색·병합 | high | 진행중 | docs/AI_MODELS.json models.similar |
-| T-1085 | **PlayerReducer 확장** — similarVideos/isLoadingSimilar/similarError/showSimilarVideos 상태 + Action 5종 | high | 예정 | |
-| T-1086 | **PlayerView UI** — 툴바 버튼 + SimilarVideosPanel(로딩/오류·재시도/빈 상태, 클릭→재생 전환) | high | 예정 | |
+| T-1084 | **SimilarVideoService 신규** — AI 검색어 생성(OpenRouter→Gemini→규칙 폴백) + UserDefaults 캐시(7일) + 병렬 검색·병합 | high | ✅ done | 2026-08-23 코드 확인(Services/SimilarVideoService.swift) |
+| T-1085 | **PlayerReducer 확장** — similarVideos/isLoadingSimilar/similarError/showSimilarVideos 상태 + Action 5종 | high | ✅ done | 2026-08-23 코드 확인(loadSimilarVideos 등) |
+| T-1086 | **PlayerView UI** — 툴바 버튼 + SimilarVideosPanel(로딩/오류·재시도/빈 상태, 클릭→재생 전환) | high | ✅ done | 2026-08-23 코드 확인(similarVideosPanel) |
 | T-1087 | **검증** — make build + swift test 76 + 실제 재생 수동 확인 | high | 예정 | |
 
 
