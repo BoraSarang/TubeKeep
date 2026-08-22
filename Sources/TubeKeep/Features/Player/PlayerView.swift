@@ -162,8 +162,9 @@ struct PlayerView: View {
 
     private var videoArea: some View {
         GeometryReader { geo in
-            let fittedHeight = min(geo.size.height, geo.size.width * 9 / 16)
-            let fittedWidth = fittedHeight * 16 / 9
+            // 정수로 반올림해 소수점 프레임의 연속 리사이즈(reshape 빈발)를 방지한다. (T-1206)
+            let fittedHeight = round(min(geo.size.height, geo.size.width * 9 / 16))
+            let fittedWidth = round(fittedHeight * 16 / 9)
             ZStack {
                 Color.black
                 ZStack {

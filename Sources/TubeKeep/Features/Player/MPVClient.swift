@@ -31,6 +31,7 @@ final class MPVClient: ObservableObject {
     private var loopB: Double?
     private var renderCallbackLogCount = 0
     private var isFullscreenTransition = false
+    private var isWindowResizing = false
     private let transitionLock = NSLock()
     private var fullscreenObservers: [NSObjectProtocol] = []
 
@@ -90,6 +91,7 @@ final class MPVClient: ObservableObject {
 
     /// fullscreen 진입/종료 전환 중에는 GL 컨텍스트가 재구성되는 순간이라
     /// displayLink 렌더링을 잠시 중단한다 (glBlit/CGLSetVirtualScreen 크래시 방지).
+    /// 창 live resize 중에도 drawable이 재구성되므로 동일하게 렌더링을 중단한다.
     private func setupFullscreenObservers() {
         let center = NotificationCenter.default
         fullscreenObservers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: nil, queue: .main) { [weak self] note in
@@ -104,6 +106,20 @@ final class MPVClient: ObservableObject {
         fullscreenObservers.append(center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main) { [weak self] note in
             self?.setFullscreenTransition(note, transitioning: false)
         })
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.willStartLiveResizeNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setWindowResizing(note, resizing: true)
+        })
+        fullscreenObservers.append(center.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: nil, queue: .main) { [weak self] note in
+            self?.setWindowResizing(note, resizing: false)
+        })
+    }
+
+    private func setWindowResizing(_ note: Notification, resizing: Bool) {
+        guard let window = note.object as? NSWindow else { return }
+        if let renderWindow = renderView?.window, renderWindow !== window { return }
+        transitionLock.lock()
+        isWindowResizing = resizing
+        transitionLock.unlock()
     }
 
     private func setFullscreenTransition(_ note: Notification, transitioning: Bool) {
@@ -187,14 +203,20 @@ final class MPVClient: ObservableObject {
         guard let window = view.window, window.screen != nil else { return }
         transitionLock.lock()
         let transitioning = isFullscreenTransition
+        let resizing = isWindowResizing
         transitionLock.unlock()
-        guard !transitioning else { return }
+        // fullscreen 전환 중 + 창 리사이즈 중에는 drawable이 재구성되는 시점이라 렌더를 건너뛴다.
+        guard !transitioning, !resizing else { return }
         guard let glCtx = view.openGLContext else { return }
         glContext = glCtx
         let scale = view.window?.backingScaleFactor ?? 2
         let w = Int32(view.bounds.width * scale)
         let h = Int32(view.bounds.height * scale)
 
+        // NSOpenGLContext는 스레드 안전하지 않다. 메인 스레드의 reshape/update(drawable 재구성)와
+        // 이 렌더 스레드의 glBlit이 겹치면 AppleMetalOpenGLRenderer 내부에서 해제된 텍스처를 참조해
+        // SIGSEGV가 발생하므로 CGL 잠금으로 직렬화한다. (T-1206)
+        glCtx.lock()
         glCtx.makeCurrentContext()
 
         var fbo = mpv_opengl_fbo(fbo: 0, w: w, h: h, internal_format: 0)
@@ -209,6 +231,7 @@ final class MPVClient: ObservableObject {
         if result < 0 { DebugLogManager.shared?.append("[mpv] render error: \(result)") }
         mpv_render_context_report_swap(ctx)
         glCtx.flushBuffer()
+        glCtx.unlock()
 
         if !firstFrameLogged, let start = playbackStart {
             firstFrameLogged = true

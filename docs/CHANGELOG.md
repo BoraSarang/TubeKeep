@@ -15,6 +15,16 @@
 - 보관함 그리드 셀 채널명 오른쪽에 `#카테고리명` 버튼 표시(첫 번째 태그), 클릭 시 사이드바 카테고리 필터(`setSelectedCategory`) 적용
 - **검증**: a11y help로 버튼 8개 확인 + AXPress 클릭으로 필터 동작(9개→3개 항목) + 빌드 성공
 
+### 플레이어 크래시 수정 — mpv 렌더 glBlit SIGSEGV (T-1206) ✅
+- **증상**: 영상 재생 중 재생목록 패널 토글 시 앱 크래시 2건(8/23 00:25, 00:26). 과거 8/18 3건 포함 총 5건 모두 동일 스택
+- **원인**: GL 컨텍스트 경합 — 렌더 스레드(renderQueue)의 `glBlitFramebuffer`가 진행 중일 때 메인 스레드에서 패널 토글 → `setContentSize` → 창 리사이즈 → `MPVOpenGLView.reshape/update()`의 drawable 재구성(`openGLContext?.update()`)이 겹침. NSOpenGLContext는 스레드 안전하지 않아 macOS 26 AppleMetalOpenGLRenderer(GL-on-Metal 계층)가 해제된 텍스처 리소스를 참조 (`GLDTextureRec::getTextureResource` SIGSEGV, pointer authentication failure)
+- **수정**:
+  - `MPVClient.renderFrame()`: makeCurrentContext~flushBuffer 구간을 CGL 잠금(`glCtx.lock()/unlock()`)으로 직렬화
+  - `MPVOpenGLView.updateGLContext()`: `update()` 호출을 동일 잠금으로 감쌈
+  - live resize 가드 신설: `willStartLiveResize`/`didEndLiveResize` 알림 → `isWindowResizing` 플래그로 리사이즈 중 렌더 스킵 (fullscreen 전환 가드와 동일 패턴)
+  - PlayerView 16:9 fitted 크기 `round()` 정수화 — 소수점 프레임(853.33px 등) 연속 reshape 제거
+- **검증**: 빌드 성공 + 앱 실행 확인 (재현 시나리오 사용자 검증 대기)
+
 ## v4.5 — 캐릭터 대화 + macOS 네이티브 디자인 리빌딩 (macOS, T-1184~T-1197) 🚧
 
 ### 캐릭터 대화 기능 (T-1184~T-1187) ✅
