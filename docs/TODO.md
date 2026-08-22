@@ -880,6 +880,6 @@
 | T-1084 | **SimilarVideoService 신규** — AI 검색어 생성(OpenRouter→Gemini→규칙 폴백) + UserDefaults 캐시(7일) + 병렬 검색·병합 | high | ✅ done | 2026-08-23 코드 확인(Services/SimilarVideoService.swift) |
 | T-1085 | **PlayerReducer 확장** — similarVideos/isLoadingSimilar/similarError/showSimilarVideos 상태 + Action 5종 | high | ✅ done | 2026-08-23 코드 확인(loadSimilarVideos 등) |
 | T-1086 | **PlayerView UI** — 툴바 버튼 + SimilarVideosPanel(로딩/오류·재시도/빈 상태, 클릭→재생 전환) | high | ✅ done | 2026-08-23 코드 확인(similarVideosPanel) |
-| T-1087 | **검증** — make build + swift test 76 + 실제 재생 수동 확인 | high | 예정 | |
+| T-1087 | **검증** — make build + swift test 76 + 실제 재생 수동 확인 | high | ✅ done | 2026-08-23 사용자 실동작 테스트 통과 |
 
 
