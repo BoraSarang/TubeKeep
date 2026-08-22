@@ -512,8 +512,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             identifier: "batch",
             title: "일괄 다운로더",
             rootView: rootView,
-            contentSize: NSSize(width: 560, height: 500),
-            minSize: NSSize(width: 500, height: 400),
+            contentSize: NSSize(width: 640, height: 560),
+            minSize: NSSize(width: 520, height: 420),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             titlebarIcon: WindowFactory.icon("shippingbox"),
             autosaveName: "TubeKeepBatch"
@@ -621,13 +621,13 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         }
 
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-        let windowHeight = min(560, screenHeight - 40)
+        let windowHeight = min(540, screenHeight - 40)
 
         let window = WindowFactory.makeWindow(
             identifier: "qna",
             title: "AI 기능",
             rootView: AIWindowView(store: store),
-            contentSize: NSSize(width: 560, height: windowHeight),
+            contentSize: NSSize(width: 520, height: windowHeight),
             titlebarIcon: WindowFactory.icon("sparkle"),
             autosaveName: "TubeKeepAI"
         )

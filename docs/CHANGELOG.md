@@ -15,6 +15,14 @@
 - 보관함 그리드 셀 채널명 오른쪽에 `#카테고리명` 버튼 표시(첫 번째 태그), 클릭 시 사이드바 카테고리 필터(`setSelectedCategory`) 적용
 - **검증**: a11y help로 버튼 8개 확인 + AXPress 클릭으로 필터 동작(9개→3개 항목) + 빌드 성공
 
+### AI 창 정리 + 다운로더 3종 네이티브 표준화 (T-1202~T-1204) ✅
+- **AI 창**: 보관함 전용으로 축소(520×540), videoHeader/팟캐스트 컨트롤/statusBadge의 8~9px 폰트 → 10px 상향. `AppColors.hoverRow`·`textBackground`는 adaptive 시스템 컬러라 유지 판정
+- **다운로더 3종**: 툴바 닫기(`xmark.circle`) 전면 제거 → traffic lights 위임 (영상/일괄/채널)
+- **일괄 다운로더**: 창 확대 560×500 → 640×560 (min 520×420)
+- **채널 다운로더**: 사이드바 180 → 200px (사용자 선호 반영)
+- **폰트 표준화**: HomeView/DownloadQueueView의 8~9px → 10px 상향 (아이콘/메타 텍스트)
+- **검증**: 빌드 성공 + a11y로 3개 다운로더 창 툴바에서 핀 버튼만 존재 확인 (닫기 0건)
+
 ### 플레이어 크래시 수정 — mpv 렌더 glBlit SIGSEGV (T-1206) ✅
 - **증상**: 영상 재생 중 재생목록 패널 토글 시 앱 크래시 2건(8/23 00:25, 00:26). 과거 8/18 3건 포함 총 5건 모두 동일 스택
 - **원인**: GL 컨텍스트 경합 — 렌더 스레드(renderQueue)의 `glBlitFramebuffer`가 진행 중일 때 메인 스레드에서 패널 토글 → `setContentSize` → 창 리사이즈 → `MPVOpenGLView.reshape/update()`의 drawable 재구성(`openGLContext?.update()`)이 겹침. NSOpenGLContext는 스레드 안전하지 않아 macOS 26 AppleMetalOpenGLRenderer(GL-on-Metal 계층)가 해제된 텍스처 리소스를 참조 (`GLDTextureRec::getTextureResource` SIGSEGV, pointer authentication failure)

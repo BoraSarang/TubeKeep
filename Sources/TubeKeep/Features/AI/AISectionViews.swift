@@ -298,7 +298,7 @@ struct AIQnASection: View {
                     store.send(.library(.qna(.deleteQnAHistoryItem(item.id))))
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tertiary)

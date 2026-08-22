@@ -110,7 +110,7 @@ struct AIWindowView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                             + Text(" ▸")
-                                .font(.system(size: 9))
+                                .font(.system(size: 10))
                                 .foregroundStyle(.tertiary)
                         }
                         .buttonStyle(.plain)
@@ -163,14 +163,14 @@ struct AIWindowView: View {
                     let podcastMsg = store.library.podcast.progressMessage
                     if !podcastMsg.isEmpty {
                         Text(podcastMsg)
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                     }
                 } else if hasPodcast {
                     if isPlaying {
                         Text("\(formatTime(playbackTime))/\(formatTime(podcastTotalDuration))")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .fixedSize()
                     }
@@ -183,7 +183,7 @@ struct AIWindowView: View {
                         }
                     } label: {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
 
@@ -191,7 +191,7 @@ struct AIWindowView: View {
                         store.send(.library(.podcast(.stopPodcast)))
                     } label: {
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
 
@@ -199,7 +199,7 @@ struct AIWindowView: View {
                         store.send(.library(.podcast(.deletePodcast(videoId))))
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.tertiary)
@@ -208,7 +208,7 @@ struct AIWindowView: View {
                         store.send(.library(.podcast(.generatePodcast(videoId))))
                     } label: {
                         Image(systemName: "mic.fill")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -237,9 +237,9 @@ struct AIWindowView: View {
     private func statusBadge(icon: String, available: Bool, label: String) -> some View {
         HStack(spacing: 2) {
             Image(systemName: icon)
-                .font(.system(size: 8))
+                .font(.system(size: 10))
             Text(label)
-                .font(.system(size: 8))
+                .font(.system(size: 10))
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 2)

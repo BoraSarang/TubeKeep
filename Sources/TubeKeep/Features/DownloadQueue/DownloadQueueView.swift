@@ -44,7 +44,7 @@ struct DownloadQueueView: View {
                 } label: {
                     HStack(spacing: 2) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                         Text("시작")
                             .font(.caption)
                     }
@@ -59,7 +59,7 @@ struct DownloadQueueView: View {
                 } label: {
                     HStack(spacing: 2) {
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                         Text("중지")
                             .font(.caption)
                     }
@@ -98,11 +98,11 @@ struct DownloadQueueView: View {
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                     if !store.aggregateSpeed.isEmpty {
                         Text(store.aggregateSpeed)
-                            .font(.system(size: 9).monospacedDigit())
+                            .font(.system(size: 10).monospacedDigit())
                     }
                     if !store.aggregateETA.isEmpty {
                         Text("\(store.aggregateETA) 남음")
-                            .font(.system(size: 9).monospacedDigit())
+                            .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -111,7 +111,7 @@ struct DownloadQueueView: View {
             if store.pendingCount > 0 {
                 HStack(spacing: 3) {
                     Image(systemName: "clock")
-                        .font(.system(size: 8))
+                        .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                     Text("대기 \(store.pendingCount)")
                         .font(.caption)
@@ -125,7 +125,7 @@ struct DownloadQueueView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                         Text("재시도 \(store.failedCount)")
                             .font(.caption)
                     }
@@ -140,7 +140,7 @@ struct DownloadQueueView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                         Text("완료 \(store.completedCount)")
                             .font(.caption)
@@ -225,7 +225,7 @@ struct DownloadRow: View {
                         .font(.system(size: 14))
                 } else {
                     statusIcon
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .padding(2)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }

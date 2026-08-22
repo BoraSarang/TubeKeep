@@ -196,7 +196,7 @@ struct HomeView: View {
 
                     HStack(spacing: 6) {
                         Image(systemName: "person.fill")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                         Text(info.channel)
                             .font(.system(size: 10))
                     }
@@ -212,7 +212,7 @@ struct HomeView: View {
                         Label(info.formattedDuration, systemImage: "clock")
                         Label(info.formattedDate, systemImage: "calendar")
                     }
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                 }
 

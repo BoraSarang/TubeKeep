@@ -57,7 +57,7 @@ struct ChannelDownloaderView: View {
                         SubscribedChannel.saveAll(channels)
                     }
                 )
-                .frame(minWidth: 180, maxWidth: 180)
+                .frame(minWidth: 200, maxWidth: 200)
 
                 ChannelContentView(
                     store: store,
@@ -181,13 +181,6 @@ struct ChannelDownloaderView: View {
                     Image(systemName: isPinned ? "pin.fill" : "pin")
                 }
                 .help(isPinned ? "최상위 고정 해제" : "항상 최상위로 표시")
-
-                Button {
-                    NSApp.keyWindow?.orderOut(nil)
-                } label: {
-                    Image(systemName: "xmark.circle")
-                }
-                .help("창 닫기")
             }
         }
         .background(.regularMaterial)
