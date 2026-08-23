@@ -784,6 +784,18 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 
     // MARK: - NSWindowDelegate
 
+    /// 플레이어 창의 close를 취소하고 숨김(orderOut)으로 전환한다.
+    /// performClose 기본 구현이 어떤 경로로 불리더라도 진짜 close는 막는다. (T-1208)
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender.identifier?.rawValue == "player" else { return true }
+        #if DEBUG
+        DebugLogManager.shared?.append("[App] windowShouldClose — 숨김으로 전환")
+        #endif
+        NotificationCenter.default.post(name: Constants.playerHideNotification, object: sender)
+        sender.orderOut(nil)
+        return false
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               window.identifier?.rawValue == "player" else { return }

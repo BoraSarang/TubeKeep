@@ -14,11 +14,18 @@ final class PlayerWindow: NSWindow {
     // 앱 생명주기 동안 1개만 유지해 재사용하면 인스턴스 누수가 원천적으로
     // 발생하지 않는다. (T-1208)
     override func performClose(_ sender: Any?) {
+        #if DEBUG
+        DebugLogManager.shared?.append("[App] PlayerWindow.performClose 호출 — \(ObjectIdentifier(self).hashValue)")
+        #endif
+        // super.performClose는 close()로 이어지므로 호출하지 않는다.
         NotificationCenter.default.post(name: Constants.playerHideNotification, object: self)
         orderOut(sender)
     }
 
     override func cancelOperation(_ sender: Any?) {
+        #if DEBUG
+        DebugLogManager.shared?.append("[App] PlayerWindow.cancelOperation 호출")
+        #endif
         if styleMask.contains(.fullScreen) {
             toggleFullScreen(sender)
         } else {
