@@ -675,6 +675,9 @@ func applicationDidFinishLaunching(_ notification: Notification) {
         let playerView = PlayerView(store: newStore, appStore: store)
         let hostingCtrl = NSHostingController(rootView: playerView)
         let window = PlayerWindow(contentViewController: hostingCtrl)
+        #if DEBUG
+        DebugLogManager.shared?.append("[App] player 창 생성 \(ObjectIdentifier(window).hashValue)")
+        #endif
         window.title = playerItem.title
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         if let docButton = window.standardWindowButton(.documentIconButton) {
@@ -778,7 +781,16 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               window.identifier?.rawValue == "player" else { return }
+        // isReleasedWhenClosed=false 창은 close 후에도 NSApp.windows에 잔존할 수 있다.
+        // 이때 Window→HostingController→PlayerView→MPVClient 체인이 통째로 살아남아
+        // 재생마다 인스턴스가 누적되므로, 컨트롤러 체인을 명시적으로 끊는다. (T-1208)
+        window.contentViewController = nil
         playerWindow = nil
+        #if DEBUG
+        DebugLogManager.shared?.append(
+            "[App] player 창 닫힘 — NSApp.windows 잔존: \(NSApp.windows.compactMap { $0.identifier?.rawValue ?? ($0 is PlayerWindow ? "player(id없음)" : nil) })"
+        )
+        #endif
     }
 
     // MARK: - Process Cleanup

@@ -41,6 +41,25 @@ struct PlayerView: View {
             setupPlayer: { setupPlayer() }
         ))
         .background(WindowAccessor { win in DispatchQueue.main.async { window = win } })
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
+            guard (notif.object as? NSWindow) == window else { return }
+            mpv.stop()
+            // 창이 닫히면 렌더 루프도 정지 — 유휴 CPU/GPU 소모 방지 (T-1208)
+            mpv.pauseRendering()
+            // @State window ↔ HostingView rootView 사이클을 끊는다.
+            // 이 참조가 남으면 윈도우+뷰트리+MPVClient가 통째로 누적됨 (T-1208)
+            window = nil
+        }
+        .onAppear {
+            #if DEBUG
+            DebugLogManager.shared?.append("[PlayerView] appear — mpv=\(ObjectIdentifier(mpv).hashValue)")
+            #endif
+        }
+        .onDisappear {
+            #if DEBUG
+            DebugLogManager.shared?.append("[PlayerView] disappear — mpv=\(ObjectIdentifier(mpv).hashValue)")
+            #endif
+        }
         .onReceive(NotificationCenter.default.publisher(for: Constants.playerVolumeChangeNotification)) { notif in
             guard let delta = notif.userInfo?["delta"] as? Double else { return }
             let newVolume = min(max(volume + delta, 0), 100)
@@ -92,16 +111,6 @@ struct PlayerView: View {
                 .onChange(of: store.playerItemId) { _, _ in stopAndSetup() }
                 .onChange(of: store.streamURL) { _, newURL in
                     if newURL != nil, store.playerItem.fileURL == nil { stopAndSetup() }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
-                    if (notif.object as? NSWindow) == windowProvider() {
-                        mpv.stop()
-                        // 창이 닫히면 렌더 루프도 정지 — 유휴 CPU/GPU 소모 방지 (T-1208)
-                        mpv.pauseRendering()
-                        // @State window ↔ HostingView rootView 사이클을 끊는다.
-                        // 이 참조가 남으면 윈도우+뷰트리+MPVClient가 통째로 누적됨 (T-1208)
-                        window = nil
-                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
                     guard let direction = notif.userInfo?["direction"] as? Double else { return }

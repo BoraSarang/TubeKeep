@@ -1,6 +1,15 @@
 import AppKit
+#if DEBUG
+import Foundation
+#endif
 
 final class PlayerWindow: NSWindow {
+    #if DEBUG
+    deinit {
+        DebugLogManager.shared?.append("[App] PlayerWindow 해제 \(ObjectIdentifier(self).hashValue)")
+    }
+    #endif
+
     override func cancelOperation(_ sender: Any?) {
         if styleMask.contains(.fullScreen) {
             toggleFullScreen(sender)
