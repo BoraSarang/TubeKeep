@@ -646,7 +646,10 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     @objc private func openPlayerWindow(_ notification: Notification) {
         guard let playerItem = notification.object as? PlayerItem else { return }
 
-        if let existingStore = playerStore, let window = playerWindow, window.isVisible || window.isMiniaturized {
+        // 플레이어 창·mpv는 앱 생명주기 동안 1개만 유지하고 재사용한다.
+        // "닫기"는 orderOut 숨김(performClose 오버라이드)이므로 숨겨진 창도
+        // 이 경로로 복원된다. (T-1208)
+        if let existingStore = playerStore, let window = playerWindow {
             existingStore.send(.loadVideo(playerItem))
             if let queue = notification.userInfo?["queue"] as? [PlayerItem] {
                 let startIndex = notification.userInfo?["startIndex"] as? Int ?? 0

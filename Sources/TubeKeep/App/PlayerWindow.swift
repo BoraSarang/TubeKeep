@@ -10,11 +10,19 @@ final class PlayerWindow: NSWindow {
     }
     #endif
 
+    // 닫기 버튼·ESC는 창을 진짜 닫지 않고 숨긴다. 창·PlayerView·MPVClient를
+    // 앱 생명주기 동안 1개만 유지해 재사용하면 인스턴스 누수가 원천적으로
+    // 발생하지 않는다. (T-1208)
+    override func performClose(_ sender: Any?) {
+        NotificationCenter.default.post(name: Constants.playerHideNotification, object: self)
+        orderOut(sender)
+    }
+
     override func cancelOperation(_ sender: Any?) {
         if styleMask.contains(.fullScreen) {
             toggleFullScreen(sender)
         } else {
-            close()
+            performClose(sender)
         }
     }
 

@@ -50,6 +50,16 @@ struct PlayerView: View {
             // 이 참조가 남으면 윈도우+뷰트리+MPVClient가 통째로 누적됨 (T-1208)
             window = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.playerHideNotification)) { notif in
+            guard (notif.object as? NSWindow) == window else { return }
+            // 창은 숨김(orderOut)으로 유지되므로 willClose가 불리지 않는다.
+            // 숨김 시점에 재생·렌더 루프를 직접 정지한다. (T-1208)
+            #if DEBUG
+            DebugLogManager.shared?.append("[PlayerView] hide — mpv 정지")
+            #endif
+            mpv.stop()
+            mpv.pauseRendering()
+        }
         .onAppear {
             #if DEBUG
             DebugLogManager.shared?.append("[PlayerView] appear — mpv=\(ObjectIdentifier(mpv).hashValue)")
