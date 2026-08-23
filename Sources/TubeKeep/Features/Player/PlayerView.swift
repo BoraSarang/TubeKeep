@@ -94,7 +94,11 @@ struct PlayerView: View {
                     if newURL != nil, store.playerItem.fileURL == nil { stopAndSetup() }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notif in
-                    if (notif.object as? NSWindow) == windowProvider() { mpv.stop() }
+                    if (notif.object as? NSWindow) == windowProvider() {
+                        mpv.stop()
+                        // 창이 닫히면 렌더 루프도 정지 — 유휴 CPU/GPU 소모 방지 (T-1208)
+                        mpv.pauseRendering()
+                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
                     guard let direction = notif.userInfo?["direction"] as? Double else { return }

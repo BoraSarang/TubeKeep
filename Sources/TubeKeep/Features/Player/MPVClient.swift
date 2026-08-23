@@ -34,13 +34,20 @@ final class MPVClient: ObservableObject {
     private var isWindowResizing = false
     private let transitionLock = NSLock()
     private var fullscreenObservers: [NSObjectProtocol] = []
+    private var isDisplayLinkRunning = false
 
     init() {
+        #if DEBUG
+        DebugLogManager.shared?.append("[mpv] client 생성 \(ObjectIdentifier(self).hashValue)")
+        #endif
         setupMPV()
         setupFullscreenObservers()
     }
 
     deinit {
+        #if DEBUG
+        DebugLogManager.shared?.append("[mpv] client 해제 \(ObjectIdentifier(self).hashValue)")
+        #endif
         fullscreenObservers.forEach { NotificationCenter.default.removeObserver($0) }
         stopDisplayLink()
         renderQueue.sync {}
@@ -177,6 +184,11 @@ final class MPVClient: ObservableObject {
     }
 
     private func setupDisplayLink() {
+        // 이미 생성돼 있으면 재시작만 시도 (멱등) — 로드마다 재생성 금지 (T-1208)
+        guard displayLink == nil else {
+            ensureDisplayLinkRunning()
+            return
+        }
         CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
         guard let displayLink else { return }
         let ctx = Unmanaged.passUnretained(self).toOpaque()
@@ -186,18 +198,39 @@ final class MPVClient: ObservableObject {
             return kCVReturnSuccess
         }
         CVDisplayLinkStart(displayLink)
+        isDisplayLinkRunning = true
     }
 
     private func stopDisplayLink() {
         guard let dl = displayLink else { return }
         CVDisplayLinkStop(dl)
         displayLink = nil
+        isDisplayLinkRunning = false
+    }
+
+    /// 렌더가 불필요한 시점(창 닫힘 등)에 디스플레이 링크만 정지한다 — 컨텍스트는 유지 (T-1208)
+    func pauseRendering() {
+        guard let dl = displayLink, isDisplayLinkRunning else { return }
+        CVDisplayLinkStop(dl)
+        isDisplayLinkRunning = false
+        DebugLogManager.shared?.append("[mpv] 디스플레이 링크 정지")
+    }
+
+    private func ensureDisplayLinkRunning() {
+        guard let dl = displayLink, !isDisplayLinkRunning else { return }
+        CVDisplayLinkStart(dl)
+        isDisplayLinkRunning = true
     }
 
     // MARK: - Rendering
 
     private func renderFrame() {
         guard let ctx = renderContext, let view = renderView else { return }
+        // mpv가 새 프레임을 준비하지 않았으면(무로드/일시정지/정지) 렌더·제출을 스킵한다.
+        // 디스플레이 링크는 계속 틱하지만 GL 컨텍스트 잠금·렌더·flushBuffer 모두 생략되어
+        // 유휴 시 CPU/GPU 소모가 사실상 0으로 수렴한다. (T-1208)
+        let updateFlags = mpv_render_context_update(ctx)
+        if updateFlags & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) == 0 { return }
         guard view.bounds.width > 0, view.bounds.height > 0 else { return }
         // 창이 사라진 뒤(윈도우 닫힘/재생성 중) GL 컨텍스트가 무효한 시점의 렌더링을 차단 — glBlit 크래시 방지
         guard let window = view.window, window.screen != nil else { return }
@@ -355,6 +388,7 @@ final class MPVClient: ObservableObject {
 
     func loadFile(_ url: URL, startTime: Double? = nil) {
         guard let mpv else { return }
+        setupDisplayLink()
         runOnMain { [self] in resetState() }
         playbackStart = Date()
         firstFrameLogged = false
@@ -373,6 +407,7 @@ final class MPVClient: ObservableObject {
 
     func loadStream(_ url: URL, startTime: Double? = nil) {
         guard let mpv else { return }
+        setupDisplayLink()
         runOnMain { [self] in resetState() }
         playbackStart = Date()
         firstFrameLogged = false

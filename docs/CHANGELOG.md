@@ -23,6 +23,13 @@
 - **폰트 표준화**: HomeView/DownloadQueueView의 8~9px → 10px 상향 (아이콘/메타 텍스트)
 - **검증**: 빌드 성공 + a11y로 3개 다운로더 창 툴바에서 핀 버튼만 존재 확인 (닫기 0건)
 
+### 플레이어 유휴 CPU/GPU 최적화 (T-1208) ✅
+- **증상**: 보관함만 표시된 유휴 상태에서 CPU 25.6% — mpv CVDisplayLink가 영상 재생 없이도 60~120fps로 renderFrame→flushBuffer(GPU 프레임 제출) 무한 실행
+- **수정**: renderFrame() 진입 시 `mpv_render_context_update()`의 MPV_RENDER_UPDATE_FRAME 플래그 검사 — 새 프레임 없으면(무로드/일시정지/정지) GL 잠금·렌더·제출 전부 스킵 (mpv 표준 패턴)
+- **라이프사이클**: pauseRendering()(창 닫힘 시 디스플레이 링크 정지) + loadFile/loadStream 시 ensureDisplayLinkRunning 재개 보장 + setupDisplayLink 멱등화
+- **누수 추적**: MPVClient init/deinit에 생성/해제 디버그 로그 추가 (샘플링에서 렌더 큐 2개 관측 — 인스턴스 누수 의심)
+- **검증**: 유휴 CPU 25.6%→**0.0%**, flushBuffer 샘플 696건→**0건** (sample 5초 실측). 재생 중 출력/일시정지 급감/열기닫기 반복 누수는 사용자 확인 대기
+
 ### 보관함 리스트 뷰 표준 List 전환 + unified 툴바 검색 (T-1191/T-1162/T-1194, v4.5 잔여) ✅
 - **LibraryListView**: ScrollView+LazyVStack → SwiftUI `List(.inset)` 전환, 썸네일 48×27 → **120×68**, 행 라운드 하이라이트
 - **인터랙션 표준화**: 좌클릭 커스텀 메뉴(LeftClickMenu) → 더블클릭 열기 + 클릭 선택 토글 + 우클릭 `contextMenu` (Finder 스타일)
