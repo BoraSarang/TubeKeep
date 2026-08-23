@@ -29,6 +29,7 @@
 - **라이프사이클**: pauseRendering()(창 닫힘 시 디스플레이 링크 정지) + loadFile/loadStream 시 ensureDisplayLinkRunning 재개 보장 + setupDisplayLink 멱등화
 - **누수 추적**: MPVClient init/deinit에 생성/해제 디버그 로그 추가 (샘플링에서 렌더 큐 2개 관측 — 인스턴스 누수 의심)
 - **검증**: 유휴 CPU 25.6%→**0.0%**, flushBuffer 샘플 696건→**0건** (sample 5초 실측). 재생 중 출력/일시정지 급감/열기닫기 반복 누수는 사용자 확인 대기
+- **누수 원인 발견 및 수정**: PlayerView @State window ↔ NSWindow.contentViewController(HostingView rootView) 순환 참조 — 창을 닫아도 윈도우+뷰트리+MPVClient가 통째로 잔존(디버그 로그에서 client 생성 2회/해제 0회 확인). willClose에서 window=nil로 사이클 해제
 
 ### 보관함 리스트 뷰 표준 List 전환 + unified 툴바 검색 (T-1191/T-1162/T-1194, v4.5 잔여) ✅
 - **LibraryListView**: ScrollView+LazyVStack → SwiftUI `List(.inset)` 전환, 썸네일 48×27 → **120×68**, 행 라운드 하이라이트

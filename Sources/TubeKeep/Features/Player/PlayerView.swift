@@ -98,6 +98,9 @@ struct PlayerView: View {
                         mpv.stop()
                         // 창이 닫히면 렌더 루프도 정지 — 유휴 CPU/GPU 소모 방지 (T-1208)
                         mpv.pauseRendering()
+                        // @State window ↔ HostingView rootView 사이클을 끊는다.
+                        // 이 참조가 남으면 윈도우+뷰트리+MPVClient가 통째로 누적됨 (T-1208)
+                        window = nil
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Constants.playerSeekNotification)) { notif in
