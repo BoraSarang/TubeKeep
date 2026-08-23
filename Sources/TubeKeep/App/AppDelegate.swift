@@ -684,7 +684,10 @@ func applicationDidFinishLaunching(_ notification: Notification) {
             docButton.isHidden = false
             docButton.image = WindowFactory.icon("play.fill")
         }
-        window.isReleasedWhenClosed = false
+        // close() 시 창을 즉시 해제한다(NSWindow 기본 동작). false로 두면 닫힌 창이
+        // NSApp.windows에 강참조로 잔존해 Window→HostingController→PlayerView→MPVClient
+        // 체인 전체가 재생마다 누적된다. (T-1208)
+        window.isReleasedWhenClosed = true
         window.collectionBehavior = [.managed, .ignoresCycle, .fullScreenPrimary]
         window.identifier = NSUserInterfaceItemIdentifier("player")
         window.setContentSize(NSSize(width: 854, height: 480))
@@ -781,10 +784,8 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               window.identifier?.rawValue == "player" else { return }
-        // isReleasedWhenClosed=false 창은 close 후에도 NSApp.windows에 잔존할 수 있다.
-        // 이때 Window→HostingController→PlayerView→MPVClient 체인이 통째로 살아남아
-        // 재생마다 인스턴스가 누적되므로, 컨트롤러 체인을 명시적으로 끊는다. (T-1208)
-        window.contentViewController = nil
+        // isReleasedWhenClosed=true이므로 close() 후 AppKit이 창과 뷰트리를 정리한다.
+        // AppDelegate 참조만 끊는다. (T-1208)
         playerWindow = nil
         #if DEBUG
         DebugLogManager.shared?.append(
