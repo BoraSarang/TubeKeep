@@ -7,10 +7,28 @@ actor TaggingService {
         AITaskTracker.shared.begin()
         defer { AITaskTracker.shared.end() }
 
+        let nvidiaAPIKey = UserDefaults.standard.string(forKey: "nvidiaAPIKey") ?? ""
+
         let steps: [LLMChainStep<String>] = [
+            LLMChainStep(provider: "Ollama", isAvailable: OllamaService.isEnabled, validate: { self.predefinedTags.contains($0) }) {
+                let prompt = LLMPrompts.tag(title: title, channel: channel, tags: self.predefinedTags)
+                return try await OllamaService.tryLocalChat(
+                    prompt: prompt,
+                    systemMessage: "당신은 YouTube 영상 분류 전문가입니다. 주어진 제목과 채널명을 분석하여 가장 적합한 카테고리 하나만 선택해 답변합니다.",
+                    timeout: 120
+                )
+            },
             LLMChainStep(provider: "Gemini", isAvailable: !geminiAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
                 let prompt = LLMPrompts.tag(title: title, channel: channel, tags: self.predefinedTags)
                 return try await GeminiService().query(prompt: prompt, apiKey: geminiAPIKey)
+            },
+            LLMChainStep(provider: "NVIDIA", isAvailable: !nvidiaAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
+                let prompt = LLMPrompts.tag(title: title, channel: channel, tags: self.predefinedTags)
+                return try await NVIDIAService.tryChat(
+                    prompt: prompt,
+                    apiKey: nvidiaAPIKey,
+                    systemMessage: "당신은 YouTube 영상 분류 전문가입니다. 가장 적합한 카테고리 하나만 정확히 출력하세요."
+                )
             },
             LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterAPIKey.isEmpty, validate: { self.predefinedTags.contains($0) }) {
                 let service = OpenRouterService()

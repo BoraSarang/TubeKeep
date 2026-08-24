@@ -52,8 +52,10 @@ struct SettingsView: View {
                 SettingsChannelsTab(store: store)
             case .automation:
                 SettingsAutomationTab(store: store)
-            case .ai:
-                SettingsAITab(store: store)
+            case .providers:
+                SettingsProvidersTab(store: store)
+            case .models:
+                SettingsModelsTab(store: store)
             case .storage:
                 SettingsStorageTab(store: store)
             case .notifications:

@@ -38,6 +38,23 @@ struct DerivedDataReport: Equatable {
     }
 }
 
+/// 모델 탭의 클라우드 공급자 구분 — 목록 조회/선택 저장 대상
+enum CloudProviderKind: String, CaseIterable, Equatable {
+    case ollama
+    case gemini
+    case nvidia
+    case openRouter
+
+    var displayName: String {
+        switch self {
+        case .ollama: return "Ollama"
+        case .gemini: return "Gemini"
+        case .nvidia: return "NVIDIA NIM"
+        case .openRouter: return "OpenRouter"
+        }
+    }
+}
+
 @Reducer
 struct SettingsReducer {
     @Dependency(\.continuousClock) private var clock
@@ -93,6 +110,36 @@ struct SettingsReducer {
             get { UserDefaults.standard.string(forKey: "geminiAPIKey") ?? "" }
             set { UserDefaults.standard.set(newValue, forKey: "geminiAPIKey") }
         }
+
+        // MARK: - 클라우드 공급자 (NVIDIA NIM + 모델 선택)
+        var nvidiaAPIKey: String {
+            get { UserDefaults.standard.string(forKey: "nvidiaAPIKey") ?? "" }
+            set { UserDefaults.standard.set(newValue, forKey: "nvidiaAPIKey") }
+        }
+
+        // 모델 탭 — 클라우드 모델 목록 + 토글 사용 설정 (TCA 감지 위해 stored)
+        var ollamaEnabledModels: Set<String> = []
+        var geminiEnabledModels: Set<String> = []
+        var nvidiaEnabledModels: Set<String> = []
+        var openRouterEnabledModels: Set<String> = []
+        var geminiModels: [CloudModelInfo] = []
+        var nvidiaModels: [CloudModelInfo] = []
+        var openRouterModels: [CloudModelInfo] = []
+        var geminiModelsLoading = false
+        var nvidiaModelsLoading = false
+        var openRouterModelsLoading = false
+        var cloudModelError: String?
+        var modelSearchText = ""
+        var openRouterFreeOnly = true
+
+        // MARK: - 로컬 Ollama
+        // TCA 변경 감지를 위해 stored property 사용 — 저장은 reducer 액션에서 수행
+        var ollamaEnabled: Bool = UserDefaults.standard.object(forKey: "ollamaEnabled") as? Bool ?? true
+        var ollamaServerRunning: Bool = false
+        var ollamaModels: [String] = []
+        var ollamaPullProgress: Double?
+        var ollamaInstallingModel: String?
+        var ollamaPullError: String?
 
         var settings: Settings {
             Settings(
@@ -180,6 +227,22 @@ struct SettingsReducer {
         case toggleShowMenuBarNotifications
         case setMenuBarNotificationDuration(Int)
         case setOpenRouterAPIKey(String)
+        case toggleOllamaEnabled
+        case refreshOllamaStatus
+        case ollamaStatusChecked(running: Bool, models: [String])
+        case installOllamaModel(String)
+        case ollamaPullProgressUpdated(fraction: Double, status: String)
+        case ollamaPullCompleted(String)
+        case ollamaPullFailed(String, String)
+        case deleteOllamaModel(String)
+        case setNVIDIAAPIKey(String)
+        case loadEnabledModels
+        case toggleCloudModel(CloudProviderKind, String)
+        case fetchCloudModels(CloudProviderKind)
+        case cloudModelsLoaded(CloudProviderKind, [CloudModelInfo])
+        case cloudModelsFailed(CloudProviderKind, String)
+        case setModelSearchText(String)
+        case toggleOpenRouterFreeOnly
         case setOpenRouterModel(String)
         case setGeminiAPIKey(String)
         case clearDerivedAIData
@@ -452,6 +515,194 @@ struct SettingsReducer {
 
             case let .setGeminiAPIKey(key):
                 state.geminiAPIKey = key
+                return .none
+
+            case .toggleOllamaEnabled:
+                state.ollamaEnabled.toggle()
+                UserDefaults.standard.set(state.ollamaEnabled, forKey: "ollamaEnabled")
+                OllamaService.invalidateServerCache()
+                return .none
+
+            case .loadEnabledModels:
+                CloudModelPrefs.migrateIfNeeded()
+                state.ollamaEnabledModels = Set(CloudModelPrefs.enabled(.ollama))
+                state.geminiEnabledModels = Set(CloudModelPrefs.enabled(.gemini))
+                state.nvidiaEnabledModels = Set(CloudModelPrefs.enabled(.nvidia))
+                state.openRouterEnabledModels = Set(CloudModelPrefs.enabled(.openRouter))
+                return .none
+
+            case let .toggleCloudModel(kind, id):
+                CloudModelPrefs.toggle(kind, id)
+                switch kind {
+                case .ollama: state.ollamaEnabledModels = Set(CloudModelPrefs.enabled(kind))
+                case .gemini: state.geminiEnabledModels = Set(CloudModelPrefs.enabled(kind))
+                case .nvidia: state.nvidiaEnabledModels = Set(CloudModelPrefs.enabled(kind))
+                case .openRouter: state.openRouterEnabledModels = Set(CloudModelPrefs.enabled(kind))
+                }
+                #if DEBUG
+                DebugLogManager.shared?.append("[Settings] \(kind.displayName) 모델 사용 토글 — \(id) → \(CloudModelPrefs.isEnabled(kind, id) ? "사용" : "해제")")
+                #endif
+                return .none
+
+            case .refreshOllamaStatus:
+                OllamaService.invalidateServerCache()
+                return .run { send in
+                    let running = await OllamaService.isServerRunning()
+                    let models = running ? await OllamaService.listModels() : []
+                    await send(.ollamaStatusChecked(running: running, models: models))
+                }
+
+            case let .ollamaStatusChecked(running, models):
+                state.ollamaServerRunning = running
+                state.ollamaModels = models
+                return .none
+
+            case let .installOllamaModel(name):
+                guard state.ollamaPullProgress == nil else { return .none }
+                state.ollamaInstallingModel = name
+                state.ollamaPullProgress = 0
+                state.ollamaPullError = nil
+                return .run { send in
+                    do {
+                        try await OllamaService.pullModel(name) { fraction, status in
+                            Task { await send(.ollamaPullProgressUpdated(fraction: fraction, status: status)) }
+                        }
+                        await send(.ollamaPullCompleted(name))
+                    } catch {
+                        await send(.ollamaPullFailed(name, error.localizedDescription))
+                    }
+                }
+
+            case let .ollamaPullProgressUpdated(fraction, _):
+                state.ollamaPullProgress = fraction
+                return .none
+
+            case let .ollamaPullCompleted(name):
+                state.ollamaPullProgress = nil
+                state.ollamaInstallingModel = nil
+                OllamaService.invalidateServerCache()
+                #if DEBUG
+                DebugLogManager.shared?.append("[Settings] Ollama 모델 설치 완료 — \(name)")
+                #endif
+                return .run { send in
+                    let running = await OllamaService.isServerRunning()
+                    let models = running ? await OllamaService.listModels() : []
+                    await send(.ollamaStatusChecked(running: running, models: models))
+                }
+
+            case let .ollamaPullFailed(_, message):
+                state.ollamaPullProgress = nil
+                state.ollamaInstallingModel = nil
+                state.ollamaPullError = message
+                return .none
+
+            case let .deleteOllamaModel(name):
+                return .run { send in
+                    try? await OllamaService.deleteModel(name)
+                    OllamaService.invalidateServerCache()
+                    #if DEBUG
+                    DebugLogManager.shared?.append("[Settings] Ollama 모델 삭제 완료 — \(name)")
+                    #endif
+                    let running = await OllamaService.isServerRunning()
+                    let models = running ? await OllamaService.listModels() : []
+                    await send(.ollamaStatusChecked(running: running, models: models))
+                }
+
+            case let .setNVIDIAAPIKey(key):
+                state.nvidiaAPIKey = key
+                return .none
+
+            case let .fetchCloudModels(kind):
+                #if DEBUG
+                DebugLogManager.shared?.append("[Settings] \(kind.displayName) 모델 목록 조회 요청")
+                #endif
+                switch kind {
+                case .ollama:
+                    return .none
+                case .gemini:
+                    guard !state.geminiAPIKey.isEmpty else {
+                        state.cloudModelError = "Gemini API 키를 먼저 입력해 주세요"
+                        return .none
+                    }
+                    state.geminiModelsLoading = true
+                    state.cloudModelError = nil
+                    let apiKey = state.geminiAPIKey
+                    return .run { send in
+                        do {
+                            let models = try await GeminiService.listModels(apiKey: apiKey)
+                            await send(.cloudModelsLoaded(.gemini, models))
+                        } catch {
+                            await send(.cloudModelsFailed(.gemini, error.localizedDescription))
+                        }
+                    }
+                case .nvidia:
+                    guard !state.nvidiaAPIKey.isEmpty else {
+                        state.cloudModelError = "NVIDIA API 키를 먼저 입력해 주세요"
+                        return .none
+                    }
+                    state.nvidiaModelsLoading = true
+                    state.cloudModelError = nil
+                    let apiKey = state.nvidiaAPIKey
+                    return .run { send in
+                        do {
+                            let models = try await NVIDIAService.listModels(apiKey: apiKey)
+                            await send(.cloudModelsLoaded(.nvidia, models))
+                        } catch {
+                            await send(.cloudModelsFailed(.nvidia, error.localizedDescription))
+                        }
+                    }
+                case .openRouter:
+                    state.openRouterModelsLoading = true
+                    state.cloudModelError = nil
+                    return .run { send in
+                        do {
+                            let models = try await OpenRouterService.listModels()
+                            await send(.cloudModelsLoaded(.openRouter, models))
+                        } catch {
+                            await send(.cloudModelsFailed(.openRouter, error.localizedDescription))
+                        }
+                    }
+                }
+
+            case let .cloudModelsLoaded(kind, models):
+                #if DEBUG
+                DebugLogManager.shared?.append("[Settings] ✅ \(kind.displayName) 모델 목록 갱신 — \(models.count)개")
+                #endif
+                switch kind {
+                case .ollama: break
+                case .gemini:
+                    state.geminiModels = models
+                    state.geminiModelsLoading = false
+                case .nvidia:
+                    state.nvidiaModels = models
+                    state.nvidiaModelsLoading = false
+                case .openRouter:
+                    state.openRouterModels = models.sorted {
+                        ($0.isFree == $1.isFree) ? $0.id < $1.id : $0.isFree && !$1.isFree
+                    }
+                    state.openRouterModelsLoading = false
+                }
+                return .none
+
+            case let .cloudModelsFailed(kind, message):
+                #if DEBUG
+                DebugLogManager.shared?.append("[Settings] ❌ \(kind.displayName) 모델 목록 실패 — E-MAC-NET-1004 \(message)")
+                #endif
+                state.cloudModelError = message
+                switch kind {
+                case .ollama: break
+                case .gemini: state.geminiModelsLoading = false
+                case .nvidia: state.nvidiaModelsLoading = false
+                case .openRouter: state.openRouterModelsLoading = false
+                }
+                return .none
+
+            case let .setModelSearchText(text):
+                state.modelSearchText = text
+                return .none
+
+            case .toggleOpenRouterFreeOnly:
+                state.openRouterFreeOnly.toggle()
                 return .none
 
             case .clearDerivedAIData:

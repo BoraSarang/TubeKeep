@@ -71,6 +71,87 @@ struct SettingsAutomationTab: View {
             }
 
             SettingsComponents.sectionHeader(
+                title: "음성 합성 (TTS)",
+                subtitle: "팟캐스트 음성 합성 엔진 선택"
+            )
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "엔진 선택", description: "팟캐스트 생성 시 사용할 TTS 엔진") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.ttsEngine },
+                        set: { store.send(.setTTSEngine($0)) }
+                    )
+                ) {
+                    ForEach(TTSEngine.allCases, id: \.self) { engine in
+                        Text(engine.displayName).tag(engine)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+            }
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "엔진 정보") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(store.ttsEngine.description)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            SettingsComponents.sectionHeader(
+                title: "로컬 자막 생성 (Whisper)",
+                subtitle: "로컬 동영상 파일의 음성을 인식하여 자동 자막 생성"
+            )
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "Whisper 사용", description: "자막이 없는 동영상에서 Whisper로 자막 생성") {
+                Toggle("", isOn: Binding(
+                    get: { store.enableWhisperTranscription },
+                    set: { _ in
+                        store.send(.toggleWhisperTranscription)
+                        store.send(.checkWhisperModelStatus)
+                    }
+                ))
+                .controlSize(.small)
+            }
+
+            SettingsComponents.divider()
+
+            SettingsRow(title: "모델 크기", description: "큰 모델일수록 정확도↑ 속도↓") {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { store.whisperModelSize },
+                        set: { store.send(.setWhisperModelSize($0)) }
+                    )
+                ) {
+                    Text("Tiny (~75 MB)").tag("tiny")
+                    Text("Base (~142 MB)").tag("base")
+                    Text("Small (~466 MB)").tag("small")
+                    Text("Medium (~1.5 GB)").tag("medium")
+                    Text("Large (~2.9 GB)").tag("large")
+                }
+                .pickerStyle(.menu)
+                .font(.callout)
+                .fixedSize()
+            }
+            .opacity(store.enableWhisperTranscription ? 1 : 0.4)
+            .disabled(!store.enableWhisperTranscription)
+
+            if store.enableWhisperTranscription {
+                SettingsComponents.divider()
+
+                whisperModelStatusRow
+            }
+
+            SettingsComponents.sectionHeader(
                 title: "행동 로그",
                 subtitle: "유휴 자동화가 실행한 작업을 순서대로 기록합니다"
             )
@@ -115,6 +196,9 @@ struct SettingsAutomationTab: View {
         }
         .onAppear {
             refreshLogs()
+            if store.enableWhisperTranscription {
+                store.send(.checkWhisperModelStatus)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: ActivityLogStore.activityLogDidChangeNotification)) { _ in
             refreshLogs()
@@ -123,6 +207,70 @@ struct SettingsAutomationTab: View {
 
     private func refreshLogs() {
         activityLogs = ActivityLogStore.shared.loadRecent(limit: 500)
+    }
+
+    private var whisperModelStatusRow: some View {
+        SettingsRow(title: "모델 상태", description: whisperStatusDescription) {
+            HStack(spacing: 8) {
+                switch store.whisperModelStatus {
+                case .unknown, .notInstalled:
+                    Button("모델 다운로드") {
+                        store.send(.downloadWhisperModel)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                case .downloading:
+                    HStack(spacing: 8) {
+                        ProgressView(value: store.whisperModelProgress)
+                            .progressViewStyle(.linear)
+                            .frame(width: 100)
+                        Text("\(Int(store.whisperModelProgress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("취소") {
+                            store.send(.cancelWhisperModelDownload)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.red)
+                        .controlSize(.small)
+                    }
+
+                case .installed:
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.system(size: 14))
+                        Text("설치됨")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Button("재설치") {
+                            store.send(.downloadWhisperModel)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                        .controlSize(.small)
+                    }
+
+                case .error:
+                    Button("다시 시도") {
+                        store.send(.downloadWhisperModel)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private var whisperStatusDescription: String {
+        switch store.whisperModelStatus {
+        case .unknown: return "확인 중..."
+        case .notInstalled: return "모델이 설치되지 않았습니다"
+        case .downloading: return "다운로드 중..."
+        case .installed: return "모델이 설치되었습니다"
+        case .error: return "다운로드 실패: \(store.whisperModelError ?? "알 수 없는 오류")"
+        }
     }
 
     private var idleSubtitleRow: some View {

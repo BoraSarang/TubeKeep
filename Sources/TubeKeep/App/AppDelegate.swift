@@ -607,7 +607,7 @@ func applicationDidFinishLaunching(_ notification: Notification) {
     }
 
     @objc private func openWhisperSettings() {
-        store.send(.settings(.setSelectedTab(.ai)))
+        store.send(.settings(.setSelectedTab(.automation)))
         openSettingsWindow()
     }
 

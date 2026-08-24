@@ -70,11 +70,36 @@ actor SummarizationService {
         }
 
         log("[AI Fallback] 사용 가능한 서비스 — Gemini: \(geminiAPIKey.isEmpty ? "없음" : "있음"), OpenRouter: \(openRouterAPIKey.isEmpty ? "없음" : "있음"), yTeaser: 항상 사용")
+        let nvidiaAPIKey = UserDefaults.standard.string(forKey: "nvidiaAPIKey") ?? ""
 
         let steps: [LLMChainStep<SummaryResult>] = [
+            LLMChainStep(provider: "Ollama", isAvailable: OllamaService.isEnabled) {
+                let text = try await self.fetchTranscript(videoId: videoId, progress: progress)
+                self.log("[AI Fallback] 1순위: Ollama 시도 — 자막 길이: \(text.count)자")
+                progress?("로컬 AI 요약 생성 중...")
+                let response = try await OllamaService.tryLocalChat(
+                    prompt: LLMPrompts.summary(transcript: text, title: title, channel: channel),
+                    systemMessage: "당신은 YouTube 영상 요약 전문가입니다. 반드시 한국어로만 답변하세요. 영어를 사용하지 마세요.",
+                    timeout: 300
+                )
+                let parsed = SummaryParser.parse(response)
+                return SummaryResult(overview: parsed.overview, keyPoints: parsed.keyPoints, chapters: parsed.chapters, provider: "Ollama")
+            },
             LLMChainStep(provider: "Gemini", isAvailable: !geminiAPIKey.isEmpty) {
                 let result = try await self.summarize(videoId: videoId, title: title, channel: channel, apiKey: geminiAPIKey, progress: progress)
                 return result
+            },
+            LLMChainStep(provider: "NVIDIA", isAvailable: !nvidiaAPIKey.isEmpty) {
+                self.log("[AI Fallback] NVIDIA 시도 — videoId: \(videoId)")
+                let text = try await self.fetchTranscript(videoId: videoId, progress: progress)
+                progress?("NVIDIA 요약 생성 중...")
+                let response = try await NVIDIAService.tryChat(
+                    prompt: LLMPrompts.summary(transcript: text, title: title, channel: channel),
+                    apiKey: nvidiaAPIKey,
+                    systemMessage: "당신은 YouTube 영상 요약 전문가입니다. 반드시 한국어로만 답변하세요. 영어를 사용하지 마세요."
+                )
+                let parsed = SummaryParser.parse(response)
+                return SummaryResult(overview: parsed.overview, keyPoints: parsed.keyPoints, chapters: parsed.chapters, provider: "NVIDIA")
             },
             LLMChainStep(provider: "OpenRouter", isAvailable: !openRouterAPIKey.isEmpty) {
                 self.log("[AI Fallback] 2순위: OpenRouter 시도 — videoId: \(videoId)")
@@ -387,6 +412,7 @@ actor SummarizationService {
         case .parsingFailed: return .summaryFailed("Gemini API 응답 파악 실패")
         case .connectionFailed: return .apiUnavailable("Gemini API에 연결할 수 없습니다.")
         case .invalidResponse: return .apiUnavailable("Gemini API 응답이 없습니다")
+        case .invalidAPIKey: return .summaryFailed("Gemini API 키가 없습니다. 설정에서 API 키를 확인해 주세요.")
         }
     }
 

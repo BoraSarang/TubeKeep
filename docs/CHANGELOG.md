@@ -23,7 +23,16 @@
 - **폰트 표준화**: HomeView/DownloadQueueView의 8~9px → 10px 상향 (아이콘/메타 텍스트)
 - **검증**: 빌드 성공 + a11y로 3개 다운로더 창 툴바에서 핀 버튼만 존재 확인 (닫기 0건)
 
+### 로컬 LLM(Ollama·NVIDIA NIM) 통합 + 설정 탭 재구성 (T-1210) ✅
+- **AI 체인 확장**: `Ollama → Gemini → NVIDIA → OpenRouter → yTeaser/규칙기반` — OllamaService(네이티브 /api/chat, num_ctx 8192 명시로 요약 15,000자 소화), NVIDIAService(OpenAI 호환 integrate.api.nvidia.com/v1) 신설. 요약/태깅/Q&A/마인드맵/팟캐스트/유사영상/채널인사이트 전 경유지 반영, 로컬 실패 시 클라우드 자동 폴백
+- **설정 탭 재구성**: "AI"→"공급자" 개명 + "모델" 탭 신설. 공급자 탭: Ollama 연결테스트(✓/✗ 결과)+하위 인덴트, Gemini/NVIDIA/OpenRouter/yTeaser 상태점 행. 모델 탭: 4공급자 세그먼트 + 검색 + 개수 배지(`102개`/`12 / 102개`) + AIModelTalk식 **사용함/사용안함 토글**(enabledModels 배열 — 켠 모델 순서대로 시도하는 공급자 내 폴백). TTS/Whisper는 자동화 탭으로 이동
+- **모델 관리**: Ollama 설치(pull 진행률 NDJSON 스트림 파싱)/삭제, NVIDIA 추천 2개(gpt-oss-20b·nemotron-super-49b) 목록 최상단 고정, OpenRouter 무료 필터(pricing==0)
+- **버그 수정**: 공급자 API 키 SecureField가 UserDefaults 직접 바인딩이라 붙여넣기 시 문자열 2배 중복되던 문제 → AIModelTalk ProviderRow 패턴(@State+저장 버튼) 전환. Gemini/NVIDIA 모델 목록 조회에 HTTP 상태 체크 추가(401이 조용히 빈 목록이 되던 문제) + 조회 전 과정 디버그 로그([Settings] 시작/성공 N개/실패 E-MAC-NET-1004)
+- **검증**: 빌드 성공. 실측 로그 — OpenRouter 422개(무료 22)/Gemini 34개/NVIDIA 102개 조회 성공
+
 ### 플레이어 유휴 CPU/GPU 최적화 (T-1208) ✅
+
+
 - **증상**: 보관함만 표시된 유휴 상태에서 CPU 25.6% — mpv CVDisplayLink가 영상 재생 없이도 60~120fps로 renderFrame→flushBuffer(GPU 프레임 제출) 무한 실행
 - **수정**: renderFrame() 진입 시 `mpv_render_context_update()`의 MPV_RENDER_UPDATE_FRAME 플래그 검사 — 새 프레임 없으면(무로드/일시정지/정지) GL 잠금·렌더·제출 전부 스킵 (mpv 표준 패턴)
 - **라이프사이클**: pauseRendering()(창 닫힘 시 디스플레이 링크 정지) + loadFile/loadStream 시 ensureDisplayLinkRunning 재개 보장 + setupDisplayLink 멱등화

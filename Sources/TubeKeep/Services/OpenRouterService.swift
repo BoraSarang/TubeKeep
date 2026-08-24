@@ -73,11 +73,72 @@ struct OpenRouterService {
 
     // MARK: - Public Chat Completion
 
+    /// 모델 목록 조회 (공개 API — 키 불필요)
+    static func listModels() async throws -> [CloudModelInfo] {
+        guard let url = URL(string: "https://openrouter.ai/api/v1/models") else {
+            throw OpenRouterError.decodingFailed
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+
+        logS("[Settings] OpenRouter 모델 목록 조회 시작")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            logS("[Settings] OpenRouter 모델 조회 실패 — HTTP \(status)")
+            throw OpenRouterError.apiError("HTTP \(status)")
+        }
+
+        struct ModelsResponse: Decodable {
+            struct Entry: Decodable {
+                struct Pricing: Decodable { let prompt: String }
+                let id: String
+                let name: String?
+                let context_length: Int?
+                let pricing: Pricing?
+            }
+            let data: [Entry]?
+        }
+
+        let decoded = try JSONDecoder().decode(ModelsResponse.self, from: data)
+        let models = (decoded.data ?? [])
+            .map { entry in
+                CloudModelInfo(
+                    id: entry.id,
+                    displayName: entry.name ?? "",
+                    contextLength: entry.context_length,
+                    isFree: entry.pricing?.prompt == "0"
+                )
+            }
+        let freeCount = models.filter(\.isFree).count
+        logS("[Settings] ✅ OpenRouter 모델 목록 성공 — \(models.count)개 (무료 \(freeCount)개)")
+        return models
+    }
+
     func chatCompletion(
         prompt: String,
         apiKey: String,
         systemMessage: String = "당신은 한국어로 답변하는 전문가입니다."
     ) async throws -> String {
+        // 최우선: 로컬 Ollama (설치·실행 중일 때만). 실패 시 조용히 클라우드로 폴백.
+        if let local = try? await OllamaService.tryLocalChat(
+            prompt: prompt,
+            systemMessage: systemMessage,
+            timeout: 180
+        ) {
+            return local
+        }
+
+        // 2순위: NVIDIA NIM (키 있을 때만)
+        let nvidiaKey = UserDefaults.standard.string(forKey: "nvidiaAPIKey") ?? ""
+        if !nvidiaKey.isEmpty, let nvidia = try? await NVIDIAService.tryChat(
+            prompt: prompt,
+            apiKey: nvidiaKey,
+            systemMessage: systemMessage
+        ) {
+            return nvidia
+        }
+
         let messages: [[String: String]] = [
             ["role": "system", "content": systemMessage],
             ["role": "user", "content": prompt]
@@ -99,18 +160,22 @@ struct OpenRouterService {
             throw OpenRouterError.decodingFailed
         }
 
-        let userModel = UserDefaults.standard.string(forKey: "openRouterModel") ?? Constants.defaultOpenRouterModel
-
-        // 1차: 사용자 지정 모델로 요청
-        log("[OpenRouter] 요청 시작 — 모델: \(userModel)")
-        if let result = try? await sendRequest(url: url, apiKey: apiKey, model: userModel, messages: messages) {
-            return result
+        // 토글로 켠 모델들을 순서대로 시도 → 마지막에 openrouter/free 폴백
+        let enabled = CloudModelPrefs.enabled(.openRouter)
+        let candidates = enabled.isEmpty ? [] : enabled
+        if candidates.count > 1 {
+            log("[OpenRouter] 사용 모델 \(candidates.count)개 순서대로 시도 — \(candidates.joined(separator: " → "))")
+        }
+        for model in candidates {
+            if let result = try? await sendRequest(url: url, apiKey: apiKey, model: model, messages: messages) {
+                return result
+            }
         }
 
-        // 2차: 429 에러 시 openrouter/free로 폴백
-        if userModel != Constants.defaultOpenRouterModel {
-            log("[OpenRouter] 모델 \(userModel) 실패 → openrouter/free로 폴백")
-            if let result = try? await sendRequest(url: url, apiKey: apiKey, model: Constants.defaultOpenRouterModel, messages: messages) {
+        let fallbackModel = Constants.defaultOpenRouterModel
+        if !candidates.contains(fallbackModel) {
+            log("[OpenRouter] 사용 모델 전부 실패 → openrouter/free로 폴백")
+            if let result = try? await sendRequest(url: url, apiKey: apiKey, model: fallbackModel, messages: messages) {
                 log("[OpenRouter] openrouter/free 폴백 성공")
                 return result
             }
@@ -160,6 +225,14 @@ struct OpenRouterService {
         return content
     }
 
+    private static func logS(_ message: String) {
+        #if DEBUG
+        Task { @MainActor in
+            DebugLogManager.shared?.append(message)
+        }
+        #endif
+    }
+
     private func log(_ message: String) {
         #if DEBUG
         Task { @MainActor in
@@ -172,6 +245,17 @@ struct OpenRouterService {
         prompt: String,
         apiKey: String
     ) async throws -> String {
+        // 최우선: 로컬 Ollama — JSON 배열 형식 요구 포함해 전체 프롬프트 전달. 실패 시 클라우드 폴백.
+        let podcastSystem = "당신은 한국어 팟캐스트 대화 스크립트 전문가입니다. 반드시 모든 출력은 한국어로만 작성하세요. 영어 단어를 절대 사용하지 마세요. 반드시 JSON 배열만 출력하세요. 다른 텍스트를 포함하지 마세요."
+        if let local = try? await OllamaService.tryLocalChat(
+            prompt: prompt + "\n\n[중요] 반드시 한국어로만 답변하세요. 반드시 JSON 배열 [{\"speaker\":\"진행자A\",\"text\":\"...\"}] 형식만 출력하세요. 다른 설명 없이 JSON만 출력하세요.",
+            systemMessage: podcastSystem,
+            timeout: 300
+        ) {
+            log("[OpenRouter] 팟캐스트 — Ollama 로컬 생성 성공")
+            return local
+        }
+
         let podcastModels = [
             "nvidia/nemotron-3-super-120b-a12b:free",
             "google/gemma-4-31b-it:free",
