@@ -185,10 +185,13 @@ struct PlayerReducer {
                     await MainActor.run {
                         LibraryCacheService.shared.removeItem(id: videoId)
                         NotificationCenter.default.post(name: Constants.libraryDataDidChangeNotification, object: nil)
-                        if let window = NSApp.keyWindow, window.identifier?.rawValue == "player" {
-                            window.close()
-                        } else if let window = NSApp.windows.first(where: { $0.title == title }) {
-                            window.close()
+                        // 창을 'close'로 해제하지 않고 'performClose'(orderOut 숨김)으로 전환 —
+                        // PlayerWindow가 재사용되므로 PlayerView 트리·팝오버가 강제 해제되며
+                        // TCA async 완료와 겹쳐 use-after-free가 나는 것을 방지한다. (T-1208 재사용과 정합)
+                        let playerWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "player" })
+                            ?? NSApp.keyWindow
+                        if let win = playerWindow, win.identifier?.rawValue == "player" || win.title == title {
+                            win.performClose(nil)
                         }
                     }
                 }

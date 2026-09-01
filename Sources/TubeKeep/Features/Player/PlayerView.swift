@@ -783,10 +783,6 @@ struct PlayerView: View {
 struct ClipSavePopoverView: View {
     let progress: Double
     let isComplete: Bool
-    @State private var elapsed: TimeInterval = 0
-    @State private var startTime = Date()
-    @State private var animProgress: Double = 0
-    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -797,47 +793,16 @@ struct ClipSavePopoverView: View {
                 Text(isComplete ? "클립 저장 완료" : "클립 저장 중...")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(Int((isComplete ? 1 : animProgress) * 100))%")
+                Text("\(Int(min(max(progress, 0), 1) * 100))%")
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
             }
-            ProgressView(value: isComplete ? 1 : animProgress)
+            ProgressView(value: min(max(progress, 0), 1))
                 .controlSize(.small)
-            HStack {
-                Text(isComplete ? "클립이 보관함에 저장되었습니다" : "경과 \(formatTime(elapsed))")
-                Spacer()
-                if !isComplete, let remaining = remainingTime {
-                    Text("남은 시간 약 \(formatTime(remaining))")
-                }
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            if !isComplete {
-                Text("저장 중에도 영상은 계속 시청할 수 있어요")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-            }
+            Text(isComplete ? "클립이 보관함에 저장되었습니다" : "저장 중에도 영상은 계속 시청할 수 있어요")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
         }
         .padding(12)
         .frame(width: 250)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6)) { animProgress = progress }
-        }
-        .onChange(of: progress) { _, newValue in
-            withAnimation(.easeOut(duration: 0.6)) { animProgress = newValue }
-        }
-        .onReceive(timer) { _ in
-            elapsed = Date().timeIntervalSince(startTime)
-        }
-    }
-
-    private var remainingTime: TimeInterval? {
-        guard progress > 0.03, elapsed > 1 else { return nil }
-        let total = elapsed / progress
-        return max(total - elapsed, 0)
-    }
-
-    private func formatTime(_ t: TimeInterval) -> String {
-        let total = Int(t)
-        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }

@@ -2,6 +2,12 @@
 
 ## v4.6 — 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1205) 🚧
 
+### 클립 팝오버 use-after-free 크래시 수정 (T-1211) ✅
+- **증상**: 재생(파일없음) → 보관함 삭제 직후 메인 스레드 SIGSEGV. ips `TubeKeep-2026-09-01-123933`, frame12 `ClipSavePopoverView.body`
+- **원인**: `removeFromLibrary`가 `window.close()`로 플레이어 창을 해제 → PlayerView 트리 + `ClipSavePopoverView`(팝오버) observation `StoredLocation`이 강제 정리되는 동안, 같은 `.run` async가 `completeTaskWithClosure`로 메인 복귀하며 이미 해제된 객체를 `objc_release` → use-after-free. `close()`는 `PlayerWindow.performClose`(orderOut 숨김)를 우회하는 경로였음
+- **수정**: ①`removeFromLibrary` 창 닫기를 `close()`→`performClose()`(orderOut 재사용, T-1208 정합)로 전환 ②`ClipSavePopoverView`에서 `Timer.publish` autoconnect·`withAnimation`·경과/남은시간 로직 제거, Store 값(`progress`/`isComplete`)만 그리는 순수 관찰 뷰로 단순화
+- **영향**: PlayerView·mpv 유지, 창 재사용 불변식 유지, 팝오버 정리 경합 제거
+
 ### 플레이어 AI 패널 + 네이티브 개선 (T-1201) 🔄
 - **AI 패널 통합**: `PlayerReducer`에 `showAIPanel`/`toggleAIPanel` 추가(기존 3개 패널과 상호 배타), `PlayerView`에 `AppReducer` store 주입, 툴바 sparkles 버튼으로 AI 패널 토글
 - **AI 공용 컴포넌트**: `AISectionViews.swift` 신설 — 요약/챕터/마인드맵/Q&A 4섹션을 `AISummarySection`/`AIChapterSection`/`AIMindmapSection`/`AIQnASection`으로 추출, AI 창과 플레이어 패널이 공유
