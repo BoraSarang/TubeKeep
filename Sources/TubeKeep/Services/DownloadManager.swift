@@ -322,10 +322,20 @@ final class DownloadManager: @unchecked Sendable {
 
     private func buildDownloadArgs(item: DownloadItem, outputDir: String, settings: Settings, filenameTemplate: String) -> [String] {
         let formatId: String = {
-            // 오디오만 추출: 영상 스트림은 받지 않고 최고 음질 m4a(원본 AAC)만 —
-            // 기존 bestvideo+bestaudio로 영상까지 받아 두 배 다운로드 되는 문제 제거.
+            // 오디오만 추출: 품질 그룹에 맞는 원본 오디오 스트림만 받는다 (영상 미수신).
             if item.audioOnly {
-                return "bestaudio[ext=m4a]/bestaudio/best"
+                switch item.audioBitrate {
+                // 유튜브 오디오 포맷은 고정(id 249/250/251=opus webm, 140=m4a 129k)이라
+                // 필터 문법(&&/범위) 대신 format id 기반으로 정확히 선택한다.
+                case .ultra:  // opus 251 ~160k
+                    return "251/bestaudio/best"
+                case .high:   // m4a 140 = 129k 원본 그대로
+                    return "140/bestaudio/best"
+                case .medium: // opus 250 ~70k (없으면 m4a 140)
+                    return "250/140/bestaudio/best"
+                case .low:    // opus 249 ~50k
+                    return "249/bestaudio/best"
+                }
             }
             let id = item.selectedFormat.id
             if id.contains("/") || id.contains("+") {
@@ -375,7 +385,11 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if item.audioOnly {
-            // formatId가 이미 bestaudio[ext=m4a] — 영상 없이 m4a 원본만. 별도 -x 변환 불필요.
+            // 원본이 m4a(140)인 고음질 그룹은 변환 없이 그대로. 그 외(opus webm 원본)는
+            // AAC/m4a로 변환해 항상 .m4a 산출물을 보장한다.
+            if !item.audioBitrate.keepsOriginalM4A {
+                args += ["-x", "--audio-format", "m4a", "--audio-quality", "0"]
+            }
         }
 
         if settings.sponsorBlock {

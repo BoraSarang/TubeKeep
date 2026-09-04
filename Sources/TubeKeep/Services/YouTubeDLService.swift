@@ -290,16 +290,20 @@ actor YouTubeDLService {
 
             // 순수 오디오 포맷(height=0, 예: 139/140/249/250/251) — 별도 수집해 목록에 포함
             if isAudioOnly && height == 0 {
+                let abr = fmt["abr"] as? Double ?? fmt["tbr"] as? Double
+                let realExt = ext == "webm" ? "webm" : (ext == "m4a" ? "m4a" : "mp4")
+                let bitrateText = abr.map { "\(Int($0.rounded()))k" } ?? ""
                 audioFormats.append(Format(
                     id: formatId,
-                    label: "Audio",
+                    label: bitrateText.isEmpty ? "Audio" : bitrateText,
                     height: 0,
-                    ext: ext == "webm" ? "webm" : "mp4",
+                    ext: realExt,
                     codec: codec,
                     filesize: filesize,
                     fps: fps,
                     isVideoOnly: false,
-                    isAudioOnly: true
+                    isAudioOnly: true,
+                    abr: abr.map { Int($0.rounded()) }
                 ))
                 continue
             }

@@ -2,6 +2,15 @@
 
 ## v4.6 — 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1205) 🚧
 
+### 오디오 품질(비트레이트) 선택 (T-1213) ✅
+- **요구**: "오디오만 추출" 시 최상 m4a(129k)로 고정되어 용량이 큼 → 품질 선택 필요
+- **추가**: 오디오 품질 그룹 Picker (기본 = **중간음질 70k**): 초고 160k / 고 129k / 중 70k / 저 50k
+- **선택 방식**: 유튜브 고정 오디오 포맷 id 기반(251=210k→초고, 140=m4a 129k→고, 250=70k→중, 249=50k→저) — yt-dlp `abr` 범위·`!=` 필터는 문법 invalid라 포맷 id 직접 지정으로 전환
+- **m4a 산출물**: 원본이 webm(opus)인 그룹(초고/중/저)은 `-x --audio-format m4a`로 변환해 **항상 .m4a 1개** 보장. 고음질(140, m4a 원본)은 변환 없이 그대로(품질 손실 0)
+- **데이터**: Format.abr 파싱(label 품질 표기, ext m4a 정확화), AudioBitrate enum(DownloadItem 저장), 옛 저장 JSON 역호환 커스텀 디코더(decodeIfPresent)
+- **UI**: 해상도 Picker 자리에 품질 Picker + 그룹별 예상 용량 표시, 다운로드 목록 `M4A 70k` 표기
+- **파일**: DownloadItem.swift, Format.swift, YouTubeDLService.swift, HomeReducer.swift, HomeView.swift, DownloadManager.swift
+
 ### 오디오만 추출 = 영상 제외 m4a 진짜 다운로드 (T-1212) ✅
 - **버그**: "오디오만 추출" 체크해도 `formatId`가 `bestvideo+bestaudio`로 유지돼 **영상(webm/mp4 비디오 스트림)까지 받은 뒤** `-x`로 음성만 남김 — 불필요한 영상 다운로드(두 배) + 중간 파일(webm/mp4/aac/썸네일) 다수 발생
 - **수정**: audioOnly면 formatId를 `bestaudio[ext=m4a]/bestaudio/best`로 교체(영상 스트림 미수신), `-x --audio-format aac` 및 mp4 병합/리먹스 옵션 제거 → **최고 음질 m4a 원본 1개만** 다운로드

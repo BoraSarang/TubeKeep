@@ -10,9 +10,46 @@ struct Format: Identifiable, Equatable, Codable {
     let fps: Int?
     let isVideoOnly: Bool
     let isAudioOnly: Bool
+    let abr: Int?
+
+    init(id: String, label: String, height: Int, ext: String, codec: String,
+         filesize: Int64?, fps: Int?, isVideoOnly: Bool, isAudioOnly: Bool,
+         abr: Int? = nil) {
+        self.id = id
+        self.label = label
+        self.height = height
+        self.ext = ext
+        self.codec = codec
+        self.filesize = filesize
+        self.fps = fps
+        self.isVideoOnly = isVideoOnly
+        self.isAudioOnly = isAudioOnly
+        self.abr = abr
+    }
+
+    // abr은 비교적 최근에 추가됨 — 기존 저장 데이터(abr 키 없음)와의 역호환을 위해
+    // decodeIfPresent로 처리해 디코딩 실패를 막는다.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.label = try c.decode(String.self, forKey: .label)
+        self.height = try c.decode(Int.self, forKey: .height)
+        self.ext = try c.decode(String.self, forKey: .ext)
+        self.codec = try c.decode(String.self, forKey: .codec)
+        self.filesize = try c.decodeIfPresent(Int64.self, forKey: .filesize)
+        self.fps = try c.decodeIfPresent(Int.self, forKey: .fps)
+        self.isVideoOnly = try c.decode(Bool.self, forKey: .isVideoOnly)
+        self.isAudioOnly = try c.decode(Bool.self, forKey: .isAudioOnly)
+        self.abr = try c.decodeIfPresent(Int.self, forKey: .abr)
+    }
 
     var isCombined: Bool { !isVideoOnly && !isAudioOnly }
     var isMP4: Bool { ext == "mp4" }
+
+    var audioBitrateLabel: String {
+        guard isAudioOnly, let abr else { return "" }
+        return "\(abr)k"
+    }
 
     var filesizeFormatted: String {
         guard let f = filesize else { return "용량 미확인" }

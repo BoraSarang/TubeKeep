@@ -24,6 +24,7 @@ struct HomeReducer {
         var selectedFormatId: String?
         var includeSubtitles: Bool = false
         var audioOnly: Bool = false
+        var audioBitrate: AudioBitrate = .medium
         var errorMessage: String?
         var lastAutoFetchedURL: String = ""
         var clipboardMonitoring: Bool = true
@@ -59,6 +60,7 @@ struct HomeReducer {
         case formatSelected(String)
         case subtitlesToggled(Bool)
         case audioOnlyToggled(Bool)
+        case audioBitrateSelected(AudioBitrate)
         case addToQueueTapped
         case addToQueueResponse(DownloadItem)
         case playlistSelection(PresentationAction<PlaylistSelectionReducer.Action>)
@@ -139,6 +141,7 @@ struct HomeReducer {
                 state.videoInfo = info
                 state.availableFormats = formats
                 state.audioOnly = false
+                state.audioBitrate = .medium
                 state.includeSubtitles = false
                 state.urlString = ""
                 state.lastAutoFetchedURL = ""
@@ -202,6 +205,10 @@ struct HomeReducer {
                 }
                 return .none
 
+            case let .audioBitrateSelected(bitrate):
+                state.audioBitrate = bitrate
+                return .none
+
             case .addToQueueTapped:
                 guard let info = state.videoInfo,
                       let format = state.selectedFormat
@@ -218,6 +225,7 @@ struct HomeReducer {
                     selectedFormat: format,
                     includeSubtitles: state.includeSubtitles,
                     audioOnly: state.audioOnly,
+                    audioBitrate: state.audioBitrate,
                     channelUploadIndex: 0
                 )
                 return .send(.addToQueueResponse(item))

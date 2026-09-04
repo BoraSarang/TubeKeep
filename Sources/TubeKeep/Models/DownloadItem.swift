@@ -9,6 +9,40 @@ enum DownloadStatus: String, Equatable, Codable {
     case retrying
 }
 
+/// 오디오만 추출 시 품질(비트레이트) 그룹. 실제 YouTube 오디오 포맷 기반으로
+/// 원본을 고르고 필요한 경우 AAC/m4a로 변환해 저장한다.
+enum AudioBitrate: String, CaseIterable, Equatable, Codable, Identifiable {
+    case ultra   // opus 251 ~160k
+    case high    // m4a 140 = 129k (원본 그대로 — 변환 없음)
+    case medium  // opus 250 ~70k
+    case low     // opus 249 ~50k
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .ultra: return "초고 160k"
+        case .high: return "고 129k"
+        case .medium: return "중 70k"
+        case .low: return "저 50k"
+        }
+    }
+
+    var displayedKbps: Int {
+        switch self {
+        case .ultra: return 160
+        case .high: return 129
+        case .medium: return 70
+        case .low: return 50
+        }
+    }
+
+    /// 원본 포맷이 m4a(AAC)라 변환이 필요 없는 그룹(원본 그대로 보존).
+    var keepsOriginalM4A: Bool {
+        self == .high
+    }
+}
+
 struct DownloadItem: Identifiable, Equatable, Codable {
     static let mediaFileExtensions: Set<String> = ["mp4", "m4a", "mkv", "webm", "mp3", "aac"]
 
@@ -17,6 +51,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
     let selectedFormat: Format
     let includeSubtitles: Bool
     let audioOnly: Bool
+    let audioBitrate: AudioBitrate
     var isChannelDownload: Bool = false
     var outputPath: String?
     var status: DownloadStatus
@@ -33,6 +68,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
         selectedFormat: Format,
         includeSubtitles: Bool = false,
         audioOnly: Bool = false,
+        audioBitrate: AudioBitrate = .medium,
         isChannelDownload: Bool = false,
         channelUploadIndex: Int = 0,
         playlistIndex: Int? = nil
@@ -42,6 +78,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
         self.selectedFormat = selectedFormat
         self.includeSubtitles = includeSubtitles
         self.audioOnly = audioOnly
+        self.audioBitrate = audioBitrate
         self.isChannelDownload = isChannelDownload
         self.outputPath = nil
         self.status = .pending
@@ -64,7 +101,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
     var optionsLabel: String {
         var parts = [selectedFormat.label]
         if includeSubtitles { parts.append("자막") }
-        if audioOnly { parts.append("M4A") }
+        if audioOnly { parts.append("M4A \(audioBitrate.displayedKbps)k") }
         return parts.joined(separator: " + ")
     }
 
