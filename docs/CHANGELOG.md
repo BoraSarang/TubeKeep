@@ -2,6 +2,13 @@
 
 ## v4.6 — 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1205) 🚧
 
+### 오디오만 추출 = 영상 제외 m4a 진짜 다운로드 (T-1212) ✅
+- **버그**: "오디오만 추출" 체크해도 `formatId`가 `bestvideo+bestaudio`로 유지돼 **영상(webm/mp4 비디오 스트림)까지 받은 뒤** `-x`로 음성만 남김 — 불필요한 영상 다운로드(두 배) + 중간 파일(webm/mp4/aac/썸네일) 다수 발생
+- **수정**: audioOnly면 formatId를 `bestaudio[ext=m4a]/bestaudio/best`로 교체(영상 스트림 미수신), `-x --audio-format aac` 및 mp4 병합/리먹스 옵션 제거 → **최고 음질 m4a 원본 1개만** 다운로드
+- **썸네일**: `embedMetadata`(기본 true) 설정 시 `--embed-thumbnail`로 **m4a 파일에 앨범 아트 내장** (별도 webp 아님)
+- **UX**: 토글 라벨 `"오디오만 추출 (MP3)"`→`"오디오만 추출 (M4A)"`, audioOnly 시 해상도 Picker를 숨기고 **최상 m4a 예상 크기** 표시, 다운로드 옵션 표기 `AAC→M4A`
+- **파일**: DownloadManager.swift(buildDownloadArgs), HomeView.swift, DownloadItem.swift
+
 ### 클립 팝오버 use-after-free 크래시 수정 (T-1211) ✅
 - **증상**: 재생(파일없음) → 보관함 삭제 직후 메인 스레드 SIGSEGV. ips `TubeKeep-2026-09-01-123933`, frame12 `ClipSavePopoverView.body`
 - **원인**: `removeFromLibrary`가 `window.close()`로 플레이어 창을 해제 → PlayerView 트리 + `ClipSavePopoverView`(팝오버) observation `StoredLocation`이 강제 정리되는 동안, 같은 `.run` async가 `completeTaskWithClosure`로 메인 복귀하며 이미 해제된 객체를 `objc_release` → use-after-free. `close()`는 `PlayerWindow.performClose`(orderOut 숨김)를 우회하는 경로였음

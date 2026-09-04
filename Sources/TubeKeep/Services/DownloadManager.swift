@@ -322,6 +322,11 @@ final class DownloadManager: @unchecked Sendable {
 
     private func buildDownloadArgs(item: DownloadItem, outputDir: String, settings: Settings, filenameTemplate: String) -> [String] {
         let formatId: String = {
+            // 오디오만 추출: 영상 스트림은 받지 않고 최고 음질 m4a(원본 AAC)만 —
+            // 기존 bestvideo+bestaudio로 영상까지 받아 두 배 다운로드 되는 문제 제거.
+            if item.audioOnly {
+                return "bestaudio[ext=m4a]/bestaudio/best"
+            }
             let id = item.selectedFormat.id
             if id.contains("/") || id.contains("+") {
                 return id
@@ -346,10 +351,13 @@ final class DownloadManager: @unchecked Sendable {
             "--no-warnings",
         ]
         args += Constants.youtubeExtractorArgs
+        // 오디오만: m4a 원본을 그대로 받으므로 병합/리먹스 불필요 (webm 오디오 리먹스로
+        // m4a가 깨지는 것 방지). 영상 모드에만 mp4 병합 적용.
+        if !item.audioOnly {
+            args += ["--merge-output-format", "mp4", "--remux-video", "mp4"]
+        }
         args += [
             "-f", formatId,
-            "--merge-output-format", "mp4",
-            "--remux-video", "mp4",
             "--ignore-no-formats-error",
             "-o", constructOutputTemplate(item: item, outputDir: outputDir, filenameTemplate: filenameTemplate),
         ]
@@ -367,7 +375,7 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if item.audioOnly {
-            args += ["-x", "--audio-format", "aac", "--audio-quality", "0"]
+            // formatId가 이미 bestaudio[ext=m4a] — 영상 없이 m4a 원본만. 별도 -x 변환 불필요.
         }
 
         if settings.sponsorBlock {

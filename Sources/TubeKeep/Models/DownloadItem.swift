@@ -64,7 +64,7 @@ struct DownloadItem: Identifiable, Equatable, Codable {
     var optionsLabel: String {
         var parts = [selectedFormat.label]
         if includeSubtitles { parts.append("자막") }
-        if audioOnly { parts.append("AAC") }
+        if audioOnly { parts.append("M4A") }
         return parts.joined(separator: " + ")
     }
 

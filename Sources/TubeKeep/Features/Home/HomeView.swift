@@ -221,18 +221,32 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 6) {
-                Picker("", selection: Binding(
-                    get: { store.selectedFormatId ?? "" },
-                    set: { store.send(.formatSelected($0)) }
-                )) {
-                    ForEach(store.availableFormats) { format in
-                        Text("\(format.label) (\(format.filesizeFormatted))")
-                            .tag(format.id)
+                if store.audioOnly {
+                    // 오디오만 모드: 해상도는 무의미 — 최상 m4a와 예상 크기 표시
+                    let bestAudio = store.availableFormats
+                        .filter { $0.isAudioOnly }
+                        .sorted { ($0.filesize ?? 0) > ($1.filesize ?? 0) }
+                        .first
+                    Label(
+                        "오디오 \(bestAudio?.filesizeFormatted ?? "용량 미확인")",
+                        systemImage: "music.note"
+                    )
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                } else {
+                    Picker("", selection: Binding(
+                        get: { store.selectedFormatId ?? "" },
+                        set: { store.send(.formatSelected($0)) }
+                    )) {
+                        ForEach(store.availableFormats) { format in
+                            Text("\(format.label) (\(format.filesizeFormatted))")
+                                .tag(format.id)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 200)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 200)
 
                 Spacer()
 
@@ -245,7 +259,7 @@ struct HomeView: View {
                     .toggleStyle(.checkbox)
                 }
 
-                Toggle("오디오만 추출 (MP3)", isOn: Binding(
+                Toggle("오디오만 추출 (M4A)", isOn: Binding(
                     get: { store.audioOnly },
                     set: { store.send(.audioOnlyToggled($0)) }
                 ))

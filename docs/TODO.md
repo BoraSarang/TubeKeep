@@ -39,6 +39,7 @@
 | T-1208 | **유휴 CPU/GPU 최적화** — mpv 디스플레이 링크 무한 렌더(25% CPU) 수정. 프레임 플래그 게이팅 + 라이프사이클 보강 + 인스턴스 누수 해결(닫기=숨김 재사용 설계) | high | ✅ 완료 | 유휴 25.6%→0.0%. 재생 6회/닫기 5회 실측: client·창 생성 각 1회, 전부 재사용, willClose 0건 |
 | T-1210 | **로컬 LLM(Ollama) + NVIDIA NIM 통합, 설정 탭 재구성(공급자/모델)** — OllamaService·NVIDIAService 신설, 모든 AI 체인 최우선 단계 삽입, 설정 "AI"→"공급자" 개명 + "모델" 탭 신설(4공급자 사용 토글·설치/삭제·진행률), TTS/Whisper 자동화 이동 | high | ✅ 완료 | PLAN_v4.7. 체인: Ollama→Gemini→NVIDIA→OpenRouter→yTeaser/규칙. AIModelTalk식 enabledModels 토글(공급자 내 순차 폴백), SecureField 중복 버그 수정(@State+저장버튼) |
 | T-1211 | **클립 팝오버 use-after-free 크래시 수정(SIGSEGV)** — 보관함 삭제(removeFromLibrary)가 window.close()로 PlayerView 트리·ClipSavePopoverView를 강제 해제하며 TCA async 완료(completeTaskWithClosure)와 겹쳐 objc_release 크래시(9/1 12:39). 창 닫기를 close→performClose(orderOut 숨김, T-1208 정합)로 전환 + ClipSavePopoverView에서 Timer.publish/withAnimation/경과시간 제거(순수 관찰로 단순화) | high | ✅ 완료 | PlayerReducer.swift, PlayerView.swift. ips `TubeKeep-2026-09-01-123933`, frame12 `ClipSavePopoverView.body` |
+| T-1212 | **오디오만 추출 = 영상 제외 m4a 진짜 다운로드** — audioOnly인데 bestvideo+bestaudio로 영상 스트림까지 받아 두 배로 받던 문제 수정. formatId를 `bestaudio[ext=m4a]/bestaudio/best`로 교체하고 `-x --audio-format aac` 제거(원본 m4a 그대로, 썸네일은 embedMetadata 설정 시 내장). 토글 라벨 MP3→M4A, audioOnly 시 해상도 Picker 숨김 + 최상 m4a 예상 크기 표시, optionsLabel AAC→M4A | high | ✅ 완료 | DownloadManager.formatId/옵션, HomeView(라벨·크기·Picker), DownloadItem.optionsLabel |
 
 ## v4.4 — 오디오 다운로드 실패 수정 (macOS, T-1182~T-1183) 🚧
 
