@@ -245,6 +245,9 @@ final class DownloadManager: @unchecked Sendable {
                         if item.includeSubtitles, let mediaPath = actualPath {
                             Self.saveSubtitlesToDB(videoPath: mediaPath)
                         }
+                        // 성공해도 썸네일(.webp/.png)·내장 실패 잔여(.temp.m4a) 등이 남을 수
+                        // 있으므로 같은 videoId의 부산물만 정리한다 (완성 파일은 유지).
+                        Self.cleanupPartialFiles(videoId: item.videoInfo.id, in: outputDir)
                         completionHandler(item.id, true, actualPath, nil)
                         if s.playSoundOnComplete {
                             _ = await MainActor.run {
@@ -387,8 +390,8 @@ final class DownloadManager: @unchecked Sendable {
         if item.audioOnly {
             // 원본이 m4a(140)인 고음질 그룹은 변환 없이 그대로. 그 외(opus webm 원본)는
             // AAC/m4a로 변환해 항상 .m4a 산출물을 보장한다.
-            if !item.audioBitrate.keepsOriginalM4A {
-                args += ["-x", "--audio-format", "m4a", "--audio-quality", "0"]
+            if let quality = item.audioBitrate.conversionQuality {
+                args += ["-x", "--audio-format", "m4a", "--audio-quality", quality]
             }
         }
 
@@ -397,7 +400,12 @@ final class DownloadManager: @unchecked Sendable {
         }
 
         if settings.embedMetadata {
-            args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata", "--embed-thumbnail"]
+            args += ["--ffmpeg-location", Constants.ffmpegDirectory, "--embed-metadata"]
+            // 오디오(m4a)에서는 썸네일 내장이 내장 ffmpeg에서 실패해 0바이트 .temp.m4a만
+            // 남기고 ERROR를 뱉으므로 제외한다. 영상(mp4) 내장은 유지.
+            if !item.audioOnly {
+                args += ["--embed-thumbnail"]
+            }
         }
 
         args.append(item.videoInfo.webpageURL)
@@ -436,6 +444,7 @@ final class DownloadManager: @unchecked Sendable {
                 let isPartial = file.hasSuffix(".part")
                     || ["webp", "jpg", "png", "jpeg"].contains(ext)
                     || file.range(of: #"\.f\d+\."#, options: .regularExpression) != nil
+                    || file.range(of: #"\.temp\."#, options: .regularExpression) != nil
                 if isPartial {
                     try? FileManager.default.removeItem(atPath: "\(dir)/\(file)")
                 }

@@ -228,7 +228,7 @@ struct HomeView: View {
                         set: { store.send(.audioBitrateSelected($0)) }
                     )) {
                         ForEach(AudioBitrate.allCases) { bitrate in
-                            let size = estimatedAudioSize(in: store.availableFormats, for: bitrate)
+                            let size = estimatedAudioSize(for: bitrate, duration: store.videoInfo?.duration)
                             Text(size == nil
                                 ? bitrate.label
                                 : "\(bitrate.label) (~\(size!))")
@@ -304,29 +304,18 @@ struct HomeView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
-    /// 품질 그룹에 해당하는 오디오 포맷의 예상 용량(없으면 nil).
-    private func estimatedAudioSize(in formats: [Format], for bitrate: AudioBitrate) -> String? {
-        let matched: Format? = {
-            let audios = formats.filter { $0.isAudioOnly && $0.filesize != nil }
-            switch bitrate {
-            case .ultra:
-                return audios.filter { ($0.abr ?? 0) > 128 }.first
-            case .high:
-                return audios.first { $0.ext == "m4a" && ($0.abr ?? 0) <= 129 && ($0.abr ?? 0) > 100 }
-            case .medium:
-                return audios.first { $0.ext != "m4a" && ($0.abr ?? 0) > 60 && ($0.abr ?? 0) <= 128 }
-            case .low:
-                return audios.first { $0.ext != "m4a" && ($0.abr ?? 0) <= 60 }
-            }
-        }()
-        guard let size = matched?.filesize else { return nil }
-        if size < 1_000_000 {
-            return String(format: "%.0f KB", Double(size) / 1_000)
+    /// 선택 비트레이트 × 영상 길이 기반 예상 용량. 변환 후 CBR로 고정되므로
+    /// 포맷 filesize_approx(원본 opus 기준)보다 실제 산출물에 가깝다.
+    private func estimatedAudioSize(for bitrate: AudioBitrate, duration: TimeInterval?) -> String? {
+        guard let duration, duration > 0 else { return nil }
+        let bytes = Double(bitrate.displayedKbps) * 1_000 / 8 * duration
+        if bytes < 1_000_000 {
+            return String(format: "%.0f KB", bytes / 1_000)
         }
-        if size < 1_000_000_000 {
-            return String(format: "%.1f MB", Double(size) / 1_000_000)
+        if bytes < 1_000_000_000 {
+            return String(format: "%.1f MB", bytes / 1_000_000)
         }
-        return String(format: "%.1f GB", Double(size) / 1_000_000_000)
+        return String(format: "%.1f GB", bytes / 1_000_000_000)
     }
 
 }

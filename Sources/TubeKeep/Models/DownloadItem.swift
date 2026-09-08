@@ -41,6 +41,17 @@ enum AudioBitrate: String, CaseIterable, Equatable, Codable, Identifiable {
     var keepsOriginalM4A: Bool {
         self == .high
     }
+
+    /// 변환 시 AAC CBR 타겟. `--audio-quality 0`(최고 VBR)은 원본보다 훨씬 커지므로
+    /// 선택 비트레이트로 고정해 표시 용량과 실제 산출물을 일치시킨다.
+    var conversionQuality: String? {
+        switch self {
+        case .ultra: return "160K"
+        case .high: return nil
+        case .medium: return "70K"
+        case .low: return "50K"
+        }
+    }
 }
 
 struct DownloadItem: Identifiable, Equatable, Codable {

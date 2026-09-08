@@ -2,6 +2,13 @@
 
 ## v4.6 — 네이티브 디자인 리빌딩 2차 (macOS, T-1201~T-1205) 🚧
 
+### 오디오 용량 표시≒실제 + m4a 썸네일 내장 제외 (T-1214) ✅
+- **버그 1**: `--audio-quality 0`(최고 VBR)이 70k opus 원본을 고비트레이트 AAC로 재인코딩 → 표시(~23MB) vs 실제(143.6MB) 6배 차이. 그룹별 CBR 타겟 고정(초고 160K/중 70K/저 50K, 고=140 원본 그대로)으로 해결
+- **버그 2**: `--embed-thumbnail`이 내장 ffmpeg 9.0에서 실패(`Unable to embed using ffprobe & ffmpeg`) → ERROR 로그 + 0바이트 `.temp.m4a` 잔여. audioOnly(m4a)에서 썸네일 내장 제외 — 영상(mp4) 내장은 유지. 썸네일 다운로드 자체가 생략되어 더 빠름
+- **예상 용량**: 포맷 `filesize_approx`(원본 기준) 대신 `선택 비트레이트 × 영상 길이` 기반으로 변경 → Picker 표시가 실제 산출물과 일치
+- **정리 강화**: `cleanupPartialFiles`에 `.temp.` 패턴 추가 + 성공 경로에서도 같은 videoId 부산물 정리. 기존 잔여 `LIMS/...temp.m4a`(0B) 삭제
+- **파일**: DownloadManager.swift(변환 품질·내장 제외·성공경로 정리), DownloadItem.swift(conversionQuality), HomeView.swift(예상 용량)
+
 ### 오디오 품질(비트레이트) 선택 (T-1213) ✅
 - **요구**: "오디오만 추출" 시 최상 m4a(129k)로 고정되어 용량이 큼 → 품질 선택 필요
 - **추가**: 오디오 품질 그룹 Picker (기본 = **중간음질 70k**): 초고 160k / 고 129k / 중 70k / 저 50k
