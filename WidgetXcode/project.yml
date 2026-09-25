@@ -1,0 +1,22 @@
+name: WidgetXcode
+options:
+  bundleIdPrefix: com.borasarang
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+targets:
+  TubeKeepWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: ../Sources/TubeKeepWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.borasarang.tubekeep.widget
+        PRODUCT_NAME: TubeKeepWidget
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: ../Info-Widget.plist
+        CODE_SIGN_ENTITLEMENTS: ../Entitlements/TubeKeepWidget.entitlements
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: "YES"
+        SWIFT_VERSION: "6.0"

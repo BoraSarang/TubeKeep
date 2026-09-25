@@ -6,6 +6,9 @@ Releases/
 *.zip
 .DS_Store
 
+# xcodegen 생성물 (WidgetXcode.xcodeproj는 project.yml에서 생성)
+WidgetXcode/WidgetXcode.xcodeproj/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

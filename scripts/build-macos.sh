@@ -280,22 +280,24 @@ rm -rf "$INSTALL_DIR/$APP_NAME.app"
 cp -R "$MAIN_BUNDLE" "$INSTALL_DIR/$APP_NAME.app"
 echo "✅ Installed: $INSTALL_DIR/$APP_NAME.app"
 
-# Build widget extension
+# Build widget extension — Xcode(xcodegen)로 빌드해야 WidgetKit bootstrap 크래시(assumeIsolated SIGTRAP) 없음
+# swift build(SPM)로 만든 executable은 extension 프로세스가 뜰 때마다 크래시하여 위젯 갤러리에 표시되지 않음
 WIDGET_NAME="TubeKeepWidget"
-echo "🔨 Building widget extension..."
-if [ "$MODE" = "debug" ]; then
-    swift build -c debug --target "$WIDGET_NAME"
-    WIDGET_EXEC="$BUILD_DIR/debug/$WIDGET_NAME"
-else
-    swift build -c release --target "$WIDGET_NAME"
-    WIDGET_EXEC="$BUILD_DIR/release/$WIDGET_NAME"
+echo "🔨 Building widget extension (Xcode)..."
+WIDGET_DIR="$PROJECT_DIR/WidgetXcode"
+if [ "$MODE" = "debug" ]; then XCODE_CFG="Debug"; else XCODE_CFG="Release"; fi
+if [ ! -d "$WIDGET_DIR/WidgetXcode.xcodeproj" ]; then
+    (cd "$WIDGET_DIR" && xcodegen generate >/dev/null)
 fi
+(cd "$WIDGET_DIR" && xcodebuild \
+    -project WidgetXcode.xcodeproj -target "$WIDGET_NAME" -configuration "$XCODE_CFG" build \
+    CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" >/dev/null)
+WIDGET_APPX="$WIDGET_DIR/build/$XCODE_CFG/$WIDGET_NAME.appex"
 WIDGET_BUNDLE="$INSTALL_DIR/$APP_NAME.app/Contents/PlugIns/$WIDGET_NAME.appex"
-mkdir -p "$WIDGET_BUNDLE/Contents/MacOS"
-cp "$WIDGET_EXEC" "$WIDGET_BUNDLE/Contents/MacOS/$WIDGET_NAME"
-cp "$PROJECT_DIR/Info-Widget.plist" "$WIDGET_BUNDLE/Contents/Info.plist"
-codesign --force --sign "$CODE_SIGN_IDENTITY" --entitlements "$PROJECT_DIR/Entitlements/TubeKeepWidget.entitlements" "$WIDGET_BUNDLE" 2>/dev/null || true
-echo "📦 Widget embedded: $WIDGET_BUNDLE"
+rm -rf "$WIDGET_BUNDLE"
+mkdir -p "$INSTALL_DIR/$APP_NAME.app/Contents/PlugIns"
+cp -R "$WIDGET_APPX" "$WIDGET_BUNDLE"
+echo "📦 Widget embedded (Xcode build): $WIDGET_BUNDLE"
 
 codesign --force --sign "$CODE_SIGN_IDENTITY" --entitlements "$PROJECT_DIR/Entitlements/TubeKeep.entitlements" "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
 
