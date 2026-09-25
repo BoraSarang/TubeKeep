@@ -33,10 +33,7 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "TubeKeepWidget",
-            swiftSettings: [
-                .swiftLanguageMode(.v5),
-            ]
+            name: "TubeKeepWidget"
         ),
         .testTarget(
             name: "TubeKeepTests",
